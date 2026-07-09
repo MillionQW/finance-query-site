@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import * as echarts from 'echarts/core';
-import { GridComponent, TooltipComponent } from 'echarts/components';
+import { AxisPointerComponent, GridComponent, TooltipComponent } from 'echarts/components';
 import { LineChart } from 'echarts/charts';
 import { CanvasRenderer } from 'echarts/renderers';
 import type { ECharts, EChartsCoreOption } from 'echarts/core';
 import type { FinancialStatements, StatementTable } from '../types/finance';
 
-echarts.use([GridComponent, TooltipComponent, LineChart, CanvasRenderer]);
+echarts.use([AxisPointerComponent, GridComponent, TooltipComponent, LineChart, CanvasRenderer]);
 
 type MetricKind = 'percent' | 'times';
 
@@ -71,13 +71,28 @@ const chart = shallowRef<ECharts | null>(null);
 const NET_PROFIT_ALIASES = ['归属于母公司股东的净利润', '股东应占溢利', '股东应占盈利', '净利润', '除税后溢利', 'PARENT NETPROFIT', 'NETPROFIT'];
 const EQUITY_ALIASES = ['归属于母公司股东权益', '股东权益', '所有者权益合计', '总权益', '净资产', 'PARENT EQUITY BALANCE', 'EQUITY BALANCE'];
 const TOTAL_ASSET_ALIASES = ['资产总计', '总资产', 'TOTAL ASSETS'];
+const CURRENT_ASSET_ALIASES = ['流动资产合计', '流动资产', 'CURRENT ASSET BALANCE', 'TOTAL CURRENT ASSETS'];
+const CURRENT_LIABILITY_ALIASES = ['流动负债合计', '流动负债', 'CURRENT LIAB BALANCE', 'TOTAL CURRENT LIAB', 'TOTAL CURRENT LIABILITIES'];
+const INVENTORY_ALIASES = ['存货', 'INVENTORY'];
+const CASH_ALIASES = ['现金及等价物', '现金及现金等价物', '现金和现金等价物', '货币资金', '现金', 'CASH AND CASH EQUIVALENTS', 'CASH EQUIVALENTS', 'CASH', 'END CCE'];
 const REVENUE_ALIASES = ['营业收入', '营业总收入', '营业额', '营运收入', '收益', '收入', 'OPERATE INCOME', 'TOTAL OPERATE INCOME'];
+const OPERATING_PROFIT_ALIASES = ['营业利润', '经营溢利', '经营利润', '营运利润', 'OPERATE PROFIT', 'OPERATE PROFIT BALANCE'];
 const RECEIVABLE_ALIASES = ['应收账款', '应收帐款', '应收票据及应收账款', '应收账款及应收票据', 'ACCOUNTS RECE', 'NOTE ACCOUNTS RECE', '应收款项'];
 const GROSS_PROFIT_ALIASES = ['毛利', '毛利润', 'GROSS PROFIT'];
-const OPERATING_COST_ALIASES = ['营业成本', 'OPERATE COST'];
+const OPERATING_COST_ALIASES = ['营业成本', '销售成本', '收入成本', '主营业务成本', 'OPERATE COST', 'COST OF SALES', 'COST OF REVENUE'];
 const SELLING_EXPENSE_ALIASES = ['销售费用', '销售及分销费用', 'SALE EXPENSE'];
 const ADMIN_EXPENSE_ALIASES = ['管理费用', '行政开支', 'MANAGE EXPENSE'];
 const FINANCE_EXPENSE_ALIASES = ['财务费用', '融资成本', 'FINANCE EXPENSE'];
+const NET_ASSET_ALIASES = ['净资产', '所有者权益合计', '股东权益', '总权益', '归属于母公司股东权益', 'PARENT EQUITY BALANCE', 'EQUITY BALANCE'];
+const FIXED_ASSET_ALIASES = ['固定资产', '固定资产净值', '物业厂房及设备', '物业厂房设备', 'FIXED ASSET', 'PROPERTY PLANT EQUIPMENT', 'PROPERTY PLANT AND EQUIPMENT'];
+const INTEREST_BEARING_DEBT_GROUPS = [
+  { label: '短期借款/贷款', aliases: ['短期借款', '短期贷款', 'SHORT LOAN', 'SHORT BORROWING', 'SHORT TERM BORROWING'] },
+  { label: '长期借款/贷款', aliases: ['长期借款', '长期贷款', 'LONG LOAN', 'LONG BORROWING', 'LONG TERM BORROWING'] },
+  { label: '应付债券', aliases: ['应付债券', '发行债券', 'BOND PAYABLE', 'BONDS PAYABLE'] },
+  { label: '租赁负债', aliases: ['租赁负债', '融资租赁负债', 'LEASE LIAB', 'LEASE LIABILITY'] },
+  { label: '一年内到期非流动负债', aliases: ['一年内到期的非流动负债', '一年内到期非流动负债', 'NONCURRENT LIAB 1YEAR'] }
+];
+const INTEREST_BEARING_DEBT_ALIASES = INTEREST_BEARING_DEBT_GROUPS.flatMap((group) => group.aliases);
 
 const definitions: MetricDefinition[] = [
   {
@@ -113,6 +128,57 @@ const definitions: MetricDefinition[] = [
       )
   },
   {
+    key: 'currentRatio',
+    label: '流动比率',
+    formula: '流动资产 / 流动负债',
+    kind: 'times',
+    description: '观察短期资产覆盖短期债务的能力。',
+    requirements: [
+      { label: '流动资产', table: 'balance', aliases: CURRENT_ASSET_ALIASES },
+      { label: '流动负债', table: 'balance', aliases: CURRENT_LIABILITY_ALIASES }
+    ],
+    calculate: (context, year) =>
+      safeDivide(
+        rowValue(context.balance, year, CURRENT_ASSET_ALIASES),
+        rowValue(context.balance, year, CURRENT_LIABILITY_ALIASES)
+      )
+  },
+  {
+    key: 'quickRatio',
+    label: '速动比率',
+    formula: '(流动资产 - 存货) / 流动负债',
+    kind: 'times',
+    description: '剔除存货后观察短期偿债能力。',
+    requirements: [
+      { label: '流动资产', table: 'balance', aliases: CURRENT_ASSET_ALIASES },
+      { label: '存货', table: 'balance', aliases: INVENTORY_ALIASES },
+      { label: '流动负债', table: 'balance', aliases: CURRENT_LIABILITY_ALIASES }
+    ],
+    calculate: (context, year) => {
+      const currentAssets = rowValue(context.balance, year, CURRENT_ASSET_ALIASES);
+      const inventory = rowValue(context.balance, year, INVENTORY_ALIASES);
+      const currentLiabilities = rowValue(context.balance, year, CURRENT_LIABILITY_ALIASES);
+      const quickAssets = currentAssets !== null && inventory !== null ? currentAssets - inventory : null;
+      return safeDivide(quickAssets, currentLiabilities);
+    }
+  },
+  {
+    key: 'cashDebtRatio',
+    label: '现金债务比',
+    formula: '现金及现金等价物 / 有息负债',
+    kind: 'times',
+    description: '观察现金对有息债务的覆盖倍数。',
+    requirements: [
+      { label: '现金及现金等价物', table: 'balance', aliases: CASH_ALIASES },
+      { label: '有息负债', table: 'balance', aliases: INTEREST_BEARING_DEBT_ALIASES }
+    ],
+    calculate: (context, year) =>
+      safeDivide(
+        rowValue(context.balance, year, CASH_ALIASES),
+        sumRows(context.balance, year, INTEREST_BEARING_DEBT_GROUPS).total
+      )
+  },
+  {
     key: 'receivableTurnover',
     label: '应收账款周转率',
     formula: '营业收入 / 应收账款平均余额',
@@ -126,6 +192,39 @@ const definitions: MetricDefinition[] = [
       safeDivide(
         rowValue(context.income, year, REVENUE_ALIASES),
         averageBalance(context.balance, year, yearIndex, RECEIVABLE_ALIASES)
+      )
+  },
+  {
+    key: 'inventoryTurnover',
+    label: '存货周转率',
+    formula: '营业成本 / 存货平均余额',
+    kind: 'times',
+    description: '观察存货转化为销售成本的速度。',
+    requirements: [
+      { label: '营业成本或毛利润', table: 'income', aliases: [...OPERATING_COST_ALIASES, ...GROSS_PROFIT_ALIASES] },
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES },
+      { label: '存货', table: 'balance', aliases: INVENTORY_ALIASES }
+    ],
+    calculate: (context, year, yearIndex) =>
+      safeDivide(
+        operatingCostDetails(context, year).costAbs,
+        averageBalance(context.balance, year, yearIndex, INVENTORY_ALIASES)
+      )
+  },
+  {
+    key: 'fixedAssetTurnover',
+    label: '固定资产周转率',
+    formula: '营业收入 / 固定资产净值',
+    kind: 'times',
+    description: '观察固定资产带来收入的效率。',
+    requirements: [
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES },
+      { label: '固定资产净值', table: 'balance', aliases: FIXED_ASSET_ALIASES }
+    ],
+    calculate: (context, year) =>
+      safeDivide(
+        rowValue(context.income, year, REVENUE_ALIASES),
+        rowValue(context.balance, year, FIXED_ASSET_ALIASES)
       )
   },
   {
@@ -149,6 +248,38 @@ const definitions: MetricDefinition[] = [
     }
   },
   {
+    key: 'operatingMargin',
+    label: '营业利润率',
+    formula: '营业利润 / 营业收入',
+    kind: 'percent',
+    description: '观察营业利润对收入的留存比例。',
+    requirements: [
+      { label: '营业利润', table: 'income', aliases: OPERATING_PROFIT_ALIASES },
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+    ],
+    calculate: (context, year) =>
+      safeDivide(
+        rowValue(context.income, year, OPERATING_PROFIT_ALIASES),
+        rowValue(context.income, year, REVENUE_ALIASES)
+      )
+  },
+  {
+    key: 'netMargin',
+    label: '净利率',
+    formula: '净利润 / 营业收入',
+    kind: 'percent',
+    description: '观察净利润对收入的留存比例。',
+    requirements: [
+      { label: '净利润', table: 'income', aliases: NET_PROFIT_ALIASES },
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+    ],
+    calculate: (context, year) =>
+      safeDivide(
+        rowValue(context.income, year, NET_PROFIT_ALIASES),
+        rowValue(context.income, year, REVENUE_ALIASES)
+      )
+  },
+  {
     key: 'expenseRatio',
     label: '费用率',
     formula: '(销售费用 + 管理费用 + 财务费用) / 营业收入',
@@ -167,6 +298,66 @@ const definitions: MetricDefinition[] = [
       const revenue = rowValue(context.income, year, REVENUE_ALIASES);
       return safeDivide(sumAbsolute([selling, admin, finance]), revenue);
     }
+  },
+  {
+    key: 'revenueGrowth',
+    label: '营业收入增长率',
+    formula: '(本期营业收入 - 上期营业收入) / 上期营业收入',
+    kind: 'percent',
+    description: '观察营业收入同比增长速度。',
+    requirements: [
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+    ],
+    calculate: (context, year, yearIndex) =>
+      growthRate(
+        rowValue(context.income, year, REVENUE_ALIASES),
+        previousRowValue(context, context.income, yearIndex, REVENUE_ALIASES)
+      )
+  },
+  {
+    key: 'operatingProfitGrowth',
+    label: '营业利润增长率',
+    formula: '(本期营业利润 - 上期营业利润) / 上期营业利润',
+    kind: 'percent',
+    description: '观察营业利润同比增长速度。',
+    requirements: [
+      { label: '营业利润', table: 'income', aliases: OPERATING_PROFIT_ALIASES }
+    ],
+    calculate: (context, year, yearIndex) =>
+      growthRate(
+        rowValue(context.income, year, OPERATING_PROFIT_ALIASES),
+        previousRowValue(context, context.income, yearIndex, OPERATING_PROFIT_ALIASES)
+      )
+  },
+  {
+    key: 'assetGrowth',
+    label: '资产增长率',
+    formula: '(本期资产 - 上期资产) / 上期资产',
+    kind: 'percent',
+    description: '观察资产规模同比增长速度。',
+    requirements: [
+      { label: '总资产', table: 'balance', aliases: TOTAL_ASSET_ALIASES }
+    ],
+    calculate: (context, year, yearIndex) =>
+      growthRate(
+        rowValue(context.balance, year, TOTAL_ASSET_ALIASES),
+        previousRowValue(context, context.balance, yearIndex, TOTAL_ASSET_ALIASES)
+      )
+  },
+  {
+    key: 'netAssetGrowth',
+    label: '净资产增长率',
+    formula: '(本期净资产 - 上期净资产) / 上期净资产',
+    kind: 'percent',
+    description: '观察净资产规模同比增长速度。',
+    requirements: [
+      { label: '净资产', table: 'balance', aliases: NET_ASSET_ALIASES }
+    ],
+    calculate: (context, year, yearIndex) =>
+      growthRate(
+        rowValue(context.balance, year, NET_ASSET_ALIASES),
+        previousRowValue(context, context.balance, yearIndex, NET_ASSET_ALIASES)
+      )
   }
 ];
 
@@ -216,10 +407,16 @@ const chartOption = computed<EChartsCoreOption>(() => {
   return {
     grid: { top: 18, right: 18, bottom: 30, left: 48 },
     tooltip: {
+      show: true,
       trigger: 'axis',
+      triggerOn: 'mousemove|click',
       confine: true,
       extraCssText: 'max-width: 380px; white-space: normal;',
       formatter: (params: unknown) => formatTooltip(params, result, displayPoints)
+    },
+    axisPointer: {
+      type: 'line',
+      snap: true
     },
     xAxis: {
       type: 'category',
@@ -303,6 +500,80 @@ function averageBalance(
   return (current + previous) / 2;
 }
 
+function previousRowValue(
+  context: MetricContext,
+  table: StatementTable | undefined,
+  yearIndex: number,
+  aliases: string[]
+): number | null {
+  const previousYear = context.statements.years[yearIndex + 1];
+  return previousYear ? rowValue(table, previousYear, aliases) : null;
+}
+
+function growthRate(current: number | null, previous: number | null): number | null {
+  if (current === null || previous === null || previous === 0) return null;
+  return (current - previous) / Math.abs(previous);
+}
+
+function absoluteValue(value: number | null): number | null {
+  return value === null ? null : Math.abs(value);
+}
+
+function operatingCostDetails(context: MetricContext, year: string) {
+  const directCost = rowValue(context.income, year, OPERATING_COST_ALIASES);
+  if (directCost !== null) {
+    const costAbs = absoluteValue(directCost);
+    const rows: FormulaDetail[] = [
+      { label: '营业成本/销售成本', value: directCost, note: '直接科目' }
+    ];
+    if (directCost < 0) {
+      rows.push({ label: '营业成本绝对值', value: costAbs });
+    }
+    return { costAbs, rows };
+  }
+
+  const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+  const grossProfit = rowValue(context.income, year, GROSS_PROFIT_ALIASES);
+  const derivedCost = revenue !== null && grossProfit !== null ? revenue - grossProfit : null;
+  const costAbs = absoluteValue(derivedCost);
+
+  return {
+    costAbs,
+    rows: [
+      { label: '营业收入', value: revenue },
+      { label: '毛利润', value: grossProfit },
+      { label: '推导营业成本', value: derivedCost, note: '营业收入 - 毛利润' }
+    ]
+  };
+}
+
+function sumRows(
+  table: StatementTable | undefined,
+  year: string,
+  groups: Array<{ label: string; aliases: string[] }>
+) {
+  const rows: FormulaDetail[] = [];
+  let total = 0;
+  let hasValue = false;
+
+  for (const group of groups) {
+    const matches = findRows(table, group.aliases);
+    for (const match of matches) {
+      const value = toNumber(match.values[year]);
+      if (value === null) continue;
+      const normalizedValue = Math.abs(value);
+      rows.push({ label: group.label, value: normalizedValue, note: match.item });
+      total += normalizedValue;
+      hasValue = true;
+    }
+  }
+
+  return {
+    total: hasValue ? total : null,
+    rows
+  };
+}
+
 function metricDetails(
   definition: MetricDefinition,
   context: MetricContext,
@@ -339,6 +610,50 @@ function metricDetails(
     };
   }
 
+  if (definition.key === 'currentRatio') {
+    const currentAssets = rowValue(context.balance, year, CURRENT_ASSET_ALIASES);
+    const currentLiabilities = rowValue(context.balance, year, CURRENT_LIABILITY_ALIASES);
+    const value = safeDivide(currentAssets, currentLiabilities);
+    return {
+      rows: [
+        { label: '流动资产', value: currentAssets },
+        { label: '流动负债', value: currentLiabilities }
+      ],
+      expression: `${formatRawValue(currentAssets)} / ${formatRawValue(currentLiabilities)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'quickRatio') {
+    const currentAssets = rowValue(context.balance, year, CURRENT_ASSET_ALIASES);
+    const inventory = rowValue(context.balance, year, INVENTORY_ALIASES);
+    const currentLiabilities = rowValue(context.balance, year, CURRENT_LIABILITY_ALIASES);
+    const quickAssets = currentAssets !== null && inventory !== null ? currentAssets - inventory : null;
+    const value = safeDivide(quickAssets, currentLiabilities);
+    return {
+      rows: [
+        { label: '流动资产', value: currentAssets },
+        { label: '存货', value: inventory },
+        { label: '速动资产', value: quickAssets, note: '流动资产 - 存货' },
+        { label: '流动负债', value: currentLiabilities }
+      ],
+      expression: `${formatRawValue(quickAssets)} / ${formatRawValue(currentLiabilities)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'cashDebtRatio') {
+    const cash = rowValue(context.balance, year, CASH_ALIASES);
+    const interestBearingDebt = sumRows(context.balance, year, INTEREST_BEARING_DEBT_GROUPS);
+    const value = safeDivide(cash, interestBearingDebt.total);
+    return {
+      rows: [
+        { label: '现金及现金等价物', value: cash },
+        ...interestBearingDebt.rows,
+        { label: '有息负债合计', value: interestBearingDebt.total, note: '借款/贷款/债券/租赁等合计' }
+      ],
+      expression: `${formatRawValue(cash)} / ${formatRawValue(interestBearingDebt.total)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
   if (definition.key === 'receivableTurnover') {
     const revenue = rowValue(context.income, year, REVENUE_ALIASES);
     const receivable = averageBalanceDetails(context, context.balance, year, yearIndex, RECEIVABLE_ALIASES);
@@ -351,6 +666,34 @@ function metricDetails(
         { label: '应收账款平均余额', value: receivable.average, note: '(期初 + 期末) / 2' }
       ],
       expression: `${formatRawValue(revenue)} / ${formatRawValue(receivable.average)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'inventoryTurnover') {
+    const cost = operatingCostDetails(context, year);
+    const inventory = averageBalanceDetails(context, context.balance, year, yearIndex, INVENTORY_ALIASES);
+    const value = safeDivide(cost.costAbs, inventory.average);
+    return {
+      rows: [
+        ...cost.rows,
+        { label: `${year} 存货`, value: inventory.current, note: '期末' },
+        { label: `${inventory.previousYear ?? '上年'} 存货`, value: inventory.previous, note: '期初' },
+        { label: '存货平均余额', value: inventory.average, note: '(期初 + 期末) / 2' }
+      ],
+      expression: `${formatRawValue(cost.costAbs)} / ${formatRawValue(inventory.average)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'fixedAssetTurnover') {
+    const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+    const fixedAssets = rowValue(context.balance, year, FIXED_ASSET_ALIASES);
+    const value = safeDivide(revenue, fixedAssets);
+    return {
+      rows: [
+        { label: '营业收入', value: revenue },
+        { label: '固定资产净值', value: fixedAssets }
+      ],
+      expression: `${formatRawValue(revenue)} / ${formatRawValue(fixedAssets)} = ${formatMetricValue(value, definition.kind)}`
     };
   }
 
@@ -379,6 +722,33 @@ function metricDetails(
     };
   }
 
+  if (definition.key === 'operatingMargin') {
+    const operatingProfit = rowValue(context.income, year, OPERATING_PROFIT_ALIASES);
+    const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+    const value = safeDivide(operatingProfit, revenue);
+    return {
+      rows: [
+        { label: '营业利润', value: operatingProfit },
+        { label: '营业收入', value: revenue }
+      ],
+      expression: `${formatRawValue(operatingProfit)} / ${formatRawValue(revenue)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'netMargin') {
+    const netProfit = rowValue(context.income, year, NET_PROFIT_ALIASES);
+    const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+    const value = safeDivide(netProfit, revenue);
+    return {
+      rows: [
+        { label: '净利润', value: netProfit },
+        { label: '营业收入', value: revenue }
+      ],
+      expression: `${formatRawValue(netProfit)} / ${formatRawValue(revenue)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'expenseRatio') {
   const revenue = rowValue(context.income, year, REVENUE_ALIASES);
   const selling = rowValue(context.income, year, SELLING_EXPENSE_ALIASES);
   const admin = rowValue(context.income, year, ADMIN_EXPENSE_ALIASES);
@@ -394,6 +764,28 @@ function metricDetails(
       { label: '三费合计', value: threeFees, note: '|销售| + |管理| + |财务|' }
     ],
     expression: `${formatRawValue(threeFees)} / ${formatRawValue(revenue)} = ${formatMetricValue(value, definition.kind)}`
+  };
+  }
+
+  if (definition.key === 'revenueGrowth') {
+    return growthDetails(definition, context, year, yearIndex, '营业收入', context.income, REVENUE_ALIASES);
+  }
+
+  if (definition.key === 'operatingProfitGrowth') {
+    return growthDetails(definition, context, year, yearIndex, '营业利润', context.income, OPERATING_PROFIT_ALIASES);
+  }
+
+  if (definition.key === 'assetGrowth') {
+    return growthDetails(definition, context, year, yearIndex, '总资产', context.balance, TOTAL_ASSET_ALIASES);
+  }
+
+  if (definition.key === 'netAssetGrowth') {
+    return growthDetails(definition, context, year, yearIndex, '净资产', context.balance, NET_ASSET_ALIASES);
+  }
+
+  return {
+    rows: [],
+    expression: '-'
   };
 }
 
@@ -412,6 +804,30 @@ function averageBalanceDetails(
   return { current, previous, previousYear, average };
 }
 
+function growthDetails(
+  definition: MetricDefinition,
+  context: MetricContext,
+  year: string,
+  yearIndex: number,
+  label: string,
+  table: StatementTable | undefined,
+  aliases: string[]
+): FormulaDetails {
+  const current = rowValue(table, year, aliases);
+  const previousYear = context.statements.years[yearIndex + 1];
+  const previous = previousYear ? rowValue(table, previousYear, aliases) : null;
+  const change = current !== null && previous !== null ? current - previous : null;
+  const value = growthRate(current, previous);
+  return {
+    rows: [
+      { label: `${year} ${label}`, value: current, note: '本期' },
+      { label: `${previousYear ?? '上期'} ${label}`, value: previous, note: '上期' },
+      { label: `${label}变动额`, value: change, note: '本期 - 上期' }
+    ],
+    expression: `(${formatRawValue(current)} - ${formatRawValue(previous)}) / ${formatRawValue(previous)} = ${formatMetricValue(value, definition.kind)}`
+  };
+}
+
 function findRow(table: StatementTable | undefined, aliases: string[]) {
   if (!table) return undefined;
   const normalizedAliases = aliases.map(normalizeLabel);
@@ -425,6 +841,15 @@ function findRow(table: StatementTable | undefined, aliases: string[]) {
   return rows.find(({ item }) => {
     return normalizedAliases.some((alias) => alias.length >= 6 && item.startsWith(alias));
   })?.row;
+}
+
+function findRows(table: StatementTable | undefined, aliases: string[]) {
+  if (!table) return [];
+  const normalizedAliases = aliases.map(normalizeLabel);
+  return table.rows.filter((row) => {
+    const item = normalizeLabel(row.item);
+    return normalizedAliases.some((alias) => item === alias || (alias.length >= 6 && item.startsWith(alias)));
+  });
 }
 
 function missingRequirements(definition: MetricDefinition, context: MetricContext): string[] {
