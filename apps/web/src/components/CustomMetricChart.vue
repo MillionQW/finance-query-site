@@ -562,7 +562,7 @@ function sumRows(
       const value = toNumber(match.values[year]);
       if (value === null) continue;
       const normalizedValue = Math.abs(value);
-      rows.push({ label: group.label, value: normalizedValue, note: match.item });
+      rows.push({ label: group.label, value: normalizedValue, note: match.sourceItem ?? match.item });
       total += normalizedValue;
       hasValue = true;
     }

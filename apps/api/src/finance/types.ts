@@ -17,6 +17,7 @@ export interface FavoriteCompany extends CompanySearchResult {
 
 export interface StatementRow {
   item: string;
+  sourceItem?: string | null;
   values: Record<string, number | string | null>;
 }
 

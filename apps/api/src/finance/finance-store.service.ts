@@ -172,7 +172,11 @@ export class FinanceStoreService implements OnModuleDestroy {
       return null;
     }
 
-    return JSON.parse(row.payload_json) as FinancialStatements;
+    const payload = JSON.parse(row.payload_json) as FinancialStatements;
+    if (!this.hasStatementSourceItems(payload)) {
+      return null;
+    }
+    return payload;
   }
 
   saveStatements(payload: FinancialStatements, yearsRequested: number): void {
@@ -287,17 +291,17 @@ export class FinanceStoreService implements OnModuleDestroy {
     const insertRow = this.db.prepare(
       `
       INSERT INTO financial_statement_rows (
-        snapshot_id, market, symbol, statement_type, item, item_order, values_json
+        snapshot_id, market, symbol, statement_type, item, source_item, item_order, values_json
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `
     );
     const insertValue = this.db.prepare(
       `
       INSERT INTO financial_statement_values (
-        snapshot_id, market, symbol, statement_type, item, year, value_num, value_text, unit, source, fetched_at
+        snapshot_id, market, symbol, statement_type, item, source_item, year, value_num, value_text, unit, source, fetched_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     );
     const insertMetric = this.db.prepare(
@@ -319,6 +323,7 @@ export class FinanceStoreService implements OnModuleDestroy {
           symbol,
           table.type,
           row.item,
+          row.sourceItem ?? row.item,
           rowIndex,
           JSON.stringify(row.values)
         );
@@ -331,6 +336,7 @@ export class FinanceStoreService implements OnModuleDestroy {
             symbol,
             table.type,
             row.item,
+            row.sourceItem ?? row.item,
             year,
             typeof value === 'number' ? value : null,
             typeof value === 'string' ? value : null,
@@ -368,6 +374,12 @@ export class FinanceStoreService implements OnModuleDestroy {
       `
       )
       .run(snapshotId, market, symbol, yearsRequested, payload.source, payload.fetchedAt);
+  }
+
+  private hasStatementSourceItems(payload: FinancialStatements): boolean {
+    return payload.tables.every((table) =>
+      table.rows.every((row) => typeof row.sourceItem === 'string' && row.sourceItem.length > 0)
+    );
   }
 
   private initializeSchema(): void {
@@ -439,6 +451,7 @@ export class FinanceStoreService implements OnModuleDestroy {
         symbol TEXT NOT NULL,
         statement_type TEXT NOT NULL,
         item TEXT NOT NULL,
+        source_item TEXT,
         item_order INTEGER NOT NULL,
         values_json TEXT NOT NULL
       );
@@ -453,6 +466,7 @@ export class FinanceStoreService implements OnModuleDestroy {
         symbol TEXT NOT NULL,
         statement_type TEXT NOT NULL,
         item TEXT NOT NULL,
+        source_item TEXT,
         year TEXT NOT NULL,
         value_num REAL,
         value_text TEXT,
@@ -495,6 +509,9 @@ export class FinanceStoreService implements OnModuleDestroy {
         stored_at TEXT NOT NULL
       );
     `);
+
+    this.ensureColumn('financial_statement_rows', 'source_item', 'TEXT');
+    this.ensureColumn('financial_statement_values', 'source_item', 'TEXT');
   }
 
   private normalizeCompany(company: CompanySearchResult): CompanySearchResult {
@@ -536,6 +553,14 @@ export class FinanceStoreService implements OnModuleDestroy {
       favoritedAt: row.favorited_at,
       updatedAt: row.updated_at
     };
+  }
+
+  private ensureColumn(tableName: string, columnName: string, declaration: string): void {
+    const columns = this.db.prepare(`PRAGMA table_info(${tableName})`).all();
+    const exists = columns.some((column: any) => column.name === columnName);
+    if (!exists) {
+      this.db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${declaration}`);
+    }
   }
 
   private withTransaction<T>(callback: () => T): T {

@@ -9,6 +9,13 @@ const props = defineProps<{
 
 const visibleRows = computed(() => props.table?.rows ?? []);
 
+function sourceTitle(row: { item: string; sourceItem?: string | null }): string | undefined {
+  if (!row.sourceItem || row.sourceItem === row.item) {
+    return undefined;
+  }
+  return row.sourceItem;
+}
+
 function formatValue(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === '') {
     return '-';
@@ -32,8 +39,16 @@ function formatValue(value: number | string | null | undefined): string {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="row in visibleRows" :key="row.item">
-          <th class="item-col">{{ row.item }}</th>
+        <tr v-for="row in visibleRows" :key="`${row.item}-${row.sourceItem ?? ''}`">
+          <th
+            class="item-col"
+            :class="{ 'has-source-title': sourceTitle(row) }"
+            :title="sourceTitle(row)"
+            :tabindex="sourceTitle(row) ? 0 : undefined"
+          >
+            <span class="item-name">{{ row.item }}</span>
+            <span v-if="sourceTitle(row)" class="item-source-tooltip">{{ sourceTitle(row) }}</span>
+          </th>
           <td v-for="year in activeYears" :key="year">{{ formatValue(row.values[year]) }}</td>
         </tr>
       </tbody>

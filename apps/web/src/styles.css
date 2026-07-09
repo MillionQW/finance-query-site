@@ -854,8 +854,64 @@ button {
   text-align: left;
   color: #172033;
   background: #fbfcff;
+  overflow: visible;
+}
+
+.statement-table thead .item-col {
+  z-index: 4;
+}
+
+.statement-table tbody .item-col {
+  z-index: 3;
+}
+
+.statement-table tbody .item-col.has-source-title {
+  cursor: help;
+}
+
+.statement-table tbody .item-col.has-source-title:hover,
+.statement-table tbody .item-col.has-source-title:focus {
+  z-index: 8;
+  outline: 2px solid rgba(37, 99, 235, 0.18);
+  outline-offset: -2px;
+}
+
+.statement-table .item-name {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statement-table .item-source-tooltip {
+  pointer-events: none;
+  position: absolute;
+  left: 10px;
+  top: calc(100% - 2px);
+  z-index: 9;
+  max-width: 340px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: #334155;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  opacity: 0;
+  overflow-wrap: anywhere;
+  transform: translateY(-4px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+  white-space: normal;
+}
+
+.statement-table tbody .item-col.has-source-title:hover .item-source-tooltip,
+.statement-table tbody .item-col.has-source-title:focus .item-source-tooltip {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .statement-table tbody tr:nth-child(even) td,
