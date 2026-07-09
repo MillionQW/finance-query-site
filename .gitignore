@@ -1,0 +1,22 @@
+node_modules
+dist
+.env
+.venv
+__pycache__
+.pytest_cache
+*.log
+.DS_Store
+
+# Local runtime data
+data/*
+!data/.gitkeep
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+*.db-shm
+*.db-wal
+server.out.log
+server.err.log
+verification-*.png
+design/
