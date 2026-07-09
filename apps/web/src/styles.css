@@ -607,6 +607,186 @@ button {
   overflow: visible;
 }
 
+.custom-metric-panel {
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.custom-metric-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.custom-metric-head h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.custom-metric-head > strong {
+  color: var(--blue);
+  font-size: 26px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.metric-selector {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.metric-selector button {
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #334155;
+  background: var(--surface-soft);
+  text-align: left;
+}
+
+.metric-selector button.active {
+  border-color: rgba(37, 99, 235, 0.42);
+  color: var(--blue);
+  background: #eff6ff;
+}
+
+.metric-selector span,
+.metric-selector strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-selector span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.metric-selector strong {
+  margin-top: 8px;
+  font-size: 17px;
+}
+
+.custom-chart {
+  width: 100%;
+  height: 300px;
+  margin-top: 16px;
+}
+
+.formula-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.formula-row span {
+  color: #334155;
+  font-weight: 800;
+}
+
+.formula-row small {
+  text-align: right;
+}
+
+.metric-warning {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #9a3412;
+  background: #fff7ed;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.metric-tooltip-content {
+  min-width: 260px;
+  color: #0f172a;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.metric-tooltip-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 7px;
+}
+
+.metric-tooltip-title strong {
+  font-size: 13px;
+}
+
+.metric-tooltip-title span {
+  color: var(--blue);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.metric-tooltip-formula {
+  color: #475569;
+  font-weight: 800;
+}
+
+.metric-tooltip-expression {
+  margin: 5px 0 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #1e3a8a;
+  background: #eff6ff;
+  font-weight: 800;
+}
+
+.metric-tooltip-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.metric-tooltip-content th,
+.metric-tooltip-content td {
+  padding: 4px 0;
+  border-top: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: top;
+}
+
+.metric-tooltip-content th {
+  padding-right: 14px;
+  color: #475569;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.metric-tooltip-content td:nth-child(2) {
+  color: #111827;
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.metric-tooltip-content td:nth-child(3) {
+  padding-left: 10px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
 .metric-cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -786,8 +966,29 @@ button {
   }
 
   .quote-grid,
+  .metric-selector,
   .metric-cards {
     grid-template-columns: 1fr;
+  }
+
+  .metric-selector {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .metric-selector button {
+    flex: 0 0 148px;
+  }
+
+  .custom-metric-head,
+  .formula-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .formula-row small {
+    text-align: left;
   }
 
   .toolbar {

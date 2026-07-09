@@ -11,6 +11,7 @@ import {
   TrendingUp
 } from 'lucide-vue-next';
 import CompanyRail from './components/CompanyRail.vue';
+import CustomMetricChart from './components/CustomMetricChart.vue';
 import MiniTrend from './components/MiniTrend.vue';
 import StatementTable from './components/StatementTable.vue';
 import { getFavorites, getStatements, removeFavorite, saveFavorite, searchCompanies } from './services/api';
@@ -390,6 +391,8 @@ onMounted(async () => {
             </article>
           </div>
         </div>
+
+        <CustomMetricChart :statements="statements" :active-years="activeYears" />
 
         <div v-if="statementLoading" class="loading-panel">正在通过 AKShare 拉取财报数据...</div>
 
