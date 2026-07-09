@@ -1,9 +1,17 @@
-import type { CompanySearchResult, FinancialStatements, Market, MarketFilter } from '../types/finance';
+import type { CompanySearchResult, FavoriteCompany, FinancialStatements, Market, MarketFilter } from '../types/finance';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
-async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`);
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (init?.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers
+  });
   if (!response.ok) {
     let message = `请求失败：${response.status}`;
     try {
@@ -33,4 +41,21 @@ export function getStatements(
     params.set('refresh', 'true');
   }
   return request<FinancialStatements>(`/finance/statements?${params.toString()}`);
+}
+
+export function getFavorites(): Promise<FavoriteCompany[]> {
+  return request<FavoriteCompany[]>('/favorites');
+}
+
+export function saveFavorite(company: CompanySearchResult): Promise<FavoriteCompany[]> {
+  return request<FavoriteCompany[]>('/favorites', {
+    method: 'POST',
+    body: JSON.stringify(company)
+  });
+}
+
+export function removeFavorite(market: Market, symbol: string): Promise<FavoriteCompany[]> {
+  return request<FavoriteCompany[]>(`/favorites/${market}/${encodeURIComponent(symbol)}`, {
+    method: 'DELETE'
+  });
 }

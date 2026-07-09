@@ -13,9 +13,10 @@ import {
 import CompanyRail from './components/CompanyRail.vue';
 import MiniTrend from './components/MiniTrend.vue';
 import StatementTable from './components/StatementTable.vue';
-import { getStatements, searchCompanies } from './services/api';
+import { getFavorites, getStatements, removeFavorite, saveFavorite, searchCompanies } from './services/api';
 import type {
   CompanySearchResult,
+  FavoriteCompany,
   FinancialStatements,
   MarketFilter,
   StatementType
@@ -40,7 +41,11 @@ const searchLoading = ref(false);
 const statementLoading = ref(false);
 const searchError = ref<string | null>(null);
 const statementError = ref<string | null>(null);
+const favorites = ref<FavoriteCompany[]>([]);
+const favoriteLoading = ref(false);
+const favoriteNotice = ref<string | null>(null);
 let searchTimer: number | undefined;
+let favoriteNoticeTimer: number | undefined;
 
 const activeTable = computed(() =>
   statements.value?.tables.find((table) => table.type === activeStatement.value)
@@ -51,6 +56,11 @@ const availableYears = computed(() => statements.value?.years ?? []);
 const activeYears = computed(() => {
   const chosen = selectedYears.value.length ? selectedYears.value : availableYears.value;
   return chosen.slice(0, 10);
+});
+
+const selectedIsFavorite = computed(() => {
+  if (!selectedCompany.value) return false;
+  return favorites.value.some((company) => companyKey(company) === companyKey(selectedCompany.value!));
 });
 
 const summaryCards = computed(() => {
@@ -87,6 +97,60 @@ function formatNumber(value: number | null): string {
 function formatDate(value?: string): string {
   if (!value) return '-';
   return new Date(value).toLocaleString('zh-CN', { hour12: false });
+}
+
+function companyKey(company: Pick<CompanySearchResult, 'market' | 'symbol'>): string {
+  return `${company.market}:${company.symbol}`;
+}
+
+function normalizeFavorite(company: CompanySearchResult): CompanySearchResult {
+  return {
+    market: company.market,
+    symbol: company.symbol,
+    displaySymbol: company.displaySymbol,
+    name: company.name,
+    source: company.source,
+    latestPrice: company.latestPrice ?? null,
+    changePercent: company.changePercent ?? null
+  };
+}
+
+async function loadFavorites(): Promise<void> {
+  try {
+    favorites.value = await getFavorites();
+  } catch (error) {
+    favorites.value = [];
+    showFavoriteNotice(error instanceof Error ? error.message : '收藏读取失败');
+  }
+}
+
+function showFavoriteNotice(message: string): void {
+  favoriteNotice.value = message;
+  window.clearTimeout(favoriteNoticeTimer);
+  favoriteNoticeTimer = window.setTimeout(() => {
+    favoriteNotice.value = null;
+  }, 1800);
+}
+
+async function toggleFavorite(): Promise<void> {
+  if (!selectedCompany.value || favoriteLoading.value) return;
+
+  const current = normalizeFavorite(selectedCompany.value);
+  const key = companyKey(current);
+  const alreadySaved = favorites.value.some((company) => companyKey(company) === key);
+
+  favoriteLoading.value = true;
+  try {
+    favorites.value = alreadySaved
+      ? await removeFavorite(current.market, current.symbol)
+      : await saveFavorite(current);
+
+    showFavoriteNotice(alreadySaved ? `已取消收藏 ${current.name}` : `已收藏 ${current.name}`);
+  } catch (error) {
+    showFavoriteNotice(error instanceof Error ? error.message : '收藏保存失败');
+  } finally {
+    favoriteLoading.value = false;
+  }
 }
 
 async function runSearch(): Promise<void> {
@@ -166,6 +230,7 @@ watch([query, market], () => {
 });
 
 onMounted(async () => {
+  await loadFavorites();
   await runSearch();
   if (selectedCompany.value) {
     await selectCompany(selectedCompany.value);
@@ -191,14 +256,25 @@ onMounted(async () => {
         <button class="ghost-button" type="button" title="刷新财报" @click="selectedCompany && selectCompany(selectedCompany, true)">
           <RefreshCw :size="17" />刷新
         </button>
-        <button class="ghost-button" type="button" title="收藏">
-          <Star :size="17" />收藏
+        <button
+          class="ghost-button"
+          :class="{ 'favorite-active': selectedIsFavorite }"
+          type="button"
+          :title="favoriteLoading ? '保存中' : selectedIsFavorite ? '取消收藏' : '收藏'"
+          :disabled="!selectedCompany || favoriteLoading"
+          @click="toggleFavorite"
+        >
+          <Star :size="17" />{{ favoriteLoading ? '保存中' : selectedIsFavorite ? '已收藏' : '收藏' }}
         </button>
         <button class="icon-button dark" type="button" title="设置">
           <Settings :size="17" />
         </button>
       </nav>
     </header>
+
+    <div v-if="favoriteNotice" class="favorite-toast" role="status">
+      {{ favoriteNotice }}
+    </div>
 
     <main class="workspace">
       <CompanyRail
@@ -213,6 +289,21 @@ onMounted(async () => {
       />
 
       <section class="content">
+        <div v-if="favorites.length" class="favorite-strip" aria-label="收藏公司">
+          <span>收藏</span>
+          <button
+            v-for="company in favorites"
+            :key="companyKey(company)"
+            :class="{ active: selectedCompany?.market === company.market && selectedCompany?.symbol === company.symbol }"
+            type="button"
+            @click="selectCompany(company)"
+          >
+            <Star :size="14" />
+            <strong>{{ company.name }}</strong>
+            <small>{{ company.displaySymbol }}</small>
+          </button>
+        </div>
+
         <div class="company-card">
           <div class="company-title">
             <span class="market-badge">{{ marketLabel(selectedCompany?.market) }}</span>

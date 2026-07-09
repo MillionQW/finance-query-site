@@ -1,6 +1,6 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { FinanceService } from './finance.service';
-import { SearchCompaniesDto, StatementQueryDto } from './dto';
+import { FavoriteCompanyDto, FavoriteIdentityDto, SearchCompaniesDto, StatementQueryDto } from './dto';
 
 @Controller()
 export class FinanceController {
@@ -28,6 +28,21 @@ export class FinanceController {
       query.years ?? 10,
       query.refresh ?? false
     );
+  }
+
+  @Get('favorites')
+  getFavorites() {
+    return this.finance.getFavorites();
+  }
+
+  @Post('favorites')
+  saveFavorite(@Body() body: FavoriteCompanyDto) {
+    return this.finance.saveFavorite(body);
+  }
+
+  @Delete('favorites/:market/:symbol')
+  removeFavorite(@Param() params: FavoriteIdentityDto) {
+    return this.finance.removeFavorite(params.market, params.symbol);
   }
 
   @Get('cache/stats')

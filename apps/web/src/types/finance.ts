@@ -12,6 +12,11 @@ export interface CompanySearchResult {
   changePercent?: number | null;
 }
 
+export interface FavoriteCompany extends CompanySearchResult {
+  favoritedAt: string;
+  updatedAt: string;
+}
+
 export interface StatementRow {
   item: string;
   values: Record<string, number | string | null>;

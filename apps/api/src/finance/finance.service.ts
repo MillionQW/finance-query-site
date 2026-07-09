@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { FinanceStoreService, normalizeSymbol } from './finance-store.service';
 import { PythonAkshareService } from './python-akshare.service';
-import { CompanySearchResult, FinancialStatements } from './types';
+import { CompanySearchResult, FavoriteCompany, FinancialStatements } from './types';
 import { Market } from './dto';
 
 @Injectable()
@@ -53,6 +53,18 @@ export class FinanceService {
     ]);
     this.store.saveStatements(payload, years);
     return payload;
+  }
+
+  getFavorites(): FavoriteCompany[] {
+    return this.store.getFavorites();
+  }
+
+  saveFavorite(company: CompanySearchResult): FavoriteCompany[] {
+    return this.store.saveFavorite(company);
+  }
+
+  removeFavorite(market: 'a' | 'hk', symbol: string): FavoriteCompany[] {
+    return this.store.removeFavorite(market, symbol);
   }
 
   getCacheStats() {

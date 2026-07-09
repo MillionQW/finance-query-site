@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, normalize, resolve } from 'node:path';
-import { CompanySearchResult, FinancialStatements, Market } from './types';
+import { CompanySearchResult, FavoriteCompany, FinancialStatements, Market } from './types';
 
 const nodeRequire = createRequire(__filename);
 const { DatabaseSync } = nodeRequire('node:sqlite') as {
@@ -86,6 +86,73 @@ export class FinanceStoreService implements OnModuleDestroy {
         });
       }
     });
+  }
+
+  getFavorites(): FavoriteCompany[] {
+    const rows = this.db
+      .prepare(
+        `
+        SELECT market, symbol, display_symbol, name, source, latest_price, change_percent,
+               favorited_at, updated_at
+        FROM favorite_companies
+        ORDER BY pinned_order DESC, favorited_at DESC
+      `
+      )
+      .all();
+
+    return rows.map((row: any) => this.toFavoriteCompany(row));
+  }
+
+  saveFavorite(company: CompanySearchResult): FavoriteCompany[] {
+    const normalized = this.normalizeCompany({
+      ...company,
+      source: company.source || 'favorite'
+    });
+
+    this.withTransaction(() => {
+      this.upsertCompanies([normalized]);
+      this.db
+        .prepare(
+          `
+          INSERT INTO favorite_companies (
+            market, symbol, display_symbol, name, source, latest_price, change_percent,
+            pinned_order, favorited_at, updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'))
+          ON CONFLICT(market, symbol) DO UPDATE SET
+            display_symbol = excluded.display_symbol,
+            name = excluded.name,
+            source = excluded.source,
+            latest_price = excluded.latest_price,
+            change_percent = excluded.change_percent,
+            updated_at = datetime('now')
+        `
+        )
+        .run(
+          normalized.market,
+          normalized.symbol,
+          normalized.displaySymbol,
+          normalized.name,
+          normalized.source,
+          normalized.latestPrice ?? null,
+          normalized.changePercent ?? null
+        );
+    });
+
+    return this.getFavorites();
+  }
+
+  removeFavorite(market: Market, symbol: string): FavoriteCompany[] {
+    this.db
+      .prepare(
+        `
+        DELETE FROM favorite_companies
+        WHERE market = ? AND symbol = ?
+      `
+      )
+      .run(market, normalizeSymbol(market, symbol));
+
+    return this.getFavorites();
   }
 
   getStatements(market: Market, symbol: string, years: number): FinancialStatements | null {
@@ -194,12 +261,14 @@ export class FinanceStoreService implements OnModuleDestroy {
 
   getStats() {
     const companies = this.db.prepare('SELECT COUNT(*) AS count FROM companies').get().count;
+    const favorites = this.db.prepare('SELECT COUNT(*) AS count FROM favorite_companies').get().count;
     const snapshots = this.db.prepare('SELECT COUNT(*) AS count FROM financial_statement_cache').get().count;
     const values = this.db.prepare('SELECT COUNT(*) AS count FROM financial_statement_values').get().count;
     const metrics = this.db.prepare('SELECT COUNT(*) AS count FROM financial_metric_values').get().count;
     return {
       dbPath: this.dbPath,
       companies,
+      favorites,
       statementSnapshots: snapshots,
       statementValues: values,
       metricValues: metrics
@@ -322,6 +391,27 @@ export class FinanceStoreService implements OnModuleDestroy {
       CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name);
       CREATE INDEX IF NOT EXISTS idx_companies_display_symbol ON companies(display_symbol);
 
+      CREATE TABLE IF NOT EXISTS favorite_companies (
+        market TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        display_symbol TEXT NOT NULL,
+        name TEXT NOT NULL,
+        source TEXT NOT NULL,
+        latest_price REAL,
+        change_percent REAL,
+        pinned_order INTEGER NOT NULL DEFAULT 0,
+        favorited_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (market, symbol),
+        FOREIGN KEY (market, symbol) REFERENCES companies(market, symbol)
+          ON UPDATE CASCADE ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_favorite_companies_order
+        ON favorite_companies(pinned_order DESC, favorited_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_favorite_companies_name
+        ON favorite_companies(name);
+
       CREATE TABLE IF NOT EXISTS financial_statement_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         market TEXT NOT NULL,
@@ -437,6 +527,14 @@ export class FinanceStoreService implements OnModuleDestroy {
       source: row.source,
       latestPrice: row.latest_price,
       changePercent: row.change_percent
+    };
+  }
+
+  private toFavoriteCompany(row: any): FavoriteCompany {
+    return {
+      ...this.toCompany(row),
+      favoritedAt: row.favorited_at,
+      updatedAt: row.updated_at
     };
   }
 
