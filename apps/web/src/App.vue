@@ -4,13 +4,13 @@ import {
   AlertTriangle,
   Database,
   Download,
+  Loader2,
   RefreshCw,
   Search,
   Settings,
   Star,
   TrendingUp
 } from 'lucide-vue-next';
-import CompanyRail from './components/CompanyRail.vue';
 import CustomMetricChart from './components/CustomMetricChart.vue';
 import MiniTrend from './components/MiniTrend.vue';
 import StatementTable from './components/StatementTable.vue';
@@ -42,11 +42,18 @@ const searchLoading = ref(false);
 const statementLoading = ref(false);
 const searchError = ref<string | null>(null);
 const statementError = ref<string | null>(null);
+const searchDropdownOpen = ref(false);
 const favorites = ref<FavoriteCompany[]>([]);
 const favoriteLoading = ref(false);
 const favoriteNotice = ref<string | null>(null);
 let searchTimer: number | undefined;
 let favoriteNoticeTimer: number | undefined;
+
+const marketOptions: { value: MarketFilter; label: string }[] = [
+  { value: 'all', label: '全部' },
+  { value: 'a', label: 'A股' },
+  { value: 'hk', label: '港股' }
+];
 
 const activeTable = computed(() =>
   statements.value?.tables.find((table) => table.type === activeStatement.value)
@@ -62,6 +69,13 @@ const activeYears = computed(() => {
 const selectedIsFavorite = computed(() => {
   if (!selectedCompany.value) return false;
   return favorites.value.some((company) => companyKey(company) === companyKey(selectedCompany.value!));
+});
+
+const showSearchDropdown = computed(() => {
+  return (
+    searchDropdownOpen.value &&
+    (searchLoading.value || Boolean(searchError.value) || query.value.trim().length > 0 || companies.value.length > 0)
+  );
 });
 
 const summaryCards = computed(() => {
@@ -131,6 +145,29 @@ function showFavoriteNotice(message: string): void {
   favoriteNoticeTimer = window.setTimeout(() => {
     favoriteNotice.value = null;
   }, 1800);
+}
+
+function openSearchDropdown(): void {
+  searchDropdownOpen.value = true;
+}
+
+function handleSearchFocusOut(event: FocusEvent): void {
+  const current = event.currentTarget;
+  const next = event.relatedTarget;
+  if (current instanceof HTMLElement && next instanceof Node && current.contains(next)) {
+    return;
+  }
+  searchDropdownOpen.value = false;
+}
+
+function submitSearch(): void {
+  searchDropdownOpen.value = true;
+  void runSearch();
+}
+
+function selectSearchCompany(company: CompanySearchResult): void {
+  searchDropdownOpen.value = false;
+  void selectCompany(company);
 }
 
 async function toggleFavorite(): Promise<void> {
@@ -247,11 +284,79 @@ onMounted(async () => {
         <strong>财报查询台</strong>
       </div>
 
-      <label class="global-search">
-        <Search :size="20" />
-        <input v-model="query" type="search" placeholder="公司/代码，例如：腾讯、00700、600519" />
-        <button type="button" @click="runSearch">搜索</button>
-      </label>
+      <div class="search-shell" @focusin="openSearchDropdown" @focusout="handleSearchFocusOut">
+        <div class="global-search">
+          <Search :size="20" />
+          <input
+            v-model="query"
+            type="search"
+            placeholder="公司/代码，例如：腾讯、00700、600519"
+            aria-label="搜索公司或股票代码"
+            @keydown.enter.prevent="submitSearch"
+          />
+          <button type="button" :disabled="searchLoading" @click="submitSearch">
+            <Loader2 v-if="searchLoading" class="spin-icon" :size="15" />
+            <span>{{ searchLoading ? '搜索中' : '搜索' }}</span>
+          </button>
+        </div>
+
+        <div v-if="showSearchDropdown" class="search-dropdown" role="listbox" aria-label="搜索结果">
+          <div class="search-market-tabs" aria-label="市场筛选">
+            <button
+              v-for="item in marketOptions"
+              :key="item.value"
+              :class="{ active: market === item.value }"
+              type="button"
+              @click="market = item.value"
+            >
+              {{ item.label }}
+            </button>
+          </div>
+
+          <div v-if="searchLoading" class="search-dropdown-state searching">
+            <Loader2 class="spin-icon" :size="16" />
+            <span>正在从 AKShare 搜索公司...</span>
+          </div>
+          <div v-else-if="searchError" class="search-dropdown-state error">
+            {{ searchError }}
+          </div>
+          <div v-else-if="companies.length" class="search-results">
+            <button
+              v-for="company in companies"
+              :key="`${company.market}-${company.symbol}`"
+              class="search-result-row"
+              :class="{ active: selectedCompany?.market === company.market && selectedCompany?.symbol === company.symbol }"
+              type="button"
+              role="option"
+              :aria-selected="selectedCompany?.market === company.market && selectedCompany?.symbol === company.symbol"
+              @click="selectSearchCompany(company)"
+            >
+              <span class="company-logo" :data-market="company.market">{{ company.name.slice(0, 1) }}</span>
+              <span class="company-main">
+                <strong>{{ company.name }}</strong>
+                <span>
+                  {{ company.displaySymbol }}
+                  <small>{{ company.market === 'hk' ? 'HK' : 'A' }}</small>
+                </span>
+              </span>
+              <span class="company-quote">
+                <span v-if="company.latestPrice !== null && company.latestPrice !== undefined">
+                  {{ company.latestPrice }}
+                </span>
+                <em
+                  v-if="company.changePercent !== null && company.changePercent !== undefined"
+                  :class="{ up: Number(company.changePercent) > 0, down: Number(company.changePercent) < 0 }"
+                >
+                  {{ Number(company.changePercent).toFixed(2) }}%
+                </em>
+              </span>
+            </button>
+          </div>
+          <div v-else class="search-dropdown-state">
+            暂无搜索结果
+          </div>
+        </div>
+      </div>
 
       <nav class="top-actions" aria-label="工具">
         <button class="ghost-button" type="button" title="刷新财报" @click="selectedCompany && selectCompany(selectedCompany, true)">
@@ -278,17 +383,6 @@ onMounted(async () => {
     </div>
 
     <main class="workspace">
-      <CompanyRail
-        :companies="companies"
-        :selected="selectedCompany"
-        :loading="searchLoading"
-        :market="market"
-        :error="searchError"
-        @select="selectCompany"
-        @refresh="runSearch"
-        @change-market="market = $event"
-      />
-
       <section class="content">
         <div v-if="favorites.length" class="favorite-strip" aria-label="收藏公司">
           <span>收藏</span>
@@ -339,33 +433,6 @@ onMounted(async () => {
           <span>{{ statementError }}</span>
         </div>
 
-        <div class="toolbar">
-          <div class="tabs">
-            <button
-              v-for="tab in [
-                { type: 'balance', label: '资产负债表' },
-                { type: 'income', label: '利润表' },
-                { type: 'cashflow', label: '现金流量表' }
-              ]"
-              :key="tab.type"
-              :class="{ active: activeStatement === tab.type }"
-              type="button"
-              @click="activeStatement = tab.type as StatementType"
-            >
-              {{ tab.label }}
-            </button>
-          </div>
-
-          <div class="toolbar-actions">
-            <button class="ghost-button blue" type="button" @click="selectedCompany && selectCompany(selectedCompany, true)">
-              <RefreshCw :size="16" />刷新
-            </button>
-            <button class="ghost-button blue" type="button" @click="exportCsv">
-              <Download :size="16" />导出
-            </button>
-          </div>
-        </div>
-
         <div class="year-strip" v-if="availableYears.length">
           <button
             v-for="year in availableYears"
@@ -393,6 +460,33 @@ onMounted(async () => {
         </div>
 
         <CustomMetricChart :statements="statements" :active-years="activeYears" />
+
+        <div class="toolbar">
+          <div class="tabs">
+            <button
+              v-for="tab in [
+                { type: 'balance', label: '资产负债表' },
+                { type: 'income', label: '利润表' },
+                { type: 'cashflow', label: '现金流量表' }
+              ]"
+              :key="tab.type"
+              :class="{ active: activeStatement === tab.type }"
+              type="button"
+              @click="activeStatement = tab.type as StatementType"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+
+          <div class="toolbar-actions">
+            <button class="ghost-button blue" type="button" @click="selectedCompany && selectCompany(selectedCompany, true)">
+              <RefreshCw :size="16" />刷新
+            </button>
+            <button class="ghost-button blue" type="button" @click="exportCsv">
+              <Download :size="16" />导出
+            </button>
+          </div>
+        </div>
 
         <div v-if="statementLoading" class="loading-panel">正在通过 AKShare 拉取财报数据...</div>
 

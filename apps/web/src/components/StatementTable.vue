@@ -1,12 +1,27 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { StatementTable } from '../types/finance';
+
+type ValueDisplayUnit = 'raw' | 'wan' | 'yi';
 
 const props = defineProps<{
   table?: StatementTable;
   activeYears: string[];
 }>();
 
+const unitDivisors: Record<ValueDisplayUnit, number> = {
+  raw: 1,
+  wan: 10_000,
+  yi: 100_000_000
+};
+
+const valueUnitOptions: { value: ValueDisplayUnit; label: string }[] = [
+  { value: 'raw', label: '原始' },
+  { value: 'wan', label: '万' },
+  { value: 'yi', label: '亿' }
+];
+
+const valueUnit = ref<ValueDisplayUnit>('yi');
 const visibleRows = computed(() => props.table?.rows ?? []);
 
 function sourceTitle(row: { item: string; sourceItem?: string | null }): string | undefined {
@@ -16,20 +31,52 @@ function sourceTitle(row: { item: string; sourceItem?: string | null }): string 
   return row.sourceItem;
 }
 
+function parseNumericValue(value: number | string): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  const normalized = value.trim().replace(/,/g, '');
+  if (!normalized) {
+    return null;
+  }
+  const numeric = Number(normalized);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 function formatValue(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === '') {
     return '-';
   }
-  if (typeof value === 'number') {
-    return new Intl.NumberFormat('zh-CN', {
-      maximumFractionDigits: 2
-    }).format(value);
+
+  const numeric = parseNumericValue(value);
+  if (numeric === null) {
+    return String(value);
   }
-  return String(value);
+
+  const scaledValue = numeric / unitDivisors[valueUnit.value];
+  const absValue = Math.abs(scaledValue);
+  return new Intl.NumberFormat('zh-CN', {
+    maximumFractionDigits: valueUnit.value === 'raw' || absValue >= 1 ? 2 : 4
+  }).format(scaledValue);
 }
 </script>
 
 <template>
+  <div v-if="table && visibleRows.length" class="statement-table-tools">
+    <div class="unit-switch" aria-label="StatementTable 数值单位">
+      <span>表格数值</span>
+      <button
+        v-for="unit in valueUnitOptions"
+        :key="unit.value"
+        :class="{ active: valueUnit === unit.value }"
+        type="button"
+        @click="valueUnit = unit.value"
+      >
+        {{ unit.label }}
+      </button>
+    </div>
+  </div>
+
   <div class="table-wrap">
     <table v-if="table && visibleRows.length" class="statement-table">
       <thead>
