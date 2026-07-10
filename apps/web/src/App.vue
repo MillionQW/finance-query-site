@@ -14,6 +14,7 @@ import {
   TrendingUp
 } from 'lucide-vue-next';
 import CustomMetricChart from './components/CustomMetricChart.vue';
+import AnnouncementPanel from './components/AnnouncementPanel.vue';
 import CacheManagerPanel from './components/CacheManagerPanel.vue';
 import MiniTrend from './components/MiniTrend.vue';
 import PeerComparisonPanel from './components/PeerComparisonPanel.vue';
@@ -21,12 +22,14 @@ import PeerMetricChart from './components/PeerMetricChart.vue';
 import StatementTable from './components/StatementTable.vue';
 import {
   getCacheEntries,
+  getAnnouncements,
   getFavorites,
   getMetricComparison,
   getPeerComparison,
   getPeerMetricComparison,
   getRefreshStatus,
   getStatements,
+  markAnnouncementsViewed,
   removeFavorite,
   saveFavorite,
   searchCompanies,
@@ -34,6 +37,7 @@ import {
 } from './services/api';
 import type {
   CompanySearchResult,
+  AnnouncementFeed,
   CacheEntry,
   FavoriteCompany,
   FinancialStatements,
@@ -65,6 +69,7 @@ const selectedCompany = ref<CompanySearchResult | null>(initialCompany);
 const statements = ref<FinancialStatements | null>(null);
 const peerComparison = ref<PeerComparison | null>(null);
 const peerMetricComparison = ref<PeerMetricComparison | null>(null);
+const announcementFeed = ref<AnnouncementFeed | null>(null);
 const activeStatement = ref<StatementType>('balance');
 const activePeerMetricKey = ref('revenue');
 const peerMetricMode = ref<'peers' | 'custom'>('peers');
@@ -75,11 +80,13 @@ const statementLoading = ref(false);
 const peerLoading = ref(false);
 const peerMetricLoading = ref(false);
 const cacheEntriesLoading = ref(false);
+const announcementLoading = ref(false);
 const searchError = ref<string | null>(null);
 const statementError = ref<string | null>(null);
 const peerError = ref<string | null>(null);
 const peerMetricError = ref<string | null>(null);
 const cacheEntriesError = ref<string | null>(null);
+const announcementError = ref<string | null>(null);
 const searchDropdownOpen = ref(false);
 const favorites = ref<FavoriteCompany[]>([]);
 const recentCompanies = ref<CompanySearchResult[]>([]);
@@ -93,6 +100,7 @@ let searchTimer: number | undefined;
 let favoriteNoticeTimer: number | undefined;
 let peerRequestId = 0;
 let peerMetricRequestId = 0;
+let announcementRequestId = 0;
 
 const marketOptions: { value: MarketFilter; label: string }[] = [
   { value: 'all', label: '全部' },
@@ -538,6 +546,7 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
   activeStatement.value = 'balance';
   void loadPeerComparison(company);
   void loadPeerMetricComparison(company);
+  void loadAnnouncements(company);
   try {
     statements.value = await getStatements(company.market, company.symbol, 10, refresh);
     if (sameCompany(company, selectedCompany.value) && statements.value.company.name) {
@@ -556,6 +565,27 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
     statementError.value = error instanceof Error ? error.message : '财报查询失败';
   } finally {
     statementLoading.value = false;
+  }
+}
+
+async function loadAnnouncements(company: CompanySearchResult): Promise<void> {
+  const requestId = ++announcementRequestId;
+  announcementLoading.value = true;
+  announcementError.value = null;
+  announcementFeed.value = null;
+  try {
+    const feed = await getAnnouncements(company.market, company.symbol);
+    if (requestId !== announcementRequestId) return;
+    announcementFeed.value = feed;
+    favorites.value = await markAnnouncementsViewed(company.market, company.symbol);
+  } catch (error) {
+    if (requestId === announcementRequestId) {
+      announcementError.value = error instanceof Error ? error.message : '公告读取失败';
+    }
+  } finally {
+    if (requestId === announcementRequestId) {
+      announcementLoading.value = false;
+    }
   }
 }
 
@@ -872,6 +902,11 @@ onUnmounted(() => {
             type="button"
             @click="selectCompany(company)"
           >
+            <i
+              v-if="company.hasUnreadAnnouncements"
+              class="favorite-unread-dot"
+              :aria-label="`${company.unreadAnnouncementCount} 条新公告`"
+            ></i>
             <Star :size="14" />
             <strong>{{ company.name }}</strong>
             <small>{{ company.displaySymbol }}</small>
@@ -926,6 +961,12 @@ onUnmounted(() => {
           <strong>{{ statementCacheLabel }}</strong>
           <small>缓存刷新：{{ formatDate(statements?.cache?.refreshedAt) }}</small>
         </div>
+
+        <AnnouncementPanel
+          :feed="announcementFeed"
+          :loading="announcementLoading"
+          :error="announcementError"
+        />
 
         <div v-if="statementError" class="status-banner">
           <AlertTriangle :size="18" />

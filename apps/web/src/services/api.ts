@@ -1,5 +1,6 @@
 import type {
   CacheEntry,
+  AnnouncementFeed,
   CompanySearchResult,
   FavoriteCompany,
   FinancialStatements,
@@ -52,6 +53,17 @@ export function getStatements(
     params.set('refresh', 'true');
   }
   return request<FinancialStatements>(`/finance/statements?${params.toString()}`);
+}
+
+export function getAnnouncements(market: Market, symbol: string): Promise<AnnouncementFeed> {
+  const params = new URLSearchParams({ market, symbol });
+  return request<AnnouncementFeed>(`/finance/announcements?${params.toString()}`);
+}
+
+export function markAnnouncementsViewed(market: Market, symbol: string): Promise<FavoriteCompany[]> {
+  return request<FavoriteCompany[]>(`/finance/announcements/${market}/${encodeURIComponent(symbol)}/viewed`, {
+    method: 'POST'
+  });
 }
 
 export function getPeerComparison(

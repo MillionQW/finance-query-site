@@ -5,6 +5,9 @@ import { createRequire } from 'node:module';
 import { dirname, join, normalize, resolve } from 'node:path';
 import {
   CompanySearchResult,
+  AnnouncementFeed,
+  AnnouncementRefreshTarget,
+  CompanyAnnouncement,
   CacheEntry,
   FavoriteCompany,
   FinancialStatements,
@@ -107,9 +110,16 @@ export class FinanceStoreService implements OnModuleDestroy {
     const rows = this.db
       .prepare(
         `
-        SELECT market, symbol, display_symbol, name, source, latest_price, change_percent,
-               favorited_at, updated_at
-        FROM favorite_companies
+        SELECT f.market, f.symbol, f.display_symbol, f.name, f.source, f.latest_price, f.change_percent,
+               f.favorited_at, f.updated_at,
+               (
+                 SELECT COUNT(*)
+                 FROM company_announcements a
+                 WHERE a.market = f.market
+                   AND a.symbol = f.symbol
+                   AND a.discovered_at > COALESCE(f.announcement_viewed_at, f.favorited_at)
+               ) AS unread_announcement_count
+        FROM favorite_companies f
         ORDER BY pinned_order DESC, favorited_at DESC
       `
       )
@@ -131,9 +141,9 @@ export class FinanceStoreService implements OnModuleDestroy {
           `
           INSERT INTO favorite_companies (
             market, symbol, display_symbol, name, source, latest_price, change_percent,
-            pinned_order, favorited_at, updated_at
+            pinned_order, favorited_at, updated_at, announcement_viewed_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'))
+          VALUES (?, ?, ?, ?, ?, ?, ?, 0, datetime('now'), datetime('now'), datetime('now'))
           ON CONFLICT(market, symbol) DO UPDATE SET
             display_symbol = excluded.display_symbol,
             name = excluded.name,
@@ -167,6 +177,132 @@ export class FinanceStoreService implements OnModuleDestroy {
       )
       .run(market, normalizeSymbol(market, symbol));
 
+    return this.getFavorites();
+  }
+
+  listAnnouncementRefreshTargets(staleBefore: Date, limit: number): AnnouncementRefreshTarget[] {
+    const rows = this.db.prepare(`
+      SELECT f.market, f.symbol, f.display_symbol, f.name, f.source,
+             f.latest_price, f.change_percent, s.last_refreshed_at
+      FROM favorite_companies f
+      LEFT JOIN announcement_refresh_state s
+        ON s.market = f.market AND s.symbol = f.symbol
+      WHERE s.last_refreshed_at IS NULL OR s.last_refreshed_at <= ?
+      ORDER BY COALESCE(s.last_refreshed_at, '1970-01-01') ASC, f.favorited_at ASC
+      LIMIT ?
+    `).all(staleBefore.toISOString(), Math.max(1, limit));
+
+    return rows.map((row: any) => ({
+      ...this.toCompany(row),
+      refreshedAt: row.last_refreshed_at ? fromSqliteDate(row.last_refreshed_at) : null
+    }));
+  }
+
+  getAnnouncementFeed(market: Market, symbol: string, limit = 100): AnnouncementFeed {
+    const normalizedSymbol = normalizeSymbol(market, symbol);
+    const company = this.db.prepare(`
+      SELECT market, symbol, display_symbol, name
+      FROM companies
+      WHERE market = ? AND symbol = ?
+      LIMIT 1
+    `).get(market, normalizedSymbol);
+    const state = this.db.prepare(`
+      SELECT last_refreshed_at
+      FROM announcement_refresh_state
+      WHERE market = ? AND symbol = ?
+      LIMIT 1
+    `).get(market, normalizedSymbol);
+    const favorite = this.db.prepare(`
+      SELECT announcement_viewed_at, favorited_at
+      FROM favorite_companies
+      WHERE market = ? AND symbol = ?
+      LIMIT 1
+    `).get(market, normalizedSymbol);
+    const viewedAt = favorite?.announcement_viewed_at ?? favorite?.favorited_at ?? null;
+    const rows = this.db.prepare(`
+      SELECT announcement_key, market, symbol, display_symbol, company_name, title,
+             category, published_at, url, source, discovered_at
+      FROM company_announcements
+      WHERE market = ? AND symbol = ?
+      ORDER BY published_at DESC, id DESC
+      LIMIT ?
+    `).all(market, normalizedSymbol, Math.max(1, Math.min(limit, 200)));
+    const items = rows.map((row: any) => this.toAnnouncement(row, viewedAt));
+    return {
+      company: {
+        market,
+        symbol: normalizedSymbol,
+        displaySymbol: company?.display_symbol ?? makeDisplaySymbol(market, normalizedSymbol),
+        name: company?.name ?? makeDisplaySymbol(market, normalizedSymbol)
+      },
+      items,
+      refreshedAt: state?.last_refreshed_at ? fromSqliteDate(state.last_refreshed_at) : null,
+      unreadCount: items.filter((item: CompanyAnnouncement) => item.isUnread).length,
+      source: 'AKShare CNInfo disclosure API'
+    };
+  }
+
+  saveAnnouncements(target: CompanySearchResult, items: CompanyAnnouncement[]): void {
+    const normalized = this.normalizeCompany(target);
+    const existingState = this.db.prepare(`
+      SELECT last_error FROM announcement_refresh_state WHERE market = ? AND symbol = ? LIMIT 1
+    `).get(normalized.market, normalized.symbol);
+    const insert = this.db.prepare(`
+      INSERT OR IGNORE INTO company_announcements (
+        announcement_key, market, symbol, display_symbol, company_name, title,
+        category, published_at, url, source, discovered_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `);
+
+    this.withTransaction(() => {
+      this.upsertCompanies([normalized]);
+      for (const item of items) {
+        insert.run(
+          item.key,
+          normalized.market,
+          normalized.symbol,
+          normalized.displaySymbol,
+          item.companyName || normalized.name,
+          item.title,
+          item.category,
+          item.publishedAt,
+          item.url,
+          item.source
+        );
+      }
+      this.db.prepare(`
+        INSERT INTO announcement_refresh_state (market, symbol, last_refreshed_at, last_error)
+        VALUES (?, ?, datetime('now'), NULL)
+        ON CONFLICT(market, symbol) DO UPDATE SET
+          last_refreshed_at = datetime('now'),
+          last_error = NULL
+      `).run(normalized.market, normalized.symbol);
+      if (!existingState || existingState.last_error) {
+        this.db.prepare(`
+          UPDATE favorite_companies
+          SET announcement_viewed_at = datetime('now')
+          WHERE market = ? AND symbol = ?
+        `).run(normalized.market, normalized.symbol);
+      }
+    });
+  }
+
+  saveAnnouncementRefreshError(market: Market, symbol: string, message: string): void {
+    this.db.prepare(`
+      INSERT INTO announcement_refresh_state (market, symbol, last_refreshed_at, last_error)
+      VALUES (?, ?, datetime('now'), ?)
+      ON CONFLICT(market, symbol) DO UPDATE SET
+        last_refreshed_at = datetime('now'),
+        last_error = excluded.last_error
+    `).run(market, normalizeSymbol(market, symbol), message.slice(0, 1000));
+  }
+
+  markAnnouncementsViewed(market: Market, symbol: string): FavoriteCompany[] {
+    this.db.prepare(`
+      UPDATE favorite_companies
+      SET announcement_viewed_at = datetime('now')
+      WHERE market = ? AND symbol = ?
+    `).run(market, normalizeSymbol(market, symbol));
     return this.getFavorites();
   }
 
@@ -837,6 +973,7 @@ export class FinanceStoreService implements OnModuleDestroy {
         pinned_order INTEGER NOT NULL DEFAULT 0,
         favorited_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
+        announcement_viewed_at TEXT,
         PRIMARY KEY (market, symbol),
         FOREIGN KEY (market, symbol) REFERENCES companies(market, symbol)
           ON UPDATE CASCADE ON DELETE CASCADE
@@ -846,6 +983,35 @@ export class FinanceStoreService implements OnModuleDestroy {
         ON favorite_companies(pinned_order DESC, favorited_at DESC);
       CREATE INDEX IF NOT EXISTS idx_favorite_companies_name
         ON favorite_companies(name);
+
+      CREATE TABLE IF NOT EXISTS company_announcements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        announcement_key TEXT NOT NULL,
+        market TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        display_symbol TEXT NOT NULL,
+        company_name TEXT NOT NULL,
+        title TEXT NOT NULL,
+        category TEXT NOT NULL,
+        published_at TEXT NOT NULL,
+        url TEXT NOT NULL,
+        source TEXT NOT NULL,
+        discovered_at TEXT NOT NULL,
+        UNIQUE (market, symbol, announcement_key)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_company_announcements_feed
+        ON company_announcements(market, symbol, published_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_company_announcements_unread
+        ON company_announcements(market, symbol, discovered_at);
+
+      CREATE TABLE IF NOT EXISTS announcement_refresh_state (
+        market TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        last_refreshed_at TEXT NOT NULL,
+        last_error TEXT,
+        PRIMARY KEY (market, symbol)
+      );
 
       CREATE TABLE IF NOT EXISTS financial_statement_cache (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -972,6 +1138,12 @@ export class FinanceStoreService implements OnModuleDestroy {
 
     this.ensureColumn('financial_statement_rows', 'source_item', 'TEXT');
     this.ensureColumn('financial_statement_values', 'source_item', 'TEXT');
+    this.ensureColumn('favorite_companies', 'announcement_viewed_at', 'TEXT');
+    this.db.prepare(`
+      UPDATE favorite_companies
+      SET announcement_viewed_at = datetime('now')
+      WHERE announcement_viewed_at IS NULL
+    `).run();
   }
 
   private normalizeCompany(company: CompanySearchResult): CompanySearchResult {
@@ -1008,10 +1180,30 @@ export class FinanceStoreService implements OnModuleDestroy {
   }
 
   private toFavoriteCompany(row: any): FavoriteCompany {
+    const unreadAnnouncementCount = Number(row.unread_announcement_count ?? 0);
     return {
       ...this.toCompany(row),
       favoritedAt: row.favorited_at,
-      updatedAt: row.updated_at
+      updatedAt: row.updated_at,
+      unreadAnnouncementCount,
+      hasUnreadAnnouncements: unreadAnnouncementCount > 0
+    };
+  }
+
+  private toAnnouncement(row: any, viewedAt: string | null): CompanyAnnouncement {
+    return {
+      key: row.announcement_key,
+      market: row.market,
+      symbol: row.symbol,
+      displaySymbol: row.display_symbol,
+      companyName: row.company_name,
+      title: row.title,
+      category: row.category,
+      publishedAt: row.published_at,
+      url: row.url,
+      source: row.source,
+      discoveredAt: fromSqliteDate(row.discovered_at),
+      isUnread: Boolean(viewedAt && new Date(row.discovered_at).getTime() > new Date(viewedAt).getTime())
     };
   }
 

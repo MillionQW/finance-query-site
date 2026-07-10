@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { FinanceService } from './finance.service';
 import { FinanceRefreshService } from './finance-refresh.service';
+import { AnnouncementRefreshService } from './announcement-refresh.service';
 import {
   FavoriteCompanyDto,
   FavoriteIdentityDto,
@@ -15,7 +16,8 @@ import {
 export class FinanceController {
   constructor(
     private readonly finance: FinanceService,
-    private readonly refresh: FinanceRefreshService
+    private readonly refresh: FinanceRefreshService,
+    private readonly announcements: AnnouncementRefreshService
   ) {}
 
   @Get('health')
@@ -82,6 +84,16 @@ export class FinanceController {
   @Delete('favorites/:market/:symbol')
   removeFavorite(@Param() params: FavoriteIdentityDto) {
     return this.finance.removeFavorite(params.market, params.symbol);
+  }
+
+  @Get('finance/announcements')
+  getAnnouncements(@Query() query: StatementQueryDto) {
+    return this.announcements.getFeed(query.market, query.symbol.trim(), 100);
+  }
+
+  @Post('finance/announcements/:market/:symbol/viewed')
+  markAnnouncementsViewed(@Param() params: FavoriteIdentityDto) {
+    return this.announcements.markViewed(params.market, params.symbol);
   }
 
   @Get('cache/stats')

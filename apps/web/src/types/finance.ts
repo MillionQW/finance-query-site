@@ -15,6 +15,38 @@ export interface CompanySearchResult {
 export interface FavoriteCompany extends CompanySearchResult {
   favoritedAt: string;
   updatedAt: string;
+  unreadAnnouncementCount: number;
+  hasUnreadAnnouncements: boolean;
+}
+
+export type AnnouncementCategory = '年报' | '业绩预告' | '权益分派' | '董事会' | '风险提示' | '其他';
+
+export interface CompanyAnnouncement {
+  key: string;
+  market: Market;
+  symbol: string;
+  displaySymbol: string;
+  companyName: string;
+  title: string;
+  category: AnnouncementCategory;
+  publishedAt: string;
+  url: string;
+  source: string;
+  discoveredAt?: string;
+  isUnread?: boolean;
+}
+
+export interface AnnouncementFeed {
+  company: {
+    market: Market;
+    symbol: string;
+    displaySymbol: string;
+    name: string;
+  };
+  items: CompanyAnnouncement[];
+  refreshedAt: string | null;
+  unreadCount: number;
+  source: string;
 }
 
 export interface StatementRow {

@@ -35,6 +35,9 @@
 - Manual refresh task button is available in the UI.
 - Search results are shown in a dropdown under the search box.
 - The old left-side company rail is removed.
+- Company pages show the latest 60 days of announcements from AKShare/CNInfo with category filters.
+- Favorite-company announcements refresh every 12 hours in batches of two, with a request gap to reduce rate-limit risk.
+- Favorite tabs show a red dot for newly discovered announcements until that company page is opened.
 
 ## Statement Table
 
@@ -122,6 +125,21 @@ If operating cost is still unavailable but revenue and gross profit are availabl
   - Compares a metric across locally cached companies that appear in the pulled peer list.
 - `GET /api/finance/metric-comparison`
   - Compares a metric across arbitrary locally cached companies.
+
+## Announcement APIs
+
+- `GET /api/finance/announcements?market=a&symbol=600519`
+  - Returns the latest cached announcements and refreshes a stale company cache on demand.
+- `POST /api/finance/announcements/:market/:symbol/viewed`
+  - Marks a favorite company's currently discovered announcements as viewed.
+
+Announcement refresh defaults:
+
+- refresh interval: 12 hours
+- scheduler check: every 15 minutes
+- batch size: 2 favorite companies
+- request gap within a batch: 3 seconds
+- announcement lookback: 60 days
 
 ## Validation
 
