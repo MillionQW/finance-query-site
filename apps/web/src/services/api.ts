@@ -1,4 +1,4 @@
-import type { CompanySearchResult, FavoriteCompany, FinancialStatements, Market, MarketFilter } from '../types/finance';
+import type { CompanySearchResult, FavoriteCompany, FinancialStatements, Market, MarketFilter, PeerComparison } from '../types/finance';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
@@ -41,6 +41,15 @@ export function getStatements(
     params.set('refresh', 'true');
   }
   return request<FinancialStatements>(`/finance/statements?${params.toString()}`);
+}
+
+export function getPeerComparison(
+  market: Market,
+  symbol: string,
+  limit = 20
+): Promise<PeerComparison> {
+  const params = new URLSearchParams({ market, symbol, limit: String(limit) });
+  return request<PeerComparison>(`/finance/peers?${params.toString()}`);
 }
 
 export function getFavorites(): Promise<FavoriteCompany[]> {

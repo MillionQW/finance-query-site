@@ -13,13 +13,15 @@ import {
 } from 'lucide-vue-next';
 import CustomMetricChart from './components/CustomMetricChart.vue';
 import MiniTrend from './components/MiniTrend.vue';
+import PeerComparisonPanel from './components/PeerComparisonPanel.vue';
 import StatementTable from './components/StatementTable.vue';
-import { getFavorites, getStatements, removeFavorite, saveFavorite, searchCompanies } from './services/api';
+import { getFavorites, getPeerComparison, getStatements, removeFavorite, saveFavorite, searchCompanies } from './services/api';
 import type {
   CompanySearchResult,
   FavoriteCompany,
   FinancialStatements,
   MarketFilter,
+  PeerComparison,
   StatementType
 } from './types/finance';
 
@@ -36,18 +38,22 @@ const market = ref<MarketFilter>('all');
 const companies = ref<CompanySearchResult[]>(seedCompanies);
 const selectedCompany = ref<CompanySearchResult | null>(seedCompanies[0]);
 const statements = ref<FinancialStatements | null>(null);
+const peerComparison = ref<PeerComparison | null>(null);
 const activeStatement = ref<StatementType>('balance');
 const selectedYears = ref<string[]>([]);
 const searchLoading = ref(false);
 const statementLoading = ref(false);
+const peerLoading = ref(false);
 const searchError = ref<string | null>(null);
 const statementError = ref<string | null>(null);
+const peerError = ref<string | null>(null);
 const searchDropdownOpen = ref(false);
 const favorites = ref<FavoriteCompany[]>([]);
 const favoriteLoading = ref(false);
 const favoriteNotice = ref<string | null>(null);
 let searchTimer: number | undefined;
 let favoriteNoticeTimer: number | undefined;
+let peerRequestId = 0;
 
 const marketOptions: { value: MarketFilter; label: string }[] = [
   { value: 'all', label: '全部' },
@@ -223,6 +229,7 @@ async function selectCompany(company: CompanySearchResult, refresh = false): Pro
   statementLoading.value = true;
   statementError.value = null;
   activeStatement.value = 'balance';
+  void loadPeerComparison(company);
   try {
     statements.value = await getStatements(company.market, company.symbol, 10, refresh);
     selectedYears.value = statements.value.years.slice(0, 10);
@@ -231,6 +238,28 @@ async function selectCompany(company: CompanySearchResult, refresh = false): Pro
     statementError.value = error instanceof Error ? error.message : '财报查询失败';
   } finally {
     statementLoading.value = false;
+  }
+}
+
+async function loadPeerComparison(company: CompanySearchResult): Promise<void> {
+  const requestId = ++peerRequestId;
+  peerLoading.value = true;
+  peerError.value = null;
+  peerComparison.value = null;
+
+  try {
+    const payload = await getPeerComparison(company.market, company.symbol, 20);
+    if (requestId === peerRequestId) {
+      peerComparison.value = payload;
+    }
+  } catch (error) {
+    if (requestId === peerRequestId) {
+      peerError.value = error instanceof Error ? error.message : '同行对比获取失败';
+    }
+  } finally {
+    if (requestId === peerRequestId) {
+      peerLoading.value = false;
+    }
   }
 }
 
@@ -458,6 +487,13 @@ onMounted(async () => {
             </article>
           </div>
         </div>
+
+        <PeerComparisonPanel
+          :company="selectedCompany"
+          :comparison="peerComparison"
+          :loading="peerLoading"
+          :error="peerError"
+        />
 
         <CustomMetricChart :statements="statements" :active-years="activeYears" />
 

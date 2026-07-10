@@ -34,6 +34,22 @@ export class StatementQueryDto {
   refresh = false;
 }
 
+export class PeerQueryDto {
+  @IsIn(['a', 'hk'])
+  market!: Exclude<Market, 'all'>;
+
+  @IsString()
+  @IsNotEmpty()
+  symbol!: string;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(5)
+  @Max(50)
+  limit = 20;
+}
+
 export class FavoriteCompanyDto {
   @IsIn(['a', 'hk'])
   market!: Exclude<Market, 'all'>;

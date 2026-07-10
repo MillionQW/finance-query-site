@@ -39,6 +39,49 @@ export interface MetricSeries {
   points: MetricPoint[];
 }
 
+export interface PeerCompany {
+  market: Market;
+  symbol: string;
+  displaySymbol: string;
+  name: string;
+  source: string;
+  latestPrice?: number | null;
+  changePercent?: number | null;
+  turnoverRate?: number | null;
+  pe?: number | null;
+  pb?: number | null;
+  isSelected?: boolean;
+}
+
+export interface PeerRanking {
+  key: string;
+  label: string;
+  rank: number | null;
+  total: number;
+  value: number | null;
+  unit?: string;
+  direction: 'asc' | 'desc';
+}
+
+export interface PeerComparison {
+  company: {
+    market: Market;
+    symbol: string;
+    displaySymbol: string;
+    name?: string | null;
+  };
+  industry?: {
+    name: string;
+    code?: string | null;
+    source: string;
+  } | null;
+  peers: PeerCompany[];
+  rankings: PeerRanking[];
+  fetchedAt: string;
+  source: string;
+  note?: string | null;
+}
+
 export interface FinancialStatements {
   company: {
     market: Market;

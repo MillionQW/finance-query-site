@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { FinanceService } from './finance.service';
-import { FavoriteCompanyDto, FavoriteIdentityDto, SearchCompaniesDto, StatementQueryDto } from './dto';
+import { FavoriteCompanyDto, FavoriteIdentityDto, PeerQueryDto, SearchCompaniesDto, StatementQueryDto } from './dto';
 
 @Controller()
 export class FinanceController {
@@ -27,6 +27,15 @@ export class FinanceController {
       query.symbol.trim(),
       query.years ?? 10,
       query.refresh ?? false
+    );
+  }
+
+  @Get('finance/peers')
+  getPeerComparison(@Query() query: PeerQueryDto) {
+    return this.finance.getPeerComparison(
+      query.market,
+      query.symbol.trim(),
+      query.limit ?? 20
     );
   }
 

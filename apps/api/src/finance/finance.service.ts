@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { FinanceStoreService, normalizeSymbol } from './finance-store.service';
 import { PythonAkshareService } from './python-akshare.service';
-import { CompanySearchResult, FavoriteCompany, FinancialStatements } from './types';
+import { CompanySearchResult, FavoriteCompany, FinancialStatements, PeerComparison } from './types';
 import { Market } from './dto';
 
 @Injectable()
@@ -52,6 +52,25 @@ export class FinanceService {
       String(years)
     ]);
     this.store.saveStatements(payload, years);
+    return payload;
+  }
+
+  async getPeerComparison(
+    market: 'a' | 'hk',
+    symbol: string,
+    limit: number
+  ): Promise<PeerComparison> {
+    const normalizedSymbol = normalizeSymbol(market, symbol);
+    const payload = await this.akshare.run<PeerComparison>([
+      'peers',
+      '--market',
+      market,
+      '--symbol',
+      normalizedSymbol,
+      '--limit',
+      String(limit)
+    ]);
+    this.store.upsertCompanies(payload.peers);
     return payload;
   }
 

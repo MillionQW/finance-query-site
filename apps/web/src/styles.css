@@ -970,6 +970,137 @@ button {
   line-height: 1.1;
 }
 
+.peer-panel {
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.peer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.peer-head span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.peer-head h3 {
+  margin: 5px 0 0;
+  font-size: 20px;
+}
+
+.peer-head small {
+  color: var(--muted);
+  font-weight: 700;
+  text-align: right;
+}
+
+.peer-state {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.peer-state.error {
+  border-color: #fed7aa;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.peer-rank-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.peer-rank-grid article {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.peer-rank-grid span,
+.peer-rank-grid em {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.peer-rank-grid strong {
+  display: block;
+  margin: 7px 0 4px;
+  color: #172033;
+  font-size: 20px;
+}
+
+.peer-table-wrap {
+  margin-top: 12px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.peer-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.peer-table th,
+.peer-table td {
+  height: 42px;
+  padding: 8px 12px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.peer-table th:first-child {
+  text-align: left;
+}
+
+.peer-table thead th {
+  color: var(--blue);
+  background: #f8fbff;
+  font-weight: 800;
+}
+
+.peer-table tbody tr.selected th,
+.peer-table tbody tr.selected td {
+  background: #eff6ff;
+}
+
+.peer-table tbody th strong,
+.peer-table tbody th span {
+  display: block;
+}
+
+.peer-table tbody th span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .statement-table-tools {
   display: flex;
   flex-wrap: wrap;
@@ -1227,6 +1358,7 @@ button {
   }
 
   .quote-grid,
+  .peer-rank-grid,
   .metric-selector,
   .metric-cards {
     grid-template-columns: 1fr;
