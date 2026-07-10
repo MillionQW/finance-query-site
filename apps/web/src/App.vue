@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
   AlertTriangle,
+  Clock3,
   Database,
   Download,
   Loader2,
@@ -29,6 +30,7 @@ import type {
   CompanySearchResult,
   FavoriteCompany,
   FinancialStatements,
+  Market,
   MarketFilter,
   PeerComparison,
   StatementRefreshRuntimeStatus,
@@ -43,10 +45,13 @@ const seedCompanies: CompanySearchResult[] = [
   { market: 'hk', symbol: '03690', displaySymbol: '03690.HK', name: '美团-W', source: 'seed' }
 ];
 
-const query = ref('腾讯');
-const market = ref<MarketFilter>('all');
-const companies = ref<CompanySearchResult[]>(seedCompanies);
-const selectedCompany = ref<CompanySearchResult | null>(seedCompanies[0]);
+type UrlMode = 'push' | 'replace' | 'none';
+
+const initialCompany = companyFromUrl() ?? seedCompanies[0];
+const query = ref(initialCompany.name);
+const market = ref<MarketFilter>(initialCompany.market);
+const companies = ref<CompanySearchResult[]>(mergeCompanyList([initialCompany], seedCompanies));
+const selectedCompany = ref<CompanySearchResult | null>(initialCompany);
 const statements = ref<FinancialStatements | null>(null);
 const peerComparison = ref<PeerComparison | null>(null);
 const activeStatement = ref<StatementType>('balance');
@@ -59,6 +64,7 @@ const statementError = ref<string | null>(null);
 const peerError = ref<string | null>(null);
 const searchDropdownOpen = ref(false);
 const favorites = ref<FavoriteCompany[]>([]);
+const recentCompanies = ref<CompanySearchResult[]>([]);
 const favoriteLoading = ref(false);
 const favoriteNotice = ref<string | null>(null);
 const refreshStatus = ref<StatementRefreshRuntimeStatus | null>(null);
@@ -89,6 +95,10 @@ const selectedIsFavorite = computed(() => {
   if (!selectedCompany.value) return false;
   return favorites.value.some((company) => companyKey(company) === companyKey(selectedCompany.value!));
 });
+
+const visibleRecentCompanies = computed(() =>
+  recentCompanies.value.filter((company) => !sameCompany(company, selectedCompany.value)).slice(0, 8)
+);
 
 const showSearchDropdown = computed(() => {
   return (
@@ -145,6 +155,114 @@ function companyKey(company: Pick<CompanySearchResult, 'market' | 'symbol'>): st
   return `${company.market}:${company.symbol}`;
 }
 
+function sameCompany(
+  left: Pick<CompanySearchResult, 'market' | 'symbol'> | null,
+  right: Pick<CompanySearchResult, 'market' | 'symbol'> | null
+): boolean {
+  return Boolean(left && right && left.market === right.market && left.symbol === right.symbol);
+}
+
+function normalizeUrlSymbol(value: string, selectedMarket: Market): string {
+  const digits = value.replace(/\D/g, '');
+  if (selectedMarket === 'hk') {
+    return digits.padStart(5, '0');
+  }
+  return digits;
+}
+
+function displaySymbolFor(selectedMarket: Market, symbol: string): string {
+  if (selectedMarket === 'hk') {
+    return `${symbol}.HK`;
+  }
+  if (symbol.startsWith('6')) {
+    return `${symbol}.SH`;
+  }
+  if (symbol.startsWith('4') || symbol.startsWith('8') || symbol.startsWith('9')) {
+    return `${symbol}.BJ`;
+  }
+  return `${symbol}.SZ`;
+}
+
+function companyFromUrl(): CompanySearchResult | null {
+  const params = new URLSearchParams(window.location.search);
+  const urlMarket = params.get('market');
+  const rawSymbol = params.get('symbol') ?? params.get('code') ?? '';
+  if (urlMarket !== 'a' && urlMarket !== 'hk') {
+    return null;
+  }
+
+  const symbol = normalizeUrlSymbol(rawSymbol, urlMarket);
+  if (!symbol) {
+    return null;
+  }
+
+  const seeded = seedCompanies.find(
+    (company) => company.market === urlMarket && company.symbol === symbol
+  );
+  if (seeded) {
+    return seeded;
+  }
+
+  const displaySymbol = displaySymbolFor(urlMarket, symbol);
+  return {
+    market: urlMarket,
+    symbol,
+    displaySymbol,
+    name: displaySymbol,
+    source: 'url'
+  };
+}
+
+function mergeCompanyList(
+  additions: CompanySearchResult[],
+  base: CompanySearchResult[]
+): CompanySearchResult[] {
+  const seen = new Set<string>();
+  const merged: CompanySearchResult[] = [];
+  for (const company of [...additions, ...base]) {
+    const key = companyKey(company);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    merged.push(company);
+  }
+  return merged;
+}
+
+function syncCompanyUrl(company: CompanySearchResult, mode: Exclude<UrlMode, 'none'>): void {
+  const params = new URLSearchParams(window.location.search);
+  const currentMarket = params.get('market');
+  const currentSymbol = params.get('symbol') ?? '';
+  const alreadySynced =
+    currentMarket === company.market &&
+    normalizeUrlSymbol(currentSymbol, company.market) === company.symbol;
+  if (alreadySynced && mode === 'push') {
+    return;
+  }
+
+  params.set('market', company.market);
+  params.set('symbol', company.symbol);
+  const nextUrl = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
+  window.history[mode === 'replace' ? 'replaceState' : 'pushState'](
+    { market: company.market, symbol: company.symbol },
+    '',
+    nextUrl
+  );
+}
+
+function handleUrlNavigation(): void {
+  const company = companyFromUrl();
+  if (!company || sameCompany(company, selectedCompany.value)) {
+    return;
+  }
+
+  market.value = company.market;
+  query.value = company.name;
+  companies.value = mergeCompanyList([company], companies.value);
+  void selectCompany(company, false, 'none');
+}
+
 function normalizeFavorite(company: CompanySearchResult): CompanySearchResult {
   return {
     market: company.market,
@@ -155,6 +273,37 @@ function normalizeFavorite(company: CompanySearchResult): CompanySearchResult {
     latestPrice: company.latestPrice ?? null,
     changePercent: company.changePercent ?? null
   };
+}
+
+function storageSafeCompany(company: CompanySearchResult): CompanySearchResult {
+  return {
+    market: company.market,
+    symbol: company.symbol,
+    displaySymbol: company.displaySymbol,
+    name: company.name,
+    source: company.source || 'recent',
+    latestPrice: company.latestPrice ?? null,
+    changePercent: company.changePercent ?? null
+  };
+}
+
+function loadRecentCompanies(): void {
+  try {
+    const raw = window.localStorage.getItem('finance-query:recent-companies');
+    const parsed = raw ? (JSON.parse(raw) as CompanySearchResult[]) : [];
+    recentCompanies.value = mergeCompanyList(parsed.filter(Boolean), []).slice(0, 8);
+  } catch {
+    recentCompanies.value = [];
+  }
+}
+
+function rememberRecentCompany(company: CompanySearchResult): void {
+  const normalized = storageSafeCompany(company);
+  recentCompanies.value = mergeCompanyList([normalized], recentCompanies.value).slice(0, 8);
+  window.localStorage.setItem(
+    'finance-query:recent-companies',
+    JSON.stringify(recentCompanies.value)
+  );
 }
 
 async function loadFavorites(): Promise<void> {
@@ -184,7 +333,7 @@ async function runRefreshTask(): Promise<void> {
     refreshTaskNotice.value = run.message ?? '数据更新任务已完成';
     await loadRefreshStatus();
     if (selectedCompany.value) {
-      await selectCompany(selectedCompany.value);
+      await selectCompany(selectedCompany.value, false, 'replace');
     }
   } catch (error) {
     refreshTaskNotice.value = error instanceof Error ? error.message : '数据更新任务触发失败';
@@ -272,14 +421,29 @@ async function runSearch(): Promise<void> {
   }
 }
 
-async function selectCompany(company: CompanySearchResult, refresh = false): Promise<void> {
+async function selectCompany(company: CompanySearchResult, refresh = false, urlMode: UrlMode = 'push'): Promise<void> {
+  companies.value = mergeCompanyList([company], companies.value);
   selectedCompany.value = company;
+  rememberRecentCompany(company);
+  if (urlMode !== 'none') {
+    syncCompanyUrl(company, urlMode);
+  }
   statementLoading.value = true;
   statementError.value = null;
   activeStatement.value = 'balance';
   void loadPeerComparison(company);
   try {
     statements.value = await getStatements(company.market, company.symbol, 10, refresh);
+    if (sameCompany(company, selectedCompany.value) && statements.value.company.name) {
+      const enrichedCompany = {
+        ...company,
+        displaySymbol: statements.value.company.displaySymbol || company.displaySymbol,
+        name: statements.value.company.name
+      };
+      selectedCompany.value = enrichedCompany;
+      companies.value = mergeCompanyList([enrichedCompany], companies.value);
+      rememberRecentCompany(enrichedCompany);
+    }
     selectedYears.value = statements.value.years.slice(0, 10);
   } catch (error) {
     statements.value = null;
@@ -345,12 +509,18 @@ watch([query, market], () => {
 });
 
 onMounted(async () => {
+  window.addEventListener('popstate', handleUrlNavigation);
+  loadRecentCompanies();
   await loadRefreshStatus();
   await loadFavorites();
   await runSearch();
   if (selectedCompany.value) {
-    await selectCompany(selectedCompany.value);
+    await selectCompany(selectedCompany.value, false, 'replace');
   }
+});
+
+onUnmounted(() => {
+  window.removeEventListener('popstate', handleUrlNavigation);
 });
 </script>
 
@@ -472,6 +642,20 @@ onMounted(async () => {
             @click="selectCompany(company)"
           >
             <Star :size="14" />
+            <strong>{{ company.name }}</strong>
+            <small>{{ company.displaySymbol }}</small>
+          </button>
+        </div>
+
+        <div v-if="visibleRecentCompanies.length" class="favorite-strip recent-strip" aria-label="最近访问公司">
+          <span>最近</span>
+          <button
+            v-for="company in visibleRecentCompanies"
+            :key="companyKey(company)"
+            type="button"
+            @click="selectCompany(company)"
+          >
+            <Clock3 :size="14" />
             <strong>{{ company.name }}</strong>
             <small>{{ company.displaySymbol }}</small>
           </button>

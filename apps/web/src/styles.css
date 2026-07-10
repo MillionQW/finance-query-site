@@ -490,6 +490,20 @@ button {
   background: #fffbeb;
 }
 
+.recent-strip {
+  margin-top: -4px;
+  margin-bottom: 14px;
+}
+
+.recent-strip button {
+  background: #f8fafc;
+}
+
+.recent-strip button svg {
+  color: var(--blue);
+  fill: none;
+}
+
 .company-card {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(460px, 1.25fr);
