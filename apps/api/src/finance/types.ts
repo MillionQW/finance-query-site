@@ -80,6 +80,10 @@ export interface PeerComparison {
   fetchedAt: string;
   source: string;
   note?: string | null;
+  cache?: {
+    hit: boolean;
+    refreshedAt: string;
+  };
 }
 
 export interface StatementRefreshTarget {

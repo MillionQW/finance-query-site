@@ -85,7 +85,16 @@ export class FinanceService {
       '50'
     ]);
     this.store.savePeerComparison(payload);
-    return this.limitPeerComparison(payload, limit);
+    return this.limitPeerComparison(
+      {
+        ...payload,
+        cache: {
+          hit: false,
+          refreshedAt: new Date().toISOString()
+        }
+      },
+      limit
+    );
   }
 
   getFavorites(): FavoriteCompany[] {

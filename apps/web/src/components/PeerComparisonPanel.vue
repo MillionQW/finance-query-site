@@ -23,6 +23,15 @@ function formatPercent(value: number | null | undefined): string {
   return formatted === '-' ? '-' : `${formatted}%`;
 }
 
+function formatDate(value: string | null | undefined): string {
+  if (!value) {
+    return '-';
+  }
+  return new Date(value).toLocaleString('zh-CN', {
+    hour12: false
+  });
+}
+
 function formatRank(ranking: PeerRanking): string {
   if (!ranking.rank || !ranking.total) {
     return '-';
@@ -57,6 +66,12 @@ function companyKey(company: PeerCompany): string {
         <h3>{{ comparison?.industry?.name ?? company?.name ?? '同行公司' }}</h3>
       </div>
       <small>{{ comparison?.industry?.source ?? comparison?.source ?? 'AKShare' }}</small>
+    </div>
+
+    <div v-if="comparison?.cache" class="peer-cache-strip">
+      <span>同行数据</span>
+      <strong>{{ comparison.cache.hit ? '本地缓存' : '刚刚更新' }}</strong>
+      <small>缓存刷新：{{ formatDate(comparison.cache.refreshedAt) }}</small>
     </div>
 
     <div v-if="loading" class="peer-state">正在通过 AKShare 拉取同行公司...</div>

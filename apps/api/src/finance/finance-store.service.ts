@@ -305,7 +305,7 @@ export class FinanceStoreService implements OnModuleDestroy {
     const row = this.db
       .prepare(
         `
-        SELECT payload_json
+        SELECT payload_json, refreshed_at
         FROM peer_comparison_cache
         WHERE market = ?
           AND symbol = ?
@@ -319,14 +319,22 @@ export class FinanceStoreService implements OnModuleDestroy {
       return null;
     }
 
-    return JSON.parse(row.payload_json) as PeerComparison;
+    const payload = JSON.parse(row.payload_json) as PeerComparison;
+    return {
+      ...payload,
+      cache: {
+        hit: true,
+        refreshedAt: fromSqliteDate(row.refreshed_at)
+      }
+    };
   }
 
   savePeerComparison(payload: PeerComparison): void {
     const market = payload.company.market;
     const symbol = normalizeSymbol(market, payload.company.symbol);
     const displaySymbol = payload.company.displaySymbol || makeDisplaySymbol(market, symbol);
-    const payloadJson = JSON.stringify(payload);
+    const payloadForStorage = withoutPeerCache(payload);
+    const payloadJson = JSON.stringify(payloadForStorage);
     const payloadHash = createHash('sha256').update(payloadJson).digest('hex');
 
     this.withTransaction(() => {
@@ -947,6 +955,11 @@ function fromSqliteDate(value: string): string {
 }
 
 function withoutStatementCache(payload: FinancialStatements): FinancialStatements {
+  const { cache: _cache, ...rest } = payload;
+  return rest;
+}
+
+function withoutPeerCache(payload: PeerComparison): PeerComparison {
   const { cache: _cache, ...rest } = payload;
   return rest;
 }
