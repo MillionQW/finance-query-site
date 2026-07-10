@@ -1,10 +1,12 @@
 import type {
+  CacheEntry,
   CompanySearchResult,
   FavoriteCompany,
   FinancialStatements,
   Market,
   MarketFilter,
   PeerComparison,
+  PeerMetricComparison,
   StatementRefreshRun,
   StatementRefreshRuntimeStatus
 } from '../types/finance';
@@ -61,6 +63,27 @@ export function getPeerComparison(
   return request<PeerComparison>(`/finance/peers?${params.toString()}`);
 }
 
+export function getPeerMetricComparison(
+  market: Market,
+  symbol: string,
+  metricKey = 'revenue',
+  limit = 12
+): Promise<PeerMetricComparison> {
+  const params = new URLSearchParams({ market, symbol, metricKey, limit: String(limit) });
+  return request<PeerMetricComparison>(`/finance/peer-metrics?${params.toString()}`);
+}
+
+export function getMetricComparison(
+  metricKey: string,
+  companies: Array<{ market: Market; symbol: string; name?: string | null }>
+): Promise<PeerMetricComparison> {
+  const companyKeys = companies
+    .map((company) => `${company.market}:${company.symbol}:${encodeURIComponent(company.name ?? '')}`)
+    .join(',');
+  const params = new URLSearchParams({ metricKey, companies: companyKeys });
+  return request<PeerMetricComparison>(`/finance/metric-comparison?${params.toString()}`);
+}
+
 export function getFavorites(): Promise<FavoriteCompany[]> {
   return request<FavoriteCompany[]>('/favorites');
 }
@@ -80,6 +103,10 @@ export function removeFavorite(market: Market, symbol: string): Promise<Favorite
 
 export function getRefreshStatus(): Promise<StatementRefreshRuntimeStatus> {
   return request<StatementRefreshRuntimeStatus>('/cache/refresh-status');
+}
+
+export function getCacheEntries(): Promise<CacheEntry[]> {
+  return request<CacheEntry[]>('/cache/entries');
 }
 
 export function triggerRefresh(): Promise<StatementRefreshRun> {

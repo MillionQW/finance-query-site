@@ -100,6 +100,42 @@ export interface FinancialStatements {
   };
 }
 
+export interface CacheEntry {
+  kind: 'statements' | 'peers';
+  market: Market;
+  symbol: string;
+  displaySymbol: string;
+  name?: string | null;
+  years?: number | null;
+  peerCount?: number | null;
+  refreshedAt: string;
+  source: string;
+  payloadBytes: number;
+}
+
+export interface PeerMetricSeries {
+  market: Market;
+  symbol: string;
+  displaySymbol: string;
+  name: string;
+  points: MetricPoint[];
+  cached: boolean;
+  isSelected?: boolean;
+}
+
+export interface PeerMetricComparison {
+  metricKey: string;
+  metricLabel: string;
+  years: string[];
+  companies: PeerMetricSeries[];
+  missingCompanies: Array<{
+    market: Market;
+    symbol: string;
+    displaySymbol: string;
+    name: string;
+  }>;
+}
+
 export interface StatementRefreshError {
   market: Market;
   symbol: string;

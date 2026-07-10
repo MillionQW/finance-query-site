@@ -1,7 +1,15 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { FinanceService } from './finance.service';
 import { FinanceRefreshService } from './finance-refresh.service';
-import { FavoriteCompanyDto, FavoriteIdentityDto, PeerQueryDto, SearchCompaniesDto, StatementQueryDto } from './dto';
+import {
+  FavoriteCompanyDto,
+  FavoriteIdentityDto,
+  MetricComparisonQueryDto,
+  PeerMetricQueryDto,
+  PeerQueryDto,
+  SearchCompaniesDto,
+  StatementQueryDto
+} from './dto';
 
 @Controller()
 export class FinanceController {
@@ -43,6 +51,24 @@ export class FinanceController {
     );
   }
 
+  @Get('finance/peer-metrics')
+  getPeerMetricComparison(@Query() query: PeerMetricQueryDto) {
+    return this.finance.getPeerMetricComparison(
+      query.market,
+      query.symbol.trim(),
+      query.metricKey.trim(),
+      query.limit ?? 20
+    );
+  }
+
+  @Get('finance/metric-comparison')
+  getMetricComparison(@Query() query: MetricComparisonQueryDto) {
+    return this.finance.getMetricComparison(
+      query.companies,
+      query.metricKey.trim()
+    );
+  }
+
   @Get('favorites')
   getFavorites() {
     return this.finance.getFavorites();
@@ -61,6 +87,11 @@ export class FinanceController {
   @Get('cache/stats')
   getCacheStats() {
     return this.finance.getCacheStats();
+  }
+
+  @Get('cache/entries')
+  getCacheEntries() {
+    return this.finance.getCacheEntries();
   }
 
   @Get('cache/refresh-status')

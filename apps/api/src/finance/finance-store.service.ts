@@ -5,10 +5,13 @@ import { createRequire } from 'node:module';
 import { dirname, join, normalize, resolve } from 'node:path';
 import {
   CompanySearchResult,
+  CacheEntry,
   FavoriteCompany,
   FinancialStatements,
   Market,
   PeerComparison,
+  PeerMetricComparison,
+  PeerMetricSeries,
   StatementRefreshError,
   StatementRefreshRun,
   StatementRefreshStatus,
@@ -300,6 +303,56 @@ export class FinanceStoreService implements OnModuleDestroy {
     };
   }
 
+  listCacheEntries(): CacheEntry[] {
+    const statementRows = this.db
+      .prepare(
+        `
+        SELECT
+          'statements' AS kind,
+          market,
+          symbol,
+          display_symbol,
+          company_name AS name,
+          years_requested,
+          NULL AS peer_count,
+          refreshed_at,
+          source,
+          length(payload_json) AS payload_bytes
+        FROM financial_statement_cache
+
+        UNION ALL
+
+        SELECT
+          'peers' AS kind,
+          market,
+          symbol,
+          display_symbol,
+          company_name AS name,
+          NULL AS years_requested,
+          peer_count,
+          refreshed_at,
+          source,
+          length(payload_json) AS payload_bytes
+        FROM peer_comparison_cache
+        ORDER BY refreshed_at DESC
+      `
+      )
+      .all();
+
+    return statementRows.map((row: any) => ({
+      kind: row.kind,
+      market: row.market,
+      symbol: row.symbol,
+      displaySymbol: row.display_symbol,
+      name: row.name,
+      years: row.years_requested === null || row.years_requested === undefined ? null : Number(row.years_requested),
+      peerCount: row.peer_count === null || row.peer_count === undefined ? null : Number(row.peer_count),
+      refreshedAt: fromSqliteDate(row.refreshed_at),
+      source: row.source,
+      payloadBytes: Number(row.payload_bytes ?? 0)
+    }));
+  }
+
   getPeerComparison(market: Market, symbol: string, refreshedAfter: Date): PeerComparison | null {
     const normalizedSymbol = normalizeSymbol(market, symbol);
     const row = this.db
@@ -386,6 +439,120 @@ export class FinanceStoreService implements OnModuleDestroy {
           payloadHash
         );
     });
+  }
+
+  getPeerMetricComparison(peerComparison: PeerComparison, metricKey: string, limit: number): PeerMetricComparison {
+    const safeLimit = Math.max(5, Math.min(limit, 20));
+    const peers = peerComparison.peers.slice(0, safeLimit);
+    const companies = peers.map((peer) => ({
+      ...peer,
+      symbol: normalizeSymbol(peer.market, peer.symbol)
+    }));
+    return this.getMetricComparison(companies, metricKey);
+  }
+
+  getMetricComparison(
+    companies: Array<{
+      market: Market;
+      symbol: string;
+      displaySymbol: string;
+      name: string;
+      isSelected?: boolean;
+    }>,
+    metricKey: string
+  ): PeerMetricComparison {
+    const normalizedCompanies = companies.map((company) => ({
+      ...company,
+      symbol: normalizeSymbol(company.market, company.symbol)
+    }));
+    const metricRows = this.db
+      .prepare(
+        `
+        SELECT
+          market,
+          symbol,
+          display_symbol,
+          name,
+          metric_label,
+          year,
+          value_num
+        FROM (
+          SELECT
+            m.market,
+            m.symbol,
+            COALESCE(c.display_symbol, m.symbol) AS display_symbol,
+            COALESCE(c.name, m.symbol) AS name,
+            m.metric_label,
+            m.year,
+            m.value_num
+          FROM financial_metric_values m
+          LEFT JOIN companies c
+            ON c.market = m.market
+           AND c.symbol = m.symbol
+          WHERE m.metric_key = ?
+        )
+        ORDER BY year ASC
+      `
+      )
+      .all(metricKey);
+
+    const allowed = new Set(normalizedCompanies.map((company) => `${company.market}:${company.symbol}`));
+    const byCompany = new Map<string, PeerMetricSeries>();
+    const years = new Set<string>();
+    let metricLabel = metricKey;
+
+    for (const row of metricRows) {
+      const key = `${row.market}:${row.symbol}`;
+      if (!allowed.has(key)) continue;
+      metricLabel = row.metric_label || metricLabel;
+      years.add(String(row.year));
+      if (!byCompany.has(key)) {
+        const peer = normalizedCompanies.find((company) => `${company.market}:${company.symbol}` === key)!;
+        byCompany.set(key, {
+          market: row.market,
+          symbol: row.symbol,
+          displaySymbol: row.display_symbol,
+          name: row.name,
+          points: [],
+          cached: true,
+          isSelected: peer.isSelected
+        });
+      }
+      byCompany.get(key)!.points.push({
+        year: String(row.year),
+        value: row.value_num === null || row.value_num === undefined ? null : Number(row.value_num)
+      });
+    }
+
+    const sortedYears = [...years].sort();
+    const series = normalizedCompanies
+      .map((company) => {
+        const key = `${company.market}:${company.symbol}`;
+        const cached = byCompany.get(key);
+        if (!cached) return null;
+        const pointMap = new Map(cached.points.map((point) => [point.year, point.value]));
+        return {
+          ...cached,
+          points: sortedYears.map((year) => ({ year, value: pointMap.get(year) ?? null }))
+        };
+      })
+      .filter((company): company is PeerMetricSeries => Boolean(company));
+
+    const cachedKeys = new Set(series.map((company) => `${company.market}:${company.symbol}`));
+    return {
+      metricKey,
+      metricLabel,
+      years: sortedYears,
+      companies: series,
+      missingCompanies: normalizedCompanies
+        .filter((company) => !cachedKeys.has(`${company.market}:${company.symbol}`))
+        .map((company) => ({
+          market: company.market,
+          symbol: company.symbol,
+          displaySymbol: company.displaySymbol,
+          name: company.name
+        }))
+    };
   }
 
   listStatementRefreshTargets(options: { staleBefore?: Date; includeFresh?: boolean } = {}): StatementRefreshTarget[] {

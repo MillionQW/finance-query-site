@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { FinanceStoreService, normalizeSymbol } from './finance-store.service';
 import { PythonAkshareService } from './python-akshare.service';
-import { CompanySearchResult, FavoriteCompany, FinancialStatements, PeerComparison } from './types';
+import { CompanySearchResult, FavoriteCompany, FinancialStatements, PeerComparison, PeerMetricComparison } from './types';
 import { Market } from './dto';
 
 @Injectable()
@@ -97,6 +97,44 @@ export class FinanceService {
     );
   }
 
+  async getPeerMetricComparison(
+    market: 'a' | 'hk',
+    symbol: string,
+    metricKey: string,
+    limit: number
+  ): Promise<PeerMetricComparison> {
+    const peerComparison = await this.getPeerComparison(market, symbol, limit);
+    return this.store.getPeerMetricComparison(peerComparison, metricKey, limit);
+  }
+
+  getMetricComparison(companyKeys: string, metricKey: string): PeerMetricComparison {
+    const companies = companyKeys
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 12)
+      .map((item) => {
+        const [market, symbol, encodedName] = item.split(':');
+        if ((market !== 'a' && market !== 'hk') || !symbol) {
+          return null;
+        }
+        const normalizedSymbol = normalizeSymbol(market, symbol);
+        const displaySymbol = this.displaySymbolFor(market, normalizedSymbol);
+        const name = encodedName ? decodeURIComponent(encodedName) : displaySymbol;
+        return {
+          market,
+          symbol: normalizedSymbol,
+          displaySymbol,
+          name
+        };
+      })
+      .filter((company): company is { market: 'a' | 'hk'; symbol: string; displaySymbol: string; name: string } =>
+        Boolean(company)
+      );
+
+    return this.store.getMetricComparison(companies, metricKey);
+  }
+
   getFavorites(): FavoriteCompany[] {
     return this.store.getFavorites();
   }
@@ -111,6 +149,10 @@ export class FinanceService {
 
   getCacheStats() {
     return this.store.getStats();
+  }
+
+  getCacheEntries() {
+    return this.store.listCacheEntries();
   }
 
   private limitPeerComparison(payload: PeerComparison, limit: number): PeerComparison {
@@ -134,5 +176,18 @@ export class FinanceService {
   private readPositiveNumber(value: string | undefined, fallback: number): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  }
+
+  private displaySymbolFor(market: 'a' | 'hk', symbol: string): string {
+    if (market === 'hk') {
+      return `${symbol}.HK`;
+    }
+    if (symbol.startsWith('6')) {
+      return `${symbol}.SH`;
+    }
+    if (symbol.startsWith('4') || symbol.startsWith('8') || symbol.startsWith('9')) {
+      return `${symbol}.BJ`;
+    }
+    return `${symbol}.SZ`;
   }
 }

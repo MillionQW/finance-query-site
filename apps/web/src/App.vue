@@ -13,12 +13,17 @@ import {
   TrendingUp
 } from 'lucide-vue-next';
 import CustomMetricChart from './components/CustomMetricChart.vue';
+import CacheManagerPanel from './components/CacheManagerPanel.vue';
 import MiniTrend from './components/MiniTrend.vue';
 import PeerComparisonPanel from './components/PeerComparisonPanel.vue';
+import PeerMetricChart from './components/PeerMetricChart.vue';
 import StatementTable from './components/StatementTable.vue';
 import {
+  getCacheEntries,
   getFavorites,
+  getMetricComparison,
   getPeerComparison,
+  getPeerMetricComparison,
   getRefreshStatus,
   getStatements,
   removeFavorite,
@@ -28,11 +33,13 @@ import {
 } from './services/api';
 import type {
   CompanySearchResult,
+  CacheEntry,
   FavoriteCompany,
   FinancialStatements,
   Market,
   MarketFilter,
   PeerComparison,
+  PeerMetricComparison,
   StatementRefreshRuntimeStatus,
   StatementType
 } from './types/finance';
@@ -54,25 +61,35 @@ const companies = ref<CompanySearchResult[]>(mergeCompanyList([initialCompany], 
 const selectedCompany = ref<CompanySearchResult | null>(initialCompany);
 const statements = ref<FinancialStatements | null>(null);
 const peerComparison = ref<PeerComparison | null>(null);
+const peerMetricComparison = ref<PeerMetricComparison | null>(null);
 const activeStatement = ref<StatementType>('balance');
+const activePeerMetricKey = ref('revenue');
+const peerMetricMode = ref<'peers' | 'custom'>('peers');
+const selectedMetricCompanyKeys = ref<string[]>([]);
 const selectedYears = ref<string[]>([]);
 const searchLoading = ref(false);
 const statementLoading = ref(false);
 const peerLoading = ref(false);
+const peerMetricLoading = ref(false);
+const cacheEntriesLoading = ref(false);
 const searchError = ref<string | null>(null);
 const statementError = ref<string | null>(null);
 const peerError = ref<string | null>(null);
+const peerMetricError = ref<string | null>(null);
+const cacheEntriesError = ref<string | null>(null);
 const searchDropdownOpen = ref(false);
 const favorites = ref<FavoriteCompany[]>([]);
 const recentCompanies = ref<CompanySearchResult[]>([]);
 const favoriteLoading = ref(false);
 const favoriteNotice = ref<string | null>(null);
 const refreshStatus = ref<StatementRefreshRuntimeStatus | null>(null);
+const cacheEntries = ref<CacheEntry[]>([]);
 const refreshTaskLoading = ref(false);
 const refreshTaskNotice = ref<string | null>(null);
 let searchTimer: number | undefined;
 let favoriteNoticeTimer: number | undefined;
 let peerRequestId = 0;
+let peerMetricRequestId = 0;
 
 const marketOptions: { value: MarketFilter; label: string }[] = [
   { value: 'all', label: '全部' },
@@ -122,6 +139,17 @@ const statementCacheLabel = computed(() => {
     return '加载中';
   }
   return statements.value.cache.hit ? '本地缓存' : '刚刚更新';
+});
+
+const selectedMetricCompanies = computed(() => {
+  const selected = new Set(selectedMetricCompanyKeys.value);
+  return cacheEntries.value
+    .filter((entry) => entry.kind === 'statements' && selected.has(companyKey(entry)))
+    .map((entry) => ({
+      market: entry.market,
+      symbol: entry.symbol,
+      name: entry.name ?? entry.displaySymbol
+    }));
 });
 
 function marketLabel(value?: MarketFilter): string {
@@ -330,6 +358,24 @@ async function loadRefreshStatus(): Promise<void> {
   }
 }
 
+async function loadCacheEntries(): Promise<void> {
+  cacheEntriesLoading.value = true;
+  cacheEntriesError.value = null;
+  try {
+    cacheEntries.value = await getCacheEntries();
+    if (!selectedMetricCompanyKeys.value.length && selectedCompany.value) {
+      selectedMetricCompanyKeys.value = cacheEntries.value
+        .filter((entry) => entry.kind === 'statements')
+        .slice(0, 4)
+        .map((entry) => companyKey(entry));
+    }
+  } catch (error) {
+    cacheEntriesError.value = error instanceof Error ? error.message : '缓存列表读取失败';
+  } finally {
+    cacheEntriesLoading.value = false;
+  }
+}
+
 async function runRefreshTask(): Promise<void> {
   if (refreshTaskLoading.value || refreshStatus.value?.running) return;
 
@@ -339,6 +385,7 @@ async function runRefreshTask(): Promise<void> {
     const run = await triggerRefresh();
     refreshTaskNotice.value = run.message ?? '数据更新任务已完成';
     await loadRefreshStatus();
+    await loadCacheEntries();
     if (selectedCompany.value) {
       await selectCompany(selectedCompany.value, false, 'replace');
     }
@@ -439,6 +486,7 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
   statementError.value = null;
   activeStatement.value = 'balance';
   void loadPeerComparison(company);
+  void loadPeerMetricComparison(company);
   try {
     statements.value = await getStatements(company.market, company.symbol, 10, refresh);
     if (sameCompany(company, selectedCompany.value) && statements.value.company.name) {
@@ -482,6 +530,62 @@ async function loadPeerComparison(company: CompanySearchResult): Promise<void> {
   }
 }
 
+async function loadPeerMetricComparison(company: CompanySearchResult): Promise<void> {
+  const requestId = ++peerMetricRequestId;
+  peerMetricLoading.value = true;
+  peerMetricError.value = null;
+
+  try {
+    if (peerMetricMode.value === 'custom' && !selectedMetricCompanies.value.length) {
+      peerMetricComparison.value = {
+        metricKey: activePeerMetricKey.value,
+        metricLabel: '自选指标',
+        years: [],
+        companies: [],
+        missingCompanies: []
+      };
+      return;
+    }
+
+    const payload = peerMetricMode.value === 'custom'
+      ? await getMetricComparison(activePeerMetricKey.value, selectedMetricCompanies.value)
+      : await getPeerMetricComparison(company.market, company.symbol, activePeerMetricKey.value, 12);
+    if (requestId === peerMetricRequestId) {
+      peerMetricComparison.value = payload;
+    }
+  } catch (error) {
+    if (requestId === peerMetricRequestId) {
+      peerMetricComparison.value = null;
+      peerMetricError.value = error instanceof Error ? error.message : '同行财务指标读取失败';
+    }
+  } finally {
+    if (requestId === peerMetricRequestId) {
+      peerMetricLoading.value = false;
+    }
+  }
+}
+
+function changePeerMetric(value: string): void {
+  activePeerMetricKey.value = value;
+  if (selectedCompany.value) {
+    void loadPeerMetricComparison(selectedCompany.value);
+  }
+}
+
+function changePeerMetricMode(value: 'peers' | 'custom'): void {
+  peerMetricMode.value = value;
+  if (selectedCompany.value) {
+    void loadPeerMetricComparison(selectedCompany.value);
+  }
+}
+
+function changeMetricCompanies(value: string[]): void {
+  selectedMetricCompanyKeys.value = value;
+  if (selectedCompany.value && peerMetricMode.value === 'custom') {
+    void loadPeerMetricComparison(selectedCompany.value);
+  }
+}
+
 function toggleYear(year: string): void {
   if (selectedYears.value.includes(year)) {
     selectedYears.value = selectedYears.value.filter((item) => item !== year);
@@ -519,6 +623,7 @@ onMounted(async () => {
   window.addEventListener('popstate', handleUrlNavigation);
   loadRecentCompanies();
   await loadRefreshStatus();
+  await loadCacheEntries();
   await loadFavorites();
   await runSearch();
   if (selectedCompany.value) {
@@ -741,6 +846,12 @@ onUnmounted(() => {
           {{ refreshTaskNotice }}
         </div>
 
+        <CacheManagerPanel
+          :entries="cacheEntries"
+          :loading="cacheEntriesLoading"
+          :error="cacheEntriesError"
+        />
+
         <div v-if="statementError" class="status-banner">
           <AlertTriangle :size="18" />
           <span>{{ statementError }}</span>
@@ -777,6 +888,19 @@ onUnmounted(() => {
           :comparison="peerComparison"
           :loading="peerLoading"
           :error="peerError"
+        />
+
+        <PeerMetricChart
+          :comparison="peerMetricComparison"
+          :loading="peerMetricLoading"
+          :error="peerMetricError"
+          :metric-key="activePeerMetricKey"
+          :mode="peerMetricMode"
+          :cache-entries="cacheEntries"
+          :selected-company-keys="selectedMetricCompanyKeys"
+          @metric-change="changePeerMetric"
+          @mode-change="changePeerMetricMode"
+          @selection-change="changeMetricCompanies"
         />
 
         <CustomMetricChart :statements="statements" :active-years="activeYears" />

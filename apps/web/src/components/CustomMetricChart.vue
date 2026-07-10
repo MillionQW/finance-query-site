@@ -10,6 +10,7 @@ import type { FinancialStatements, StatementTable } from '../types/finance';
 echarts.use([AxisPointerComponent, GridComponent, TooltipComponent, LineChart, CanvasRenderer]);
 
 type MetricKind = 'percent' | 'times';
+type MetricGroupKey = 'profitability' | 'growth' | 'solvency' | 'efficiency';
 
 interface MetricPoint {
   year: string;
@@ -21,6 +22,7 @@ interface MetricPoint {
 interface MetricDefinition {
   key: string;
   label: string;
+  group: MetricGroupKey;
   formula: string;
   kind: MetricKind;
   description: string;
@@ -45,6 +47,13 @@ interface MetricResult {
   points: MetricPoint[];
   latest: number | null;
   missing: string[];
+  alerts: MetricAlert[];
+}
+
+interface MetricAlert {
+  year?: string;
+  message: string;
+  tone: 'warning' | 'danger';
 }
 
 interface FormulaDetail {
@@ -65,6 +74,7 @@ const props = defineProps<{
 }>();
 
 const activeMetricKey = ref('roe');
+const activeMetricGroup = ref<MetricGroupKey>('profitability');
 const chartElement = ref<HTMLDivElement | null>(null);
 const chart = shallowRef<ECharts | null>(null);
 
@@ -94,10 +104,18 @@ const INTEREST_BEARING_DEBT_GROUPS = [
 ];
 const INTEREST_BEARING_DEBT_ALIASES = INTEREST_BEARING_DEBT_GROUPS.flatMap((group) => group.aliases);
 
+const metricGroups: Array<{ key: MetricGroupKey; label: string }> = [
+  { key: 'profitability', label: '盈利能力' },
+  { key: 'growth', label: '成长能力' },
+  { key: 'solvency', label: '偿债能力' },
+  { key: 'efficiency', label: '营运效率' }
+];
+
 const definitions: MetricDefinition[] = [
   {
     key: 'roe',
     label: 'ROE',
+    group: 'profitability',
     formula: '净利润 / 平均股东权益',
     kind: 'percent',
     description: '衡量股东权益产生利润的效率。',
@@ -114,6 +132,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'roa',
     label: 'ROA',
+    group: 'profitability',
     formula: '净利润 / 平均总资产',
     kind: 'percent',
     description: '衡量资产投入转化为利润的效率。',
@@ -130,6 +149,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'currentRatio',
     label: '流动比率',
+    group: 'solvency',
     formula: '流动资产 / 流动负债',
     kind: 'times',
     description: '观察短期资产覆盖短期债务的能力。',
@@ -146,6 +166,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'quickRatio',
     label: '速动比率',
+    group: 'solvency',
     formula: '(流动资产 - 存货) / 流动负债',
     kind: 'times',
     description: '剔除存货后观察短期偿债能力。',
@@ -165,6 +186,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'cashDebtRatio',
     label: '现金债务比',
+    group: 'solvency',
     formula: '现金及现金等价物 / 有息负债',
     kind: 'times',
     description: '观察现金对有息债务的覆盖倍数。',
@@ -181,6 +203,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'receivableTurnover',
     label: '应收账款周转率',
+    group: 'efficiency',
     formula: '营业收入 / 应收账款平均余额',
     kind: 'times',
     description: '观察收入回款相关资产的周转速度。',
@@ -197,6 +220,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'inventoryTurnover',
     label: '存货周转率',
+    group: 'efficiency',
     formula: '营业成本 / 存货平均余额',
     kind: 'times',
     description: '观察存货转化为销售成本的速度。',
@@ -214,6 +238,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'fixedAssetTurnover',
     label: '固定资产周转率',
+    group: 'efficiency',
     formula: '营业收入 / 固定资产净值',
     kind: 'times',
     description: '观察固定资产带来收入的效率。',
@@ -230,6 +255,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'grossMargin',
     label: '毛利率',
+    group: 'profitability',
     formula: '毛利润 / 营业收入',
     kind: 'percent',
     description: '观察主营业务留存的毛利空间。',
@@ -250,6 +276,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'operatingMargin',
     label: '营业利润率',
+    group: 'profitability',
     formula: '营业利润 / 营业收入',
     kind: 'percent',
     description: '观察营业利润对收入的留存比例。',
@@ -266,6 +293,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'netMargin',
     label: '净利率',
+    group: 'profitability',
     formula: '净利润 / 营业收入',
     kind: 'percent',
     description: '观察净利润对收入的留存比例。',
@@ -282,6 +310,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'expenseRatio',
     label: '费用率',
+    group: 'profitability',
     formula: '(销售费用 + 管理费用 + 财务费用) / 营业收入',
     kind: 'percent',
     description: '观察三费对营业收入的消耗比例。',
@@ -302,6 +331,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'revenueGrowth',
     label: '营业收入增长率',
+    group: 'growth',
     formula: '(本期营业收入 - 上期营业收入) / 上期营业收入',
     kind: 'percent',
     description: '观察营业收入同比增长速度。',
@@ -317,6 +347,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'operatingProfitGrowth',
     label: '营业利润增长率',
+    group: 'growth',
     formula: '(本期营业利润 - 上期营业利润) / 上期营业利润',
     kind: 'percent',
     description: '观察营业利润同比增长速度。',
@@ -332,6 +363,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'assetGrowth',
     label: '资产增长率',
+    group: 'growth',
     formula: '(本期资产 - 上期资产) / 上期资产',
     kind: 'percent',
     description: '观察资产规模同比增长速度。',
@@ -347,6 +379,7 @@ const definitions: MetricDefinition[] = [
   {
     key: 'netAssetGrowth',
     label: '净资产增长率',
+    group: 'growth',
     formula: '(本期净资产 - 上期净资产) / 上期净资产',
     kind: 'percent',
     description: '观察净资产规模同比增长速度。',
@@ -363,7 +396,7 @@ const definitions: MetricDefinition[] = [
 
 const metricResults = computed<MetricResult[]>(() => {
   if (!props.statements) {
-    return definitions.map((definition) => ({ definition, points: [], latest: null, missing: [] }));
+    return definitions.map((definition) => ({ definition, points: [], latest: null, missing: [], alerts: [] }));
   }
 
   const context: MetricContext = {
@@ -389,14 +422,27 @@ const metricResults = computed<MetricResult[]>(() => {
       definition,
       points,
       latest,
-      missing: missingRequirements(definition, context)
+      missing: missingRequirements(definition, context),
+      alerts: metricAlerts(definition, points)
     };
   });
 });
 
-const selectedResult = computed(() =>
-  metricResults.value.find((result) => result.definition.key === activeMetricKey.value) ?? metricResults.value[0]
+const groupedMetricResults = computed(() =>
+  metricResults.value.filter((result) => result.definition.group === activeMetricGroup.value)
 );
+
+const selectedResult = computed(() =>
+  metricResults.value.find((result) => result.definition.key === activeMetricKey.value) ??
+  groupedMetricResults.value[0] ??
+  metricResults.value[0]
+);
+
+watch(activeMetricGroup, () => {
+  const current = metricResults.value.find((result) => result.definition.key === activeMetricKey.value);
+  if (current?.definition.group === activeMetricGroup.value) return;
+  activeMetricKey.value = groupedMetricResults.value[0]?.definition.key ?? metricResults.value[0]?.definition.key ?? 'roe';
+});
 
 const chartOption = computed<EChartsCoreOption>(() => {
   const result = selectedResult.value;
@@ -861,6 +907,37 @@ function missingRequirements(definition: MetricDefinition, context: MetricContex
     .map((requirement) => requirement.label);
 }
 
+function metricAlerts(definition: MetricDefinition, points: MetricPoint[]): MetricAlert[] {
+  const alerts: MetricAlert[] = [];
+  const missingYears = points.filter((point) => point.value === null).map((point) => point.year);
+  if (missingYears.length) {
+    alerts.push({
+      message: `${missingYears.join('、')} 无法计算，通常是公式科目缺失或分母为 0。`,
+      tone: 'warning'
+    });
+  }
+
+  for (const point of points) {
+    if (point.value === null) continue;
+    if (definition.kind === 'percent' && Math.abs(point.value) >= 1) {
+      alerts.push({
+        year: point.year,
+        message: `${point.year} 数值达到 ${formatMetricValue(point.value, definition.kind)}，建议核对公式明细。`,
+        tone: 'danger'
+      });
+    }
+    if (definition.kind === 'times' && Math.abs(point.value) >= 100) {
+      alerts.push({
+        year: point.year,
+        message: `${point.year} 倍数达到 ${formatMetricValue(point.value, definition.kind)}，可能由分母过小导致。`,
+        tone: 'warning'
+      });
+    }
+  }
+
+  return alerts.slice(0, 3);
+}
+
 function toNumber(value: number | string | null | undefined): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value !== 'string') return null;
@@ -981,9 +1058,21 @@ function formatAxisValue(value: number, kind: MetricKind): string {
       <strong>{{ formatMetricValue(selectedResult.latest, selectedResult.definition.kind) }}</strong>
     </div>
 
+    <div class="metric-group-tabs" aria-label="指标分组">
+      <button
+        v-for="group in metricGroups"
+        :key="group.key"
+        :class="{ active: activeMetricGroup === group.key }"
+        type="button"
+        @click="activeMetricGroup = group.key"
+      >
+        {{ group.label }}
+      </button>
+    </div>
+
     <div class="metric-selector" aria-label="自定义指标">
       <button
-        v-for="result in metricResults"
+        v-for="result in groupedMetricResults"
         :key="result.definition.key"
         :class="{ active: activeMetricKey === result.definition.key }"
         type="button"
@@ -1003,6 +1092,16 @@ function formatAxisValue(value: number, kind: MetricKind): string {
 
     <div v-if="selectedResult.missing.length" class="metric-warning">
       缺少科目：{{ selectedResult.missing.join('、') }}
+    </div>
+
+    <div v-if="selectedResult.alerts.length" class="metric-alert-list">
+      <div
+        v-for="alert in selectedResult.alerts"
+        :key="`${alert.year ?? 'metric'}-${alert.message}`"
+        :class="['metric-alert', alert.tone]"
+      >
+        {{ alert.message }}
+      </div>
     </div>
   </section>
 </template>

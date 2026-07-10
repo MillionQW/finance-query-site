@@ -50,6 +50,22 @@ export class PeerQueryDto {
   limit = 20;
 }
 
+export class PeerMetricQueryDto extends PeerQueryDto {
+  @IsOptional()
+  @IsString()
+  metricKey = 'revenue';
+}
+
+export class MetricComparisonQueryDto {
+  @IsOptional()
+  @IsString()
+  metricKey = 'revenue';
+
+  @IsString()
+  @IsNotEmpty()
+  companies!: string;
+}
+
 export class FavoriteCompanyDto {
   @IsIn(['a', 'hk'])
   market!: Exclude<Market, 'all'>;
