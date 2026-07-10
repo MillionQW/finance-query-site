@@ -54,7 +54,13 @@ export class FinanceService {
       String(years)
     ]);
     this.store.saveStatements(payload, years);
-    return payload;
+    return {
+      ...payload,
+      cache: {
+        hit: false,
+        refreshedAt: new Date().toISOString()
+      }
+    };
   }
 
   async getPeerComparison(

@@ -117,6 +117,13 @@ const summaryCards = computed(() => {
   });
 });
 
+const statementCacheLabel = computed(() => {
+  if (!statements.value?.cache) {
+    return '加载中';
+  }
+  return statements.value.cache.hit ? '本地缓存' : '刚刚更新';
+});
+
 function marketLabel(value?: MarketFilter): string {
   if (value === 'hk') return '港股';
   if (value === 'a') return 'A股';
@@ -688,6 +695,12 @@ onUnmounted(() => {
               <strong>{{ statements?.unit ?? '-' }}</strong>
             </div>
           </div>
+        </div>
+
+        <div class="statement-cache-strip">
+          <span>财报数据</span>
+          <strong>{{ statementCacheLabel }}</strong>
+          <small>缓存刷新：{{ formatDate(statements?.cache?.refreshedAt) }}</small>
         </div>
 
         <section class="refresh-task-panel">

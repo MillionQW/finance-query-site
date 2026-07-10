@@ -570,6 +570,23 @@ button {
   font-size: 16px;
 }
 
+.statement-cache-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.statement-cache-strip strong {
+  color: #1d4ed8;
+}
+
+.statement-cache-strip small {
+  color: var(--muted);
+}
+
 .refresh-task-panel {
   display: grid;
   grid-template-columns: minmax(180px, 1.3fr) repeat(3, minmax(120px, 1fr)) auto;

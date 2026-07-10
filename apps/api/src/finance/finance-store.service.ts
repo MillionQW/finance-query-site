@@ -172,7 +172,7 @@ export class FinanceStoreService implements OnModuleDestroy {
     const row = this.db
       .prepare(
         `
-        SELECT payload_json
+        SELECT payload_json, refreshed_at
         FROM financial_statement_cache
         WHERE market = ? AND symbol = ? AND years_requested = ?
         LIMIT 1
@@ -188,7 +188,13 @@ export class FinanceStoreService implements OnModuleDestroy {
     if (!this.hasStatementSourceItems(payload)) {
       return null;
     }
-    return payload;
+    return {
+      ...payload,
+      cache: {
+        hit: true,
+        refreshedAt: fromSqliteDate(row.refreshed_at)
+      }
+    };
   }
 
   saveStatements(payload: FinancialStatements, yearsRequested: number): void {
@@ -196,7 +202,8 @@ export class FinanceStoreService implements OnModuleDestroy {
     const symbol = normalizeSymbol(market, payload.company.symbol);
     const displaySymbol = payload.company.displaySymbol || makeDisplaySymbol(market, symbol);
     const yearsKey = payload.years.join(',');
-    const payloadJson = JSON.stringify(payload);
+    const payloadForStorage = withoutStatementCache(payload);
+    const payloadJson = JSON.stringify(payloadForStorage);
     const payloadHash = createHash('sha256').update(payloadJson).digest('hex');
 
     this.withTransaction(() => {
@@ -933,4 +940,13 @@ function makeDisplaySymbol(market: Market, symbol: string): string {
 
 function toSqliteDate(value: Date): string {
   return value.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function fromSqliteDate(value: string): string {
+  return value.includes('T') ? value : `${value.replace(' ', 'T')}Z`;
+}
+
+function withoutStatementCache(payload: FinancialStatements): FinancialStatements {
+  const { cache: _cache, ...rest } = payload;
+  return rest;
 }

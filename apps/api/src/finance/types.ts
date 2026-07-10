@@ -141,4 +141,8 @@ export interface FinancialStatements {
   highlights: MetricSeries[];
   fetchedAt: string;
   source: string;
+  cache?: {
+    hit: boolean;
+    refreshedAt: string;
+  };
 }
