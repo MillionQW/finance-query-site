@@ -972,6 +972,8 @@ button {
 
 .statement-table-tools {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: flex-end;
   margin: 18px 0 8px;
 }
@@ -1050,6 +1052,37 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.statement-cell-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  line-height: 1.22;
+}
+
+.statement-cell-main {
+  color: #334155;
+  font-weight: 800;
+}
+
+.statement-cell-main.up {
+  color: var(--red);
+}
+
+.statement-cell-main.down {
+  color: var(--green);
+}
+
+.statement-cell-main.flat {
+  color: #334155;
+}
+
+.statement-cell-raw {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .statement-table .item-source-tooltip {
