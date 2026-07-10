@@ -6,6 +6,8 @@ import { Market } from './dto';
 
 @Injectable()
 export class FinanceService {
+  private readonly peerCacheDays = this.readPositiveNumber(process.env.FINANCE_PEER_CACHE_DAYS, 7);
+
   constructor(
     private readonly akshare: PythonAkshareService,
     private readonly store: FinanceStoreService
@@ -61,6 +63,12 @@ export class FinanceService {
     limit: number
   ): Promise<PeerComparison> {
     const normalizedSymbol = normalizeSymbol(market, symbol);
+    const refreshedAfter = new Date(Date.now() - this.peerCacheDays * 24 * 60 * 60 * 1000);
+    const cached = this.store.getPeerComparison(market, normalizedSymbol, refreshedAfter);
+    if (cached) {
+      return this.limitPeerComparison(cached, limit);
+    }
+
     const payload = await this.akshare.run<PeerComparison>([
       'peers',
       '--market',
@@ -68,10 +76,10 @@ export class FinanceService {
       '--symbol',
       normalizedSymbol,
       '--limit',
-      String(limit)
+      '50'
     ]);
-    this.store.upsertCompanies(payload.peers);
-    return payload;
+    this.store.savePeerComparison(payload);
+    return this.limitPeerComparison(payload, limit);
   }
 
   getFavorites(): FavoriteCompany[] {
@@ -88,5 +96,28 @@ export class FinanceService {
 
   getCacheStats() {
     return this.store.getStats();
+  }
+
+  private limitPeerComparison(payload: PeerComparison, limit: number): PeerComparison {
+    const safeLimit = Math.max(5, Math.min(limit, 50));
+    const selectedPeer = payload.peers.find((peer) => peer.isSelected);
+    const peers = selectedPeer
+      ? [
+          selectedPeer,
+          ...payload.peers
+            .filter((peer) => peer.market !== selectedPeer.market || peer.symbol !== selectedPeer.symbol)
+            .slice(0, safeLimit - 1)
+        ]
+      : payload.peers.slice(0, safeLimit);
+
+    return {
+      ...payload,
+      peers
+    };
+  }
+
+  private readPositiveNumber(value: string | undefined, fallback: number): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
 }

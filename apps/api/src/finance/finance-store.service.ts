@@ -8,6 +8,7 @@ import {
   FavoriteCompany,
   FinancialStatements,
   Market,
+  PeerComparison,
   StatementRefreshError,
   StatementRefreshRun,
   StatementRefreshStatus,
@@ -278,6 +279,7 @@ export class FinanceStoreService implements OnModuleDestroy {
     const companies = this.db.prepare('SELECT COUNT(*) AS count FROM companies').get().count;
     const favorites = this.db.prepare('SELECT COUNT(*) AS count FROM favorite_companies').get().count;
     const snapshots = this.db.prepare('SELECT COUNT(*) AS count FROM financial_statement_cache').get().count;
+    const peerComparisons = this.db.prepare('SELECT COUNT(*) AS count FROM peer_comparison_cache').get().count;
     const values = this.db.prepare('SELECT COUNT(*) AS count FROM financial_statement_values').get().count;
     const metrics = this.db.prepare('SELECT COUNT(*) AS count FROM financial_metric_values').get().count;
     return {
@@ -285,9 +287,90 @@ export class FinanceStoreService implements OnModuleDestroy {
       companies,
       favorites,
       statementSnapshots: snapshots,
+      peerComparisons,
       statementValues: values,
       metricValues: metrics
     };
+  }
+
+  getPeerComparison(market: Market, symbol: string, refreshedAfter: Date): PeerComparison | null {
+    const normalizedSymbol = normalizeSymbol(market, symbol);
+    const row = this.db
+      .prepare(
+        `
+        SELECT payload_json
+        FROM peer_comparison_cache
+        WHERE market = ?
+          AND symbol = ?
+          AND refreshed_at >= ?
+        LIMIT 1
+      `
+      )
+      .get(market, normalizedSymbol, toSqliteDate(refreshedAfter));
+
+    if (!row?.payload_json) {
+      return null;
+    }
+
+    return JSON.parse(row.payload_json) as PeerComparison;
+  }
+
+  savePeerComparison(payload: PeerComparison): void {
+    const market = payload.company.market;
+    const symbol = normalizeSymbol(market, payload.company.symbol);
+    const displaySymbol = payload.company.displaySymbol || makeDisplaySymbol(market, symbol);
+    const payloadJson = JSON.stringify(payload);
+    const payloadHash = createHash('sha256').update(payloadJson).digest('hex');
+
+    this.withTransaction(() => {
+      this.upsertCompanies([
+        {
+          market,
+          symbol,
+          displaySymbol,
+          name: payload.company.name ?? displaySymbol,
+          source: payload.source,
+          latestPrice: null,
+          changePercent: null
+        },
+        ...payload.peers
+      ]);
+
+      this.db
+        .prepare(
+          `
+          INSERT INTO peer_comparison_cache (
+            market, symbol, display_symbol, company_name, industry_name, industry_source,
+            source, fetched_at, peer_count, payload_json, payload_hash, created_at, refreshed_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+          ON CONFLICT(market, symbol) DO UPDATE SET
+            display_symbol = excluded.display_symbol,
+            company_name = excluded.company_name,
+            industry_name = excluded.industry_name,
+            industry_source = excluded.industry_source,
+            source = excluded.source,
+            fetched_at = excluded.fetched_at,
+            peer_count = excluded.peer_count,
+            payload_json = excluded.payload_json,
+            payload_hash = excluded.payload_hash,
+            refreshed_at = datetime('now')
+        `
+        )
+        .run(
+          market,
+          symbol,
+          displaySymbol,
+          payload.company.name ?? null,
+          payload.industry?.name ?? null,
+          payload.industry?.source ?? null,
+          payload.source,
+          payload.fetchedAt,
+          payload.peers.length,
+          payloadJson,
+          payloadHash
+        );
+    });
   }
 
   listStatementRefreshTargets(options: { staleBefore?: Date; includeFresh?: boolean } = {}): StatementRefreshTarget[] {
@@ -682,6 +765,27 @@ export class FinanceStoreService implements OnModuleDestroy {
 
       CREATE INDEX IF NOT EXISTS idx_statement_refresh_jobs_started
         ON statement_refresh_jobs(started_at DESC);
+
+      CREATE TABLE IF NOT EXISTS peer_comparison_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        market TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        display_symbol TEXT NOT NULL,
+        company_name TEXT,
+        industry_name TEXT,
+        industry_source TEXT,
+        source TEXT NOT NULL,
+        fetched_at TEXT NOT NULL,
+        peer_count INTEGER NOT NULL,
+        payload_json TEXT NOT NULL,
+        payload_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        refreshed_at TEXT NOT NULL,
+        UNIQUE (market, symbol)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_peer_comparison_cache_lookup
+        ON peer_comparison_cache(market, symbol, refreshed_at);
     `);
 
     this.ensureColumn('financial_statement_rows', 'source_item', 'TEXT');
@@ -825,4 +929,8 @@ function makeDisplaySymbol(market: Market, symbol: string): string {
     return `${symbol}.BJ`;
   }
   return `${symbol}.SZ`;
+}
+
+function toSqliteDate(value: Date): string {
+  return value.toISOString().slice(0, 19).replace('T', ' ');
 }
