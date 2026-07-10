@@ -15,13 +15,23 @@ import CustomMetricChart from './components/CustomMetricChart.vue';
 import MiniTrend from './components/MiniTrend.vue';
 import PeerComparisonPanel from './components/PeerComparisonPanel.vue';
 import StatementTable from './components/StatementTable.vue';
-import { getFavorites, getPeerComparison, getStatements, removeFavorite, saveFavorite, searchCompanies } from './services/api';
+import {
+  getFavorites,
+  getPeerComparison,
+  getRefreshStatus,
+  getStatements,
+  removeFavorite,
+  saveFavorite,
+  searchCompanies,
+  triggerRefresh
+} from './services/api';
 import type {
   CompanySearchResult,
   FavoriteCompany,
   FinancialStatements,
   MarketFilter,
   PeerComparison,
+  StatementRefreshRuntimeStatus,
   StatementType
 } from './types/finance';
 
@@ -51,6 +61,9 @@ const searchDropdownOpen = ref(false);
 const favorites = ref<FavoriteCompany[]>([]);
 const favoriteLoading = ref(false);
 const favoriteNotice = ref<string | null>(null);
+const refreshStatus = ref<StatementRefreshRuntimeStatus | null>(null);
+const refreshTaskLoading = ref(false);
+const refreshTaskNotice = ref<string | null>(null);
 let searchTimer: number | undefined;
 let favoriteNoticeTimer: number | undefined;
 let peerRequestId = 0;
@@ -120,6 +133,14 @@ function formatDate(value?: string): string {
   return new Date(value).toLocaleString('zh-CN', { hour12: false });
 }
 
+function refreshRunLabel(status?: string): string {
+  if (status === 'completed') return '已完成';
+  if (status === 'failed') return '失败';
+  if (status === 'skipped') return '已跳过';
+  if (status === 'running') return '运行中';
+  return '-';
+}
+
 function companyKey(company: Pick<CompanySearchResult, 'market' | 'symbol'>): string {
   return `${company.market}:${company.symbol}`;
 }
@@ -142,6 +163,33 @@ async function loadFavorites(): Promise<void> {
   } catch (error) {
     favorites.value = [];
     showFavoriteNotice(error instanceof Error ? error.message : '收藏读取失败');
+  }
+}
+
+async function loadRefreshStatus(): Promise<void> {
+  try {
+    refreshStatus.value = await getRefreshStatus();
+  } catch (error) {
+    refreshTaskNotice.value = error instanceof Error ? error.message : '更新任务状态读取失败';
+  }
+}
+
+async function runRefreshTask(): Promise<void> {
+  if (refreshTaskLoading.value || refreshStatus.value?.running) return;
+
+  refreshTaskLoading.value = true;
+  refreshTaskNotice.value = null;
+  try {
+    const run = await triggerRefresh();
+    refreshTaskNotice.value = run.message ?? '数据更新任务已完成';
+    await loadRefreshStatus();
+    if (selectedCompany.value) {
+      await selectCompany(selectedCompany.value);
+    }
+  } catch (error) {
+    refreshTaskNotice.value = error instanceof Error ? error.message : '数据更新任务触发失败';
+  } finally {
+    refreshTaskLoading.value = false;
   }
 }
 
@@ -297,6 +345,7 @@ watch([query, market], () => {
 });
 
 onMounted(async () => {
+  await loadRefreshStatus();
   await loadFavorites();
   await runSearch();
   if (selectedCompany.value) {
@@ -455,6 +504,44 @@ onMounted(async () => {
               <strong>{{ statements?.unit ?? '-' }}</strong>
             </div>
           </div>
+        </div>
+
+        <section class="refresh-task-panel">
+          <div>
+            <span>数据更新任务</span>
+            <strong>
+              {{ refreshStatus?.enabled ? `每 ${refreshStatus.intervalDays} 天自动检查` : '未启用' }}
+            </strong>
+          </div>
+          <div>
+            <span>待更新</span>
+            <strong>{{ refreshStatus?.pendingTargets ?? 0 }}</strong>
+          </div>
+          <div>
+            <span>上次运行</span>
+            <strong>{{ refreshRunLabel(refreshStatus?.latestRun?.status) }}</strong>
+            <small v-if="refreshStatus?.latestRun">
+              {{ refreshStatus.latestRun.succeeded }}/{{ refreshStatus.latestRun.totalTargets }}
+            </small>
+          </div>
+          <div>
+            <span>下次检查</span>
+            <strong>{{ formatDate(refreshStatus?.nextRunAt ?? undefined) }}</strong>
+          </div>
+          <button
+            class="ghost-button blue"
+            type="button"
+            :disabled="refreshTaskLoading || refreshStatus?.running"
+            @click="runRefreshTask"
+          >
+            <Loader2 v-if="refreshTaskLoading || refreshStatus?.running" class="spin-icon" :size="16" />
+            <RefreshCw v-else :size="16" />
+            {{ refreshTaskLoading || refreshStatus?.running ? '更新中' : '立即更新' }}
+          </button>
+        </section>
+
+        <div v-if="refreshTaskNotice" class="refresh-task-notice">
+          {{ refreshTaskNotice }}
         </div>
 
         <div v-if="statementError" class="status-banner">

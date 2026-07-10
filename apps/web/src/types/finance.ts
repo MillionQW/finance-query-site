@@ -91,3 +91,36 @@ export interface FinancialStatements {
   fetchedAt: string;
   source: string;
 }
+
+export interface StatementRefreshError {
+  market: Market;
+  symbol: string;
+  displaySymbol: string;
+  years: number;
+  message: string;
+}
+
+export interface StatementRefreshRun {
+  id: number;
+  trigger: 'manual' | 'scheduled';
+  status: 'running' | 'completed' | 'failed' | 'skipped';
+  startedAt: string;
+  finishedAt?: string | null;
+  totalTargets: number;
+  succeeded: number;
+  failed: number;
+  message?: string | null;
+  errors: StatementRefreshError[];
+}
+
+export interface StatementRefreshRuntimeStatus {
+  enabled: boolean;
+  running: boolean;
+  intervalDays: number;
+  checkEveryMinutes: number;
+  nextRunAt: string | null;
+  staleBefore: string;
+  pendingTargets: number;
+  currentRun: StatementRefreshRun | null;
+  latestRun: StatementRefreshRun | null;
+}

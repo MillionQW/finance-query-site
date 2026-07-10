@@ -1,10 +1,14 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { FinanceService } from './finance.service';
+import { FinanceRefreshService } from './finance-refresh.service';
 import { FavoriteCompanyDto, FavoriteIdentityDto, PeerQueryDto, SearchCompaniesDto, StatementQueryDto } from './dto';
 
 @Controller()
 export class FinanceController {
-  constructor(private readonly finance: FinanceService) {}
+  constructor(
+    private readonly finance: FinanceService,
+    private readonly refresh: FinanceRefreshService
+  ) {}
 
   @Get('health')
   health() {
@@ -57,5 +61,15 @@ export class FinanceController {
   @Get('cache/stats')
   getCacheStats() {
     return this.finance.getCacheStats();
+  }
+
+  @Get('cache/refresh-status')
+  getRefreshStatus() {
+    return this.refresh.getStatus();
+  }
+
+  @Post('cache/refresh')
+  refreshStatements() {
+    return this.refresh.triggerManualRefresh();
   }
 }

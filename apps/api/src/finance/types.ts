@@ -82,6 +82,52 @@ export interface PeerComparison {
   note?: string | null;
 }
 
+export interface StatementRefreshTarget {
+  market: Market;
+  symbol: string;
+  displaySymbol: string;
+  name?: string | null;
+  years: number;
+  refreshedAt?: string | null;
+  reason: 'cached' | 'favorite-missing-cache';
+}
+
+export type StatementRefreshTrigger = 'manual' | 'scheduled';
+export type StatementRefreshStatus = 'running' | 'completed' | 'failed' | 'skipped';
+
+export interface StatementRefreshError {
+  market: Market;
+  symbol: string;
+  displaySymbol: string;
+  years: number;
+  message: string;
+}
+
+export interface StatementRefreshRun {
+  id: number;
+  trigger: StatementRefreshTrigger;
+  status: StatementRefreshStatus;
+  startedAt: string;
+  finishedAt?: string | null;
+  totalTargets: number;
+  succeeded: number;
+  failed: number;
+  message?: string | null;
+  errors: StatementRefreshError[];
+}
+
+export interface StatementRefreshRuntimeStatus {
+  enabled: boolean;
+  running: boolean;
+  intervalDays: number;
+  checkEveryMinutes: number;
+  nextRunAt: string | null;
+  staleBefore: string;
+  pendingTargets: number;
+  currentRun: StatementRefreshRun | null;
+  latestRun: StatementRefreshRun | null;
+}
+
 export interface FinancialStatements {
   company: {
     market: Market;

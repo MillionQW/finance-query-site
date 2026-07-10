@@ -1,4 +1,13 @@
-import type { CompanySearchResult, FavoriteCompany, FinancialStatements, Market, MarketFilter, PeerComparison } from '../types/finance';
+import type {
+  CompanySearchResult,
+  FavoriteCompany,
+  FinancialStatements,
+  Market,
+  MarketFilter,
+  PeerComparison,
+  StatementRefreshRun,
+  StatementRefreshRuntimeStatus
+} from '../types/finance';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
@@ -66,5 +75,15 @@ export function saveFavorite(company: CompanySearchResult): Promise<FavoriteComp
 export function removeFavorite(market: Market, symbol: string): Promise<FavoriteCompany[]> {
   return request<FavoriteCompany[]>(`/favorites/${market}/${encodeURIComponent(symbol)}`, {
     method: 'DELETE'
+  });
+}
+
+export function getRefreshStatus(): Promise<StatementRefreshRuntimeStatus> {
+  return request<StatementRefreshRuntimeStatus>('/cache/refresh-status');
+}
+
+export function triggerRefresh(): Promise<StatementRefreshRun> {
+  return request<StatementRefreshRun>('/cache/refresh', {
+    method: 'POST'
   });
 }
