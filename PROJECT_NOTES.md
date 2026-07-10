@@ -88,6 +88,11 @@ If operating cost is still unavailable but revenue and gross profit are availabl
 
 ## Recent Optimizations
 
+- Peer comparison details are collapsed by default and can be manually expanded or collapsed from the panel header.
+- Refresh task status and cache management now live on a dedicated settings page opened from the top-right settings button.
+- The settings page preserves the current company in the URL and lists all cache entries.
+- Custom local-company picker now supports filtering by company name, stock code, and market.
+- The picker shows matching/selected counts, an empty-result hint, and all cached statement companies instead of only the latest 24.
 - Metric charts are grouped into:
   - profitability
   - growth
@@ -142,7 +147,6 @@ Recently verified:
 
 ## Suggested Next Steps
 
-- Add search/filter to the custom local-company picker.
 - Add single-cache-entry delete and refresh actions to the cache management panel.
 - Add more fixed metrics to peer/custom comparison, such as ROE, gross margin, net margin, and revenue growth.
 - Persist selected peer/custom comparison companies in localStorage.

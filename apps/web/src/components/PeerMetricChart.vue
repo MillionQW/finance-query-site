@@ -27,6 +27,7 @@ const emit = defineEmits<{
 
 const chartElement = ref<HTMLDivElement | null>(null);
 const chart = shallowRef<ECharts | null>(null);
+const companySearchQuery = ref('');
 
 const metricOptions = [
   { key: 'revenue', label: '营业收入' },
@@ -37,10 +38,19 @@ const metricOptions = [
 ];
 
 const cachedStatementEntries = computed(() =>
-  props.cacheEntries
-    .filter((entry) => entry.kind === 'statements')
-    .slice(0, 24)
+  props.cacheEntries.filter((entry) => entry.kind === 'statements')
 );
+
+const filteredStatementEntries = computed(() => {
+  const keyword = companySearchQuery.value.trim().toLocaleLowerCase('zh-CN');
+  if (!keyword) return cachedStatementEntries.value;
+
+  return cachedStatementEntries.value.filter((entry) =>
+    [entry.name, entry.symbol, entry.displaySymbol, entry.market === 'a' ? 'A股' : '港股']
+      .filter(Boolean)
+      .some((value) => String(value).toLocaleLowerCase('zh-CN').includes(keyword))
+  );
+});
 
 const chartOption = computed<EChartsCoreOption>(() => {
   const comparison = props.comparison;
@@ -179,17 +189,50 @@ function toggleCompany(entry: CacheEntry): void {
       </button>
     </div>
 
-    <div v-if="mode === 'custom'" class="peer-metric-company-picker" aria-label="已缓存财报公司">
-      <button
-        v-for="entry in cachedStatementEntries"
-        :key="companyKey(entry)"
-        :class="{ active: selectedCompanyKeys.includes(companyKey(entry)) }"
-        type="button"
-        @click="toggleCompany(entry)"
+    <div v-if="mode === 'custom'" class="peer-metric-company-select">
+      <div class="peer-metric-company-search">
+        <label for="peer-company-search">筛选本地公司</label>
+        <div class="peer-metric-company-search-control">
+          <input
+            id="peer-company-search"
+            v-model="companySearchQuery"
+            type="search"
+            placeholder="输入公司名称、代码、A股或港股"
+            autocomplete="off"
+          />
+          <button
+            v-if="companySearchQuery"
+            type="button"
+            aria-label="清空公司筛选"
+            @click="companySearchQuery = ''"
+          >
+            清空
+          </button>
+        </div>
+        <small>
+          {{ filteredStatementEntries.length }} 家匹配 · 已选 {{ selectedCompanyKeys.length }} 家
+        </small>
+      </div>
+
+      <div
+        v-if="filteredStatementEntries.length"
+        class="peer-metric-company-picker"
+        aria-label="已缓存财报公司"
       >
-        <span>{{ entry.name ?? entry.displaySymbol }}</span>
-        <small>{{ entry.displaySymbol }}</small>
-      </button>
+        <button
+          v-for="entry in filteredStatementEntries"
+          :key="companyKey(entry)"
+          :class="{ active: selectedCompanyKeys.includes(companyKey(entry)) }"
+          type="button"
+          @click="toggleCompany(entry)"
+        >
+          <span>{{ entry.name ?? entry.displaySymbol }}</span>
+          <small>{{ entry.displaySymbol }} · {{ entry.market === 'a' ? 'A股' : '港股' }}</small>
+        </button>
+      </div>
+      <div v-else class="peer-metric-company-empty">
+        没有匹配“{{ companySearchQuery.trim() }}”的本地财报缓存
+      </div>
     </div>
 
     <div v-if="loading" class="peer-state">正在读取本地同行财务缓存...</div>

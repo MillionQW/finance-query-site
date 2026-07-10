@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
   AlertTriangle,
+  ArrowLeft,
   Clock3,
   Database,
   Download,
@@ -53,8 +54,10 @@ const seedCompanies: CompanySearchResult[] = [
 ];
 
 type UrlMode = 'push' | 'replace' | 'none';
+type AppView = 'company' | 'settings';
 
 const initialCompany = companyFromUrl() ?? seedCompanies[0];
+const currentView = ref<AppView>(viewFromUrl());
 const query = ref(initialCompany.name);
 const market = ref<MarketFilter>(initialCompany.market);
 const companies = ref<CompanySearchResult[]>(mergeCompanyList([initialCompany], seedCompanies));
@@ -248,6 +251,12 @@ function companyFromUrl(): CompanySearchResult | null {
   };
 }
 
+function viewFromUrl(): AppView {
+  return new URLSearchParams(window.location.search).get('view') === 'settings'
+    ? 'settings'
+    : 'company';
+}
+
 function mergeCompanyList(
   additions: CompanySearchResult[],
   base: CompanySearchResult[]
@@ -286,9 +295,51 @@ function syncCompanyUrl(company: CompanySearchResult, mode: Exclude<UrlMode, 'no
   );
 }
 
+function syncViewUrl(view: AppView, mode: 'push' | 'replace' = 'push'): void {
+  const params = new URLSearchParams(window.location.search);
+  if (view === 'settings') {
+    params.set('view', 'settings');
+  } else {
+    params.delete('view');
+  }
+  const queryString = params.toString();
+  const nextUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}${window.location.hash}`;
+  window.history[mode === 'replace' ? 'replaceState' : 'pushState']({ view }, '', nextUrl);
+  currentView.value = view;
+}
+
+async function openSettingsPage(): Promise<void> {
+  searchDropdownOpen.value = false;
+  syncViewUrl('settings');
+  window.scrollTo({ top: 0, behavior: 'auto' });
+  await Promise.all([loadRefreshStatus(), loadCacheEntries()]);
+}
+
+async function openCompanyPage(): Promise<void> {
+  syncViewUrl('company');
+  window.scrollTo({ top: 0, behavior: 'auto' });
+  if (!statements.value && selectedCompany.value) {
+    await runSearch();
+    await selectCompany(selectedCompany.value, false, 'replace');
+  }
+}
+
 function handleUrlNavigation(): void {
+  currentView.value = viewFromUrl();
+  window.scrollTo({ top: 0, behavior: 'auto' });
+  if (currentView.value === 'settings') {
+    void Promise.all([loadRefreshStatus(), loadCacheEntries()]);
+    return;
+  }
+
   const company = companyFromUrl();
-  if (!company || sameCompany(company, selectedCompany.value)) {
+  if (!company) {
+    return;
+  }
+  if (sameCompany(company, selectedCompany.value)) {
+    if (!statements.value) {
+      void selectCompany(company, false, 'none');
+    }
     return;
   }
 
@@ -386,7 +437,7 @@ async function runRefreshTask(): Promise<void> {
     refreshTaskNotice.value = run.message ?? '数据更新任务已完成';
     await loadRefreshStatus();
     await loadCacheEntries();
-    if (selectedCompany.value) {
+    if (selectedCompany.value && currentView.value === 'company') {
       await selectCompany(selectedCompany.value, false, 'replace');
     }
   } catch (error) {
@@ -622,12 +673,12 @@ watch([query, market], () => {
 onMounted(async () => {
   window.addEventListener('popstate', handleUrlNavigation);
   loadRecentCompanies();
-  await loadRefreshStatus();
-  await loadCacheEntries();
-  await loadFavorites();
-  await runSearch();
-  if (selectedCompany.value) {
-    await selectCompany(selectedCompany.value, false, 'replace');
+  await Promise.all([loadRefreshStatus(), loadCacheEntries(), loadFavorites()]);
+  if (currentView.value === 'company') {
+    await runSearch();
+    if (selectedCompany.value) {
+      await selectCompany(selectedCompany.value, false, 'replace');
+    }
   }
 });
 
@@ -644,7 +695,7 @@ onUnmounted(() => {
         <strong>财报查询台</strong>
       </div>
 
-      <div class="search-shell" @focusin="openSearchDropdown" @focusout="handleSearchFocusOut">
+      <div v-if="currentView === 'company'" class="search-shell" @focusin="openSearchDropdown" @focusout="handleSearchFocusOut">
         <div class="global-search">
           <Search :size="20" />
           <input
@@ -718,11 +769,17 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <div v-else class="settings-topbar-title">
+        <Settings :size="18" />
+        <strong>系统设置</strong>
+      </div>
+
       <nav class="top-actions" aria-label="工具">
-        <button class="ghost-button" type="button" title="刷新财报" @click="selectedCompany && selectCompany(selectedCompany, true)">
+        <button v-if="currentView === 'company'" class="ghost-button" type="button" title="刷新财报" @click="selectedCompany && selectCompany(selectedCompany, true)">
           <RefreshCw :size="17" />刷新
         </button>
         <button
+          v-if="currentView === 'company'"
           class="ghost-button"
           :class="{ 'favorite-active': selectedIsFavorite }"
           type="button"
@@ -732,8 +789,18 @@ onUnmounted(() => {
         >
           <Star :size="17" />{{ favoriteLoading ? '保存中' : selectedIsFavorite ? '已收藏' : '收藏' }}
         </button>
-        <button class="icon-button dark" type="button" title="设置">
+        <button
+          v-if="currentView === 'company'"
+          class="icon-button dark"
+          type="button"
+          title="设置"
+          aria-label="打开设置"
+          @click="openSettingsPage"
+        >
           <Settings :size="17" />
+        </button>
+        <button v-else class="ghost-button" type="button" @click="openCompanyPage">
+          <ArrowLeft :size="17" />返回财报
         </button>
       </nav>
     </header>
@@ -743,7 +810,59 @@ onUnmounted(() => {
     </div>
 
     <main class="workspace">
-      <section class="content">
+      <section v-if="currentView === 'settings'" class="settings-page">
+        <header class="settings-page-head">
+          <span>系统设置</span>
+          <h1>数据与缓存</h1>
+          <p>查看自动更新任务运行情况和本地 SQLite 缓存占用。</p>
+        </header>
+
+        <section class="refresh-task-panel">
+          <div>
+            <span>数据更新任务</span>
+            <strong>
+              {{ refreshStatus?.enabled ? `每 ${refreshStatus.intervalDays} 天自动检查` : '未启用' }}
+            </strong>
+          </div>
+          <div>
+            <span>待更新</span>
+            <strong>{{ refreshStatus?.pendingTargets ?? 0 }}</strong>
+          </div>
+          <div>
+            <span>上次运行</span>
+            <strong>{{ refreshRunLabel(refreshStatus?.latestRun?.status) }}</strong>
+            <small v-if="refreshStatus?.latestRun">
+              {{ refreshStatus.latestRun.succeeded }}/{{ refreshStatus.latestRun.totalTargets }}
+            </small>
+          </div>
+          <div>
+            <span>下次检查</span>
+            <strong>{{ formatDate(refreshStatus?.nextRunAt ?? undefined) }}</strong>
+          </div>
+          <button
+            class="ghost-button blue"
+            type="button"
+            :disabled="refreshTaskLoading || refreshStatus?.running"
+            @click="runRefreshTask"
+          >
+            <Loader2 v-if="refreshTaskLoading || refreshStatus?.running" class="spin-icon" :size="16" />
+            <RefreshCw v-else :size="16" />
+            {{ refreshTaskLoading || refreshStatus?.running ? '更新中' : '立即更新' }}
+          </button>
+        </section>
+
+        <div v-if="refreshTaskNotice" class="refresh-task-notice">
+          {{ refreshTaskNotice }}
+        </div>
+
+        <CacheManagerPanel
+          :entries="cacheEntries"
+          :loading="cacheEntriesLoading"
+          :error="cacheEntriesError"
+        />
+      </section>
+
+      <section v-else class="content">
         <div v-if="favorites.length" class="favorite-strip" aria-label="收藏公司">
           <span>收藏</span>
           <button
@@ -807,50 +926,6 @@ onUnmounted(() => {
           <strong>{{ statementCacheLabel }}</strong>
           <small>缓存刷新：{{ formatDate(statements?.cache?.refreshedAt) }}</small>
         </div>
-
-        <section class="refresh-task-panel">
-          <div>
-            <span>数据更新任务</span>
-            <strong>
-              {{ refreshStatus?.enabled ? `每 ${refreshStatus.intervalDays} 天自动检查` : '未启用' }}
-            </strong>
-          </div>
-          <div>
-            <span>待更新</span>
-            <strong>{{ refreshStatus?.pendingTargets ?? 0 }}</strong>
-          </div>
-          <div>
-            <span>上次运行</span>
-            <strong>{{ refreshRunLabel(refreshStatus?.latestRun?.status) }}</strong>
-            <small v-if="refreshStatus?.latestRun">
-              {{ refreshStatus.latestRun.succeeded }}/{{ refreshStatus.latestRun.totalTargets }}
-            </small>
-          </div>
-          <div>
-            <span>下次检查</span>
-            <strong>{{ formatDate(refreshStatus?.nextRunAt ?? undefined) }}</strong>
-          </div>
-          <button
-            class="ghost-button blue"
-            type="button"
-            :disabled="refreshTaskLoading || refreshStatus?.running"
-            @click="runRefreshTask"
-          >
-            <Loader2 v-if="refreshTaskLoading || refreshStatus?.running" class="spin-icon" :size="16" />
-            <RefreshCw v-else :size="16" />
-            {{ refreshTaskLoading || refreshStatus?.running ? '更新中' : '立即更新' }}
-          </button>
-        </section>
-
-        <div v-if="refreshTaskNotice" class="refresh-task-notice">
-          {{ refreshTaskNotice }}
-        </div>
-
-        <CacheManagerPanel
-          :entries="cacheEntries"
-          :loading="cacheEntriesLoading"
-          :error="cacheEntriesError"
-        />
 
         <div v-if="statementError" class="status-banner">
           <AlertTriangle :size="18" />
