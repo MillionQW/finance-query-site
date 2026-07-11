@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import StatementItemTrend from './StatementItemTrend.vue';
 import type { StatementTable } from '../types/finance';
 
 type ValueDisplayUnit = 'raw' | 'wan' | 'yi';
@@ -33,8 +34,16 @@ const valueUnitOptions: { value: ValueDisplayUnit; label: string }[] = [
 
 const viewMode = ref<StatementViewMode>('value');
 const valueUnit = ref<ValueDisplayUnit>('yi');
+const selectedRow = ref<StatementRowLike | null>(null);
 const visibleRows = computed(() => props.table?.rows ?? []);
 const ratioBaseRow = computed(() => findRatioBaseRow());
+
+watch(
+  () => props.table?.type,
+  () => {
+    selectedRow.value = null;
+  }
+);
 
 function sourceTitle(row: { item: string; sourceItem?: string | null }): string | undefined {
   if (!row.sourceItem || row.sourceItem === row.item) {
@@ -175,9 +184,25 @@ function cellTone(row: StatementRowLike, year: string): CellTone {
 function formatRawValue(row: StatementRowLike, year: string): string {
   return formatNumberValue(rowValue(row, year));
 }
+
+function isSelectedRow(row: StatementRowLike): boolean {
+  return selectedRow.value === row;
+}
+
+function toggleSelectedRow(row: StatementRowLike): void {
+  selectedRow.value = isSelectedRow(row) ? null : row;
+}
 </script>
 
 <template>
+  <StatementItemTrend
+    v-if="selectedRow"
+    :row="selectedRow"
+    :years="activeYears"
+    :unit="valueUnit"
+    @close="selectedRow = null"
+  />
+
   <div v-if="table && visibleRows.length" class="statement-table-tools">
     <div class="unit-switch" aria-label="StatementTable 展示方式">
       <span>表格视图</span>
@@ -215,14 +240,25 @@ function formatRawValue(row: StatementRowLike, year: string): string {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="row in visibleRows" :key="`${row.item}-${row.sourceItem ?? ''}`">
+        <tr
+          v-for="row in visibleRows"
+          :key="`${row.item}-${row.sourceItem ?? ''}`"
+          :class="{ selected: isSelectedRow(row) }"
+        >
           <th
             class="item-col"
             :class="{ 'has-source-title': sourceTitle(row) }"
             :title="sourceTitle(row)"
-            :tabindex="sourceTitle(row) ? 0 : undefined"
           >
-            <span class="item-name">{{ row.item }}</span>
+            <button
+              class="statement-item-button"
+              type="button"
+              :aria-pressed="isSelectedRow(row)"
+              :aria-label="`${isSelectedRow(row) ? '收起' : '查看'}${row.item}变化趋势`"
+              @click="toggleSelectedRow(row)"
+            >
+              <span class="item-name">{{ row.item }}</span>
+            </button>
             <span v-if="sourceTitle(row)" class="item-source-tooltip">{{ sourceTitle(row) }}</span>
           </th>
           <td v-for="year in activeYears" :key="year">
