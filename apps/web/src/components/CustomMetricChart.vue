@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import * as echarts from 'echarts/core';
-import { AxisPointerComponent, GridComponent, TooltipComponent } from 'echarts/components';
+import { AxisPointerComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import { LineChart } from 'echarts/charts';
 import { CanvasRenderer } from 'echarts/renderers';
 import type { ECharts, EChartsCoreOption } from 'echarts/core';
 import type { FinancialStatements, StatementTable } from '../types/finance';
 
-echarts.use([AxisPointerComponent, GridComponent, TooltipComponent, LineChart, CanvasRenderer]);
+echarts.use([AxisPointerComponent, GridComponent, LegendComponent, TooltipComponent, LineChart, CanvasRenderer]);
 
 type MetricKind = 'percent' | 'times';
 type MetricGroupKey = 'profitability' | 'growth' | 'solvency' | 'efficiency';
@@ -86,6 +86,9 @@ const CURRENT_LIABILITY_ALIASES = ['流动负债合计', '流动负债', 'CURREN
 const INVENTORY_ALIASES = ['存货', 'INVENTORY'];
 const CASH_ALIASES = ['现金及等价物', '现金及现金等价物', '现金和现金等价物', '货币资金', '现金', 'CASH AND CASH EQUIVALENTS', 'CASH EQUIVALENTS', 'CASH', 'END CCE'];
 const REVENUE_ALIASES = ['营业收入', '营业总收入', '营业额', '营运收入', '收益', '收入', 'OPERATE INCOME', 'TOTAL OPERATE INCOME'];
+const OPERATING_REVENUE_ALIASES = ['营业收入', 'OPERATE INCOME'];
+const TOTAL_OPERATING_REVENUE_ALIASES = ['营业总收入', 'TOTAL OPERATE INCOME'];
+const TOTAL_OPERATING_COST_ALIASES = ['营业总成本', 'TOTAL OPERATE COST'];
 const OPERATING_PROFIT_ALIASES = ['营业利润', '经营溢利', '经营利润', '营运利润', 'OPERATE PROFIT', 'OPERATE PROFIT BALANCE'];
 const RECEIVABLE_ALIASES = ['应收账款', '应收帐款', '应收票据及应收账款', '应收账款及应收票据', 'ACCOUNTS RECE', 'NOTE ACCOUNTS RECE', '应收款项'];
 const GROSS_PROFIT_ALIASES = ['毛利', '毛利润', 'GROSS PROFIT'];
@@ -243,7 +246,7 @@ const definitions: MetricDefinition[] = [
     description: '看应收账款相当于几个月的收入。这个比例越小越好。',
     requirements: [
       { label: '应收账款余额', table: 'balance', aliases: RECEIVABLE_ALIASES },
-      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+      { label: '营业收入', table: 'income', aliases: OPERATING_REVENUE_ALIASES }
     ],
     calculate: (context, year) => {
       const annualRevenue = rowValue(context.income, year, REVENUE_ALIASES);
@@ -342,6 +345,28 @@ const definitions: MetricDefinition[] = [
       )
   },
   {
+    key: 'tangOperatingMargin',
+    label: '老唐营业利润率',
+    group: 'profitability',
+    formula: '(营业总收入 - 营业总成本) / 营业收入',
+    kind: 'percent',
+    description: '老唐营业利润不含公允价值变动收益，投资收益，汇兑收益。',
+    requirements: [
+      { label: '营业总收入', table: 'income', aliases: TOTAL_OPERATING_REVENUE_ALIASES },
+      { label: '营业总成本', table: 'income', aliases: TOTAL_OPERATING_COST_ALIASES },
+      { label: '营业收入', table: 'income', aliases: OPERATING_REVENUE_ALIASES }
+    ],
+    calculate: (context, year) => {
+      const totalRevenue = rowValue(context.income, year, TOTAL_OPERATING_REVENUE_ALIASES);
+      const totalCost = rowValue(context.income, year, TOTAL_OPERATING_COST_ALIASES);
+      const operatingRevenue = rowValue(context.income, year, OPERATING_REVENUE_ALIASES);
+      const tangOperatingProfit = totalRevenue !== null && totalCost !== null
+        ? totalRevenue - Math.abs(totalCost)
+        : null;
+      return safeDivide(tangOperatingProfit, operatingRevenue);
+    }
+  },
+  {
     key: 'netMargin',
     label: '净利率',
     group: 'profitability',
@@ -364,7 +389,7 @@ const definitions: MetricDefinition[] = [
     group: 'profitability',
     formula: '(销售费用 + 管理费用 + 财务费用) / 营业收入',
     kind: 'percent',
-    description: '观察三费对营业收入的消耗比例。警惕费用率过高或剧烈变化的公司，销售费用过高，说明产品没吸引力。费用率在30%内，算优秀企业；30%-70%，仍然是有一定竞争优势的企业；超过70%，关注价值不大。',
+    description: '观察三费对营业收入的消耗比例。警惕费用率过高或剧烈变化的公司，销售费用过高，说明产品没吸引力。如果管理费用增幅大于营业收入增幅，需查出明细，可能利用管理费用操控报表。',
     requirements: [
       { label: '销售费用', table: 'income', aliases: SELLING_EXPENSE_ALIASES },
       { label: '管理费用', table: 'income', aliases: ADMIN_EXPENSE_ALIASES },
@@ -377,6 +402,33 @@ const definitions: MetricDefinition[] = [
       const finance = rowValue(context.income, year, FINANCE_EXPENSE_ALIASES);
       const revenue = rowValue(context.income, year, REVENUE_ALIASES);
       return safeDivide(sumAbsolute([selling, admin, finance]), revenue);
+    }
+  },
+  {
+    key: 'expenseToGrossProfitRatio',
+    label: '费用率（毛利润）',
+    group: 'profitability',
+    formula: '(销售费用 + 管理费用 + 财务费用) / 毛利润',
+    kind: 'percent',
+    description: '费用率在毛利润的30%内，算优秀企业；30%-70%，仍然是有一定竞争优势的企业；超过70%，关注价值不大。',
+    requirements: [
+      { label: '销售费用', table: 'income', aliases: SELLING_EXPENSE_ALIASES },
+      { label: '管理费用', table: 'income', aliases: ADMIN_EXPENSE_ALIASES },
+      { label: '财务费用', table: 'income', aliases: FINANCE_EXPENSE_ALIASES },
+      { label: '毛利润或营业成本', table: 'income', aliases: [...GROSS_PROFIT_ALIASES, ...OPERATING_COST_ALIASES] },
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+    ],
+    calculate: (context, year) => {
+      const selling = rowValue(context.income, year, SELLING_EXPENSE_ALIASES);
+      const admin = rowValue(context.income, year, ADMIN_EXPENSE_ALIASES);
+      const finance = rowValue(context.income, year, FINANCE_EXPENSE_ALIASES);
+      const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+      const directGrossProfit = rowValue(context.income, year, GROSS_PROFIT_ALIASES);
+      const cost = rowValue(context.income, year, OPERATING_COST_ALIASES);
+      const grossProfit = directGrossProfit ?? (
+        revenue !== null && cost !== null ? revenue - Math.abs(cost) : null
+      );
+      return safeDivide(sumAbsolute([selling, admin, finance]), grossProfit);
     }
   },
   {
@@ -497,7 +549,10 @@ function isCriticalMetric(result: MetricResult): boolean {
 }
 
 function isPositiveMetric(result: MetricResult): boolean {
-  return result.definition.key === 'grossMargin' && result.latest !== null && result.latest > 0.4;
+  if (result.latest === null) return false;
+  if (result.definition.key === 'grossMargin') return result.latest > 0.4;
+  if (result.definition.key === 'expenseToGrossProfitRatio') return result.latest < 0.3;
+  return false;
 }
 
 watch(activeMetricGroup, () => {
@@ -517,9 +572,23 @@ const chartOption = computed<EChartsCoreOption>(() => {
   const displayPoints = result.points.slice().reverse();
   const years = displayPoints.map((point) => point.year);
   const data = displayPoints.map((point) => point.value);
+  const showRevenueGrowth = result.definition.key === 'expenseRatio';
+  const revenueGrowthData = displayPoints.map((point) => {
+    if (!props.statements) return null;
+    const income = props.statements.tables.find((table) => table.type === 'income');
+    const yearIndex = props.statements.years.indexOf(point.year);
+    const previousYear = props.statements.years[yearIndex + 1];
+    return growthRate(
+      rowValue(income, point.year, REVENUE_ALIASES),
+      previousYear ? rowValue(income, previousYear, REVENUE_ALIASES) : null
+    );
+  });
 
   return {
-    grid: { top: 18, right: 18, bottom: 30, left: 48 },
+    grid: { top: showRevenueGrowth ? 48 : 18, right: 18, bottom: 30, left: 48 },
+    legend: showRevenueGrowth
+      ? { top: 8, right: 18, textStyle: { color: '#64748b', fontSize: 12 } }
+      : { show: false },
     tooltip: {
       show: true,
       trigger: 'axis',
@@ -556,11 +625,41 @@ const chartOption = computed<EChartsCoreOption>(() => {
         smooth: true,
         connectNulls: false,
         symbolSize: 7,
+        label: {
+          show: true,
+          position: 'top',
+          color: seriesColor,
+          fontSize: 11,
+          fontWeight: 700,
+          formatter: (params: { value: number | null }) =>
+            params.value === null ? '' : formatMetricValue(params.value, result.definition.kind)
+        },
         itemStyle: { color: seriesColor },
         lineStyle: { color: seriesColor, width: 3 },
         areaStyle: { color: areaColor },
         data
-      }
+      },
+      ...(showRevenueGrowth
+        ? [{
+            name: '营业收入增幅',
+            type: 'line' as const,
+            smooth: true,
+            connectNulls: false,
+            symbolSize: 6,
+            label: {
+              show: true,
+              position: 'bottom' as const,
+              color: '#b45309',
+              fontSize: 11,
+              fontWeight: 700,
+              formatter: (params: { value: number | null }) =>
+                params.value === null ? '' : formatMetricValue(params.value, 'percent')
+            },
+            itemStyle: { color: '#f59e0b' },
+            lineStyle: { color: '#f59e0b', width: 2, type: 'dashed' as const },
+            data: revenueGrowthData
+          }]
+        : [])
     ]
   };
 });
@@ -908,6 +1007,25 @@ function metricDetails(
     };
   }
 
+  if (definition.key === 'tangOperatingMargin') {
+    const totalRevenue = rowValue(context.income, year, TOTAL_OPERATING_REVENUE_ALIASES);
+    const totalCost = rowValue(context.income, year, TOTAL_OPERATING_COST_ALIASES);
+    const operatingRevenue = rowValue(context.income, year, OPERATING_REVENUE_ALIASES);
+    const tangOperatingProfit = totalRevenue !== null && totalCost !== null
+      ? totalRevenue - Math.abs(totalCost)
+      : null;
+    const value = safeDivide(tangOperatingProfit, operatingRevenue);
+    return {
+      rows: [
+        { label: '营业总收入', value: totalRevenue },
+        { label: '营业总成本', value: totalCost },
+        { label: '老唐营业利润', value: tangOperatingProfit, note: '营业总收入 - |营业总成本|' },
+        { label: '营业收入', value: operatingRevenue }
+      ],
+      expression: `${formatRawValue(tangOperatingProfit)} / ${formatRawValue(operatingRevenue)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
   if (definition.key === 'netMargin') {
     const netProfit = rowValue(context.income, year, NET_PROFIT_ALIASES);
     const revenue = rowValue(context.income, year, REVENUE_ALIASES);
@@ -928,16 +1046,50 @@ function metricDetails(
   const finance = rowValue(context.income, year, FINANCE_EXPENSE_ALIASES);
   const threeFees = sumAbsolute([selling, admin, finance]);
   const value = safeDivide(threeFees, revenue);
+  const previousRevenue = previousRowValue(context, context.income, yearIndex, REVENUE_ALIASES);
+  const revenueGrowth = growthRate(revenue, previousRevenue);
   return {
     rows: [
       { label: '营业收入', value: revenue },
       { label: '销售费用', value: selling },
       { label: '管理费用', value: admin },
       { label: '财务费用', value: finance },
-      { label: '三费合计', value: threeFees, note: '|销售| + |管理| + |财务|' }
+      { label: '三费合计', value: threeFees, note: '|销售| + |管理| + |财务|' },
+      { label: '营业收入增幅', value: revenueGrowth, kind: 'percent', note: '与上年比较' }
     ],
     expression: `${formatRawValue(threeFees)} / ${formatRawValue(revenue)} = ${formatMetricValue(value, definition.kind)}`
   };
+  }
+
+  if (definition.key === 'expenseToGrossProfitRatio') {
+    const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+    const selling = rowValue(context.income, year, SELLING_EXPENSE_ALIASES);
+    const admin = rowValue(context.income, year, ADMIN_EXPENSE_ALIASES);
+    const finance = rowValue(context.income, year, FINANCE_EXPENSE_ALIASES);
+    const threeFees = sumAbsolute([selling, admin, finance]);
+    const directGrossProfit = rowValue(context.income, year, GROSS_PROFIT_ALIASES);
+    const cost = rowValue(context.income, year, OPERATING_COST_ALIASES);
+    const grossProfit = directGrossProfit ?? (
+      revenue !== null && cost !== null ? revenue - Math.abs(cost) : null
+    );
+    const value = safeDivide(threeFees, grossProfit);
+    const grossProfitRows: FormulaDetail[] = directGrossProfit !== null
+      ? [{ label: '毛利润', value: directGrossProfit, note: '直接科目' }]
+      : [
+          { label: '营业收入', value: revenue },
+          { label: '营业成本', value: cost },
+          { label: '推导毛利润', value: grossProfit, note: '营业收入 - |营业成本|' }
+        ];
+    return {
+      rows: [
+        { label: '销售费用', value: selling },
+        { label: '管理费用', value: admin },
+        { label: '财务费用', value: finance },
+        { label: '三费合计', value: threeFees, note: '|销售| + |管理| + |财务|' },
+        ...grossProfitRows
+      ],
+      expression: `${formatRawValue(threeFees)} / ${formatRawValue(grossProfit)} = ${formatMetricValue(value, definition.kind)}`
+    };
   }
 
   if (definition.key === 'revenueGrowth') {
