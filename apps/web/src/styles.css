@@ -963,7 +963,7 @@ button {
 }
 
 .trend-panel {
-  min-height: 238px;
+  min-height: 336px;
   padding: 18px;
 }
 
@@ -979,32 +979,123 @@ button {
   font-size: 18px;
 }
 
-.trend-legend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px 14px;
+.trend-panel-title {
+  align-items: center;
+}
+
+.trend-panel-title small {
+  display: block;
+  margin-top: 4px;
   color: var(--muted);
   font-size: 12px;
+  font-weight: 700;
 }
 
-.trend-legend span {
+.trend-mode-switch {
   display: inline-flex;
+  height: 34px;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 6px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
 }
 
-.trend-legend i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.trend-mode-switch button {
+  height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  color: #475569;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.trend-mode-switch button:hover,
+.trend-mode-switch button.active {
+  color: var(--blue);
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
 }
 
 .trend-chart {
   width: 100%;
-  height: 160px;
-  margin-top: 14px;
-  overflow: visible;
+  height: 252px;
+  margin-top: 8px;
+}
+
+.trend-chart-empty {
+  display: grid;
+  min-height: 240px;
+  place-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mini-trend-tooltip {
+  min-width: 340px;
+  color: #172033;
+  font-size: 12px;
+}
+
+.mini-trend-tooltip > strong {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 13px;
+}
+
+.mini-trend-tooltip-head,
+.mini-trend-tooltip-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) 92px 62px 48px;
+  gap: 10px;
+  align-items: center;
+}
+
+.mini-trend-tooltip-head {
+  padding-bottom: 5px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.mini-trend-tooltip-head span:not(:first-child),
+.mini-trend-tooltip-row b,
+.mini-trend-tooltip-row em,
+.mini-trend-tooltip-row small {
+  text-align: right;
+}
+
+.mini-trend-tooltip-row {
+  min-height: 26px;
+  border-top: 1px solid #eef2f7;
+}
+
+.mini-trend-tooltip-row span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.mini-trend-tooltip-row i {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.mini-trend-tooltip-row b,
+.mini-trend-tooltip-row em {
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.mini-trend-tooltip-row small {
+  color: #64748b;
+  font-weight: 700;
 }
 
 .custom-metric-panel {
