@@ -33,8 +33,11 @@
 ## Git
 
 - Local `main` is synchronized with `origin/main` as of this update.
-- Latest known commit: `43feed2 Rebuild financial trend panel with ECharts`
+- Latest known feature commit: `c7e8801 Add ETF research and tracking-index valuation`
 - Recent related commits:
+  - `c7e8801 Add ETF research and tracking-index valuation`
+  - `39caecf Document local AKShare reference repository`
+  - `1c426f6 Update project notes with recent chart improvements`
   - `86024db Add interactive statement item trends`
   - `43feed2 Rebuild financial trend panel with ECharts`
 
@@ -124,6 +127,34 @@ ETF APIs:
 - `GET /api/etfs/favorites`
 - `POST /api/etfs/favorites/:symbol`
 - `DELETE /api/etfs/favorites/:symbol`
+
+## ETF Valuation Notes
+
+The ETF price-to-earnings value is the valuation of the tracking index, not the ETF price divided by fund earnings. ETFs are investment vehicles rather than operating companies, so presenting an ETF-level corporate P/E would be misleading.
+
+Resolution flow:
+
+1. Read the fund's exact `跟踪标的` from `ak.fund_overview_em`.
+2. Require a unique exact match in `ak.index_csindex_all`; do not use fuzzy matching or infer a code from the ETF name.
+3. Fetch official CSI valuation data with `ak.stock_zh_index_value_csindex`.
+4. Display `市盈率1` as the primary P/E (total-shares basis) and `市盈率2` as the supporting P/E (calculated-shares basis).
+5. Store the latest result in SQLite table `etf_valuations` and reuse it for 24 hours.
+
+Coverage limitations:
+
+- Only ETFs whose tracking targets uniquely match an index in the CSI catalog can currently show P/E.
+- Commodity, bond, currency, overseas, or non-CSI index ETFs may legitimately show no P/E.
+- A failed or ambiguous match must return an explicit unavailable reason; it must never silently substitute a similarly named index.
+- Valuation loads separately from ETF quotes and price history, so a slow index request does not block the main ETF page.
+
+Verified example as of 2026-07-11:
+
+- ETF: `510300` / 沪深300ETF华泰柏瑞
+- Tracking index: `000300` / 沪深300指数
+- Primary P/E: `14.79`
+- Supporting P/E: `17.69`
+- Valuation date: `2026-07-10`
+- Cached API response after the initial fetch: approximately `74 ms` on the local machine
 
 ETF frontend ownership:
 
