@@ -1126,6 +1126,14 @@ button {
   white-space: nowrap;
 }
 
+.custom-metric-head > strong.critical {
+  color: #dc2626;
+}
+
+.custom-metric-head > strong.positive {
+  color: #16a34a;
+}
+
 .metric-group-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1599,6 +1607,27 @@ button {
   border-color: rgba(37, 99, 235, 0.38);
   color: var(--blue);
   background: #eff6ff;
+}
+
+.metric-selector button.critical {
+  border-color: rgba(220, 38, 38, 0.42);
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.metric-selector button.critical span {
+  color: #b91c1c;
+}
+
+.metric-selector button.positive {
+  border-color: rgba(22, 163, 74, 0.42);
+  color: #15803d;
+  background: #f0fdf4;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.08);
+}
+
+.metric-selector button.positive span {
+  color: #15803d;
 }
 
 .peer-metric-company-select {

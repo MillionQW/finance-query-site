@@ -201,6 +201,57 @@ const definitions: MetricDefinition[] = [
       )
   },
   {
+    key: 'debtRatio',
+    label: '负债率',
+    group: 'solvency',
+    formula: '有息负债 / 总资产',
+    kind: 'percent',
+    description: '排除负债率超过60%的企业',
+    requirements: [
+      { label: '有息负债', table: 'balance', aliases: INTEREST_BEARING_DEBT_ALIASES },
+      { label: '总资产', table: 'balance', aliases: TOTAL_ASSET_ALIASES }
+    ],
+    calculate: (context, year) =>
+      safeDivide(
+        sumRows(context.balance, year, INTEREST_BEARING_DEBT_GROUPS).total,
+        rowValue(context.balance, year, TOTAL_ASSET_ALIASES)
+      )
+  },
+  {
+    key: 'receivablesToAssets',
+    label: '应收/总资产',
+    group: 'solvency',
+    formula: '所有“应收”科目合计 / 总资产',
+    kind: 'percent',
+    description: '比值超过30%算有严重问题',
+    requirements: [
+      { label: '所有“应收”科目', table: 'balance', aliases: [] },
+      { label: '总资产', table: 'balance', aliases: TOTAL_ASSET_ALIASES }
+    ],
+    calculate: (context, year) =>
+      safeDivide(
+        sumRowsContaining(context.balance, year, '应收').total,
+        rowValue(context.balance, year, TOTAL_ASSET_ALIASES)
+      )
+  },
+  {
+    key: 'receivableRevenueMonths',
+    label: '应收账款余额/月均营业收入',
+    group: 'solvency',
+    formula: '应收账款余额 / (年度营业收入 / 12)',
+    kind: 'times',
+    description: '看应收账款相当于几个月的收入。这个比例越小越好。',
+    requirements: [
+      { label: '应收账款余额', table: 'balance', aliases: RECEIVABLE_ALIASES },
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+    ],
+    calculate: (context, year) => {
+      const annualRevenue = rowValue(context.income, year, REVENUE_ALIASES);
+      const monthlyRevenue = annualRevenue === null ? null : annualRevenue / 12;
+      return safeDivide(rowValue(context.balance, year, RECEIVABLE_ALIASES), monthlyRevenue);
+    }
+  },
+  {
     key: 'receivableTurnover',
     label: '应收账款周转率',
     group: 'efficiency',
@@ -258,7 +309,7 @@ const definitions: MetricDefinition[] = [
     group: 'profitability',
     formula: '毛利润 / 营业收入',
     kind: 'percent',
-    description: '观察主营业务留存的毛利空间。',
+    description: '观察主营业务留存的毛利空间。毛利率保持在40%以上的企业，通常具有某种持续竞争优势。',
     requirements: [
       { label: '毛利润或营业成本', table: 'income', aliases: [...GROSS_PROFIT_ALIASES, ...OPERATING_COST_ALIASES] },
       { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
@@ -313,7 +364,7 @@ const definitions: MetricDefinition[] = [
     group: 'profitability',
     formula: '(销售费用 + 管理费用 + 财务费用) / 营业收入',
     kind: 'percent',
-    description: '观察三费对营业收入的消耗比例。',
+    description: '观察三费对营业收入的消耗比例。警惕费用率过高或剧烈变化的公司，销售费用过高，说明产品没吸引力。费用率在30%内，算优秀企业；30%-70%，仍然是有一定竞争优势的企业；超过70%，关注价值不大。',
     requirements: [
       { label: '销售费用', table: 'income', aliases: SELLING_EXPENSE_ALIASES },
       { label: '管理费用', table: 'income', aliases: ADMIN_EXPENSE_ALIASES },
@@ -438,6 +489,17 @@ const selectedResult = computed(() =>
   metricResults.value[0]
 );
 
+function isCriticalMetric(result: MetricResult): boolean {
+  if (result.latest === null) return false;
+  if (result.definition.key === 'receivablesToAssets') return result.latest > 0.3;
+  if (result.definition.key === 'debtRatio') return result.latest > 0.6;
+  return false;
+}
+
+function isPositiveMetric(result: MetricResult): boolean {
+  return result.definition.key === 'grossMargin' && result.latest !== null && result.latest > 0.4;
+}
+
 watch(activeMetricGroup, () => {
   const current = metricResults.value.find((result) => result.definition.key === activeMetricKey.value);
   if (current?.definition.group === activeMetricGroup.value) return;
@@ -446,6 +508,12 @@ watch(activeMetricGroup, () => {
 
 const chartOption = computed<EChartsCoreOption>(() => {
   const result = selectedResult.value;
+  const seriesColor = isCriticalMetric(result) ? '#dc2626' : isPositiveMetric(result) ? '#16a34a' : '#2563eb';
+  const areaColor = isCriticalMetric(result)
+    ? 'rgba(220, 38, 38, 0.08)'
+    : isPositiveMetric(result)
+      ? 'rgba(22, 163, 74, 0.10)'
+      : 'rgba(37, 99, 235, 0.08)';
   const displayPoints = result.points.slice().reverse();
   const years = displayPoints.map((point) => point.year);
   const data = displayPoints.map((point) => point.value);
@@ -488,9 +556,9 @@ const chartOption = computed<EChartsCoreOption>(() => {
         smooth: true,
         connectNulls: false,
         symbolSize: 7,
-        itemStyle: { color: '#2563eb' },
-        lineStyle: { color: '#2563eb', width: 3 },
-        areaStyle: { color: 'rgba(37, 99, 235, 0.08)' },
+        itemStyle: { color: seriesColor },
+        lineStyle: { color: seriesColor, width: 3 },
+        areaStyle: { color: areaColor },
         data
       }
     ]
@@ -620,6 +688,22 @@ function sumRows(
   };
 }
 
+function sumRowsContaining(table: StatementTable | undefined, year: string, keyword: string) {
+  const matches = table?.rows.filter((row) => row.item.includes(keyword) || row.sourceItem?.includes(keyword)) ?? [];
+  const rows: FormulaDetail[] = [];
+  let total = 0;
+
+  for (const match of matches) {
+    const value = toNumber(match.values[year]);
+    if (value === null) continue;
+    const normalizedValue = Math.abs(value);
+    rows.push({ label: match.item, value: normalizedValue, note: match.sourceItem ?? match.item });
+    total += normalizedValue;
+  }
+
+  return { total: rows.length ? total : null, rows };
+}
+
 function metricDetails(
   definition: MetricDefinition,
   context: MetricContext,
@@ -697,6 +781,49 @@ function metricDetails(
         { label: '有息负债合计', value: interestBearingDebt.total, note: '借款/贷款/债券/租赁等合计' }
       ],
       expression: `${formatRawValue(cash)} / ${formatRawValue(interestBearingDebt.total)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'debtRatio') {
+    const interestBearingDebt = sumRows(context.balance, year, INTEREST_BEARING_DEBT_GROUPS);
+    const totalAssets = rowValue(context.balance, year, TOTAL_ASSET_ALIASES);
+    const value = safeDivide(interestBearingDebt.total, totalAssets);
+    return {
+      rows: [
+        ...interestBearingDebt.rows,
+        { label: '有息负债合计', value: interestBearingDebt.total, note: '借款/贷款/债券/租赁等合计' },
+        { label: '总资产', value: totalAssets, note: '期末' }
+      ],
+      expression: `${formatRawValue(interestBearingDebt.total)} / ${formatRawValue(totalAssets)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'receivablesToAssets') {
+    const receivables = sumRowsContaining(context.balance, year, '应收');
+    const totalAssets = rowValue(context.balance, year, TOTAL_ASSET_ALIASES);
+    const value = safeDivide(receivables.total, totalAssets);
+    return {
+      rows: [
+        ...receivables.rows,
+        { label: '所有“应收”科目合计', value: receivables.total },
+        { label: '总资产', value: totalAssets, note: '期末' }
+      ],
+      expression: `${formatRawValue(receivables.total)} / ${formatRawValue(totalAssets)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'receivableRevenueMonths') {
+    const receivable = rowValue(context.balance, year, RECEIVABLE_ALIASES);
+    const annualRevenue = rowValue(context.income, year, REVENUE_ALIASES);
+    const monthlyRevenue = annualRevenue === null ? null : annualRevenue / 12;
+    const value = safeDivide(receivable, monthlyRevenue);
+    return {
+      rows: [
+        { label: '应收账款余额', value: receivable, note: '期末' },
+        { label: '年度营业收入', value: annualRevenue },
+        { label: '月均营业收入', value: monthlyRevenue, note: '年度营业收入 / 12' }
+      ],
+      expression: `${formatRawValue(receivable)} / ${formatRawValue(monthlyRevenue)} = ${formatMetricValue(value, definition.kind)}`
     };
   }
 
@@ -902,6 +1029,9 @@ function missingRequirements(definition: MetricDefinition, context: MetricContex
   return definition.requirements
     .filter((requirement) => {
       const table = requirement.table === 'balance' ? context.balance : context.income;
+      if (definition.key === 'receivablesToAssets' && requirement.label === '所有“应收”科目') {
+        return !table?.rows.some((row) => row.item.includes('应收') || row.sourceItem?.includes('应收'));
+      }
       return !findRow(table, requirement.aliases);
     })
     .map((requirement) => requirement.label);
@@ -1055,7 +1185,12 @@ function formatAxisValue(value: number, kind: MetricKind): string {
         <p class="section-label">自定义指标图表</p>
         <h3>{{ selectedResult.definition.label }}</h3>
       </div>
-      <strong>{{ formatMetricValue(selectedResult.latest, selectedResult.definition.kind) }}</strong>
+      <strong :class="{
+        critical: isCriticalMetric(selectedResult),
+        positive: isPositiveMetric(selectedResult)
+      }">
+        {{ formatMetricValue(selectedResult.latest, selectedResult.definition.kind) }}
+      </strong>
     </div>
 
     <div class="metric-group-tabs" aria-label="指标分组">
@@ -1074,7 +1209,11 @@ function formatAxisValue(value: number, kind: MetricKind): string {
       <button
         v-for="result in groupedMetricResults"
         :key="result.definition.key"
-        :class="{ active: activeMetricKey === result.definition.key }"
+        :class="{
+          active: activeMetricKey === result.definition.key,
+          critical: isCriticalMetric(result),
+          positive: isPositiveMetric(result)
+        }"
         type="button"
         @click="activeMetricKey = result.definition.key"
       >
