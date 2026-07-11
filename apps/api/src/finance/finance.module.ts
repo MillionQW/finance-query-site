@@ -7,12 +7,17 @@ import { PythonAkshareService } from './python-akshare.service';
 import { AnnouncementRefreshService } from './announcement-refresh.service';
 import { EtfController } from './etf.controller';
 import { EtfService } from './etf.service';
+import { IndexController } from './index.controller';
+import { IndexService } from './index.service';
+import { IndexStoreService } from './index-store.service';
 
 @Module({
-  controllers: [FinanceController, EtfController],
+  controllers: [FinanceController, EtfController, IndexController],
   providers: [
     FinanceService,
     EtfService,
+    IndexService,
+    IndexStoreService,
     FinanceRefreshService,
     AnnouncementRefreshService,
     PythonAkshareService,

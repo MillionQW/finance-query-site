@@ -128,6 +128,43 @@ ETF APIs:
 - `POST /api/etfs/favorites/:symbol`
 - `DELETE /api/etfs/favorites/:symbol`
 
+## Index Research Phase 1
+
+A dedicated index research page is available with URL state such as `?view=index&index=cn:000300`.
+
+- Curated coverage: SSE Composite, CSI 300, CSI 500, CSI 1000, CSI A500, SZSE Component, ChiNext, STAR 50, Beijing 50, Hang Seng, Hang Seng TECH, and Hang Seng China Enterprises.
+- Shows a common-index quote strip, searchable and market-filtered directory, selected-index quote facts, up to ten years of daily history, and return/risk metrics.
+- Supports SQLite-backed favorites and restores the selected index from browser history.
+- A-share spot data uses `stock_zh_index_spot_em` with Sina spot fallback; Hong Kong spot data uses `stock_hk_index_spot_em` with Sina fallback.
+- CSI history uses the official `stock_zh_index_hist_csindex` interface. Other mainland and Hong Kong indices use their respective AKShare daily-history adapters and fallbacks.
+- Every index history adapter has independent fallbacks: mainland indices try Tencent and then Sina after the primary source; Hong Kong indices try Tencent and then the dedicated Sina Hong Kong-index interface after Eastmoney.
+- Tencent mainland `amount` is normalized as trading volume (hands), not mislabeled as turnover amount.
+- When every remote source fails, the API returns stale SQLite history when available; otherwise it returns a user-facing unavailable message while retaining technical details in server logs.
+- Market cache defaults to 3 minutes and history cache defaults to 24 hours, with stale cached history returned when a remote refresh fails.
+
+Index SQLite tables:
+
+- `indices`
+- `index_daily_prices`
+- `index_refresh_state`
+- `favorite_indices`
+- `index_valuations`
+
+Index APIs:
+
+- `GET /api/indices`
+- `GET /api/indices/:market/:symbol`
+- `GET /api/indices/:market/:symbol/valuation`
+- `GET /api/indices/favorites`
+- `POST /api/indices/favorites/:market/:symbol`
+- `DELETE /api/indices/favorites/:market/:symbol`
+
+Index valuation behavior:
+
+- CSI-family indices use official `stock_zh_index_value_csindex` data and cache the latest result for 24 hours.
+- `PE1` (total-shares basis) is the primary displayed value; `PE2` (calculated-shares basis) is supporting context.
+- Unsupported markets and index providers return an explicit unavailable reason rather than substituting a different valuation source.
+
 ## ETF Valuation Notes
 
 The ETF price-to-earnings value is the valuation of the tracking index, not the ETF price divided by fund earnings. ETFs are investment vehicles rather than operating companies, so presenting an ETF-level corporate P/E would be misleading.

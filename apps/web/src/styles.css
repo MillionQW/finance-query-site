@@ -2062,6 +2062,70 @@ button {
   padding: 22px 0 36px;
 }
 
+.index-page {
+  width: min(1480px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 22px 0 36px;
+}
+
+.index-snapshot-strip {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+  overflow-x: auto;
+}
+
+.index-snapshot-strip button {
+  min-width: 130px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #172033;
+  background: #fff;
+  text-align: left;
+}
+
+.index-snapshot-strip button:hover,
+.index-snapshot-strip button.active {
+  border-color: #93b4ff;
+  background: #f4f7ff;
+}
+
+.index-snapshot-strip span,
+.index-snapshot-strip strong,
+.index-snapshot-strip em { display: block; }
+.index-snapshot-strip span { overflow: hidden; color: var(--muted); font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.index-snapshot-strip strong { margin-top: 5px; font-size: 16px; }
+.index-snapshot-strip em { margin-top: 3px; font-size: 12px; font-style: normal; font-weight: 800; }
+
+.index-quote-band { grid-template-columns: minmax(190px, 1fr) 180px minmax(550px, 2.4fr) minmax(160px, auto); }
+.index-workspace { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 14px; margin-top: 14px; }
+.index-directory { align-self: start; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.index-directory > header { padding: 15px; border-bottom: 1px solid var(--line); }
+.index-directory > header > div:first-child span { color: var(--muted); font-size: 11px; font-weight: 700; }
+.index-directory h2 { margin: 3px 0 12px; color: #172033; font-size: 18px; }
+.index-directory .etf-exchange-tabs { width: 100%; }
+.index-directory .etf-exchange-tabs button { flex: 1; }
+.index-directory-group h3 { margin: 0; padding: 12px 14px 6px; color: #94a3b8; font-size: 11px; }
+.index-directory-group > button { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border: 0; border-top: 1px solid #f1f5f9; color: #172033; background: #fff; text-align: left; }
+.index-directory-group > button:hover,.index-directory-group > button.active { background: #eef4ff; }
+.index-directory-group > button strong,.index-directory-group > button small { display: block; }
+.index-directory-group > button strong { font-size: 12px; }
+.index-directory-group > button small { margin-top: 2px; color: var(--muted); font-size: 10px; }
+.index-directory-group > button em { font-size: 11px; font-style: normal; font-weight: 800; white-space: nowrap; }
+.index-analysis-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(310px, .75fr); gap: 14px; }
+.index-metric-note { margin: 15px 0 0; padding: 10px 12px; border-left: 3px solid #94a3b8; color: var(--muted); background: #f8fafc; font-size: 11px; line-height: 1.55; }
+.index-valuation-card { display: grid; grid-template-columns: 120px minmax(0,1fr); gap: 14px; min-height: 92px; margin-top: 15px; padding: 12px; border: 1px solid #cbd5e1; border-left: 3px solid var(--blue); border-radius: 6px; background: #f8fafc; }
+.index-valuation-card span,.index-valuation-card dt { color: var(--muted); font-size: 11px; font-weight: 700; }
+.index-valuation-card strong { display: flex; min-height: 36px; align-items: baseline; gap: 4px; margin-top: 4px; color: #172033; font-size: 28px; }
+.index-valuation-card strong small { font-size: 11px; }
+.index-valuation-card dl { display: grid; gap: 4px; margin: 0; }
+.index-valuation-card dl div { display: flex; justify-content: space-between; gap: 10px; }
+.index-valuation-card dd { margin: 0; color: #334155; font-size: 11px; font-weight: 800; text-align: right; }
+.index-valuation-card p { align-self: center; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.index-valuation-card.unavailable { border-left-color: #94a3b8; }
+
 .etf-page-toolbar {
   display: grid;
   grid-template-columns: minmax(180px, auto) minmax(320px, 620px) auto;
@@ -2631,6 +2695,10 @@ button {
     border-left: 0;
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .index-workspace,.index-analysis-grid { grid-template-columns: 1fr; }
+  .index-directory { position: static; }
+  .index-snapshot-strip { grid-template-columns: repeat(8, 140px); }
 }
 
 @media (max-width: 640px) {

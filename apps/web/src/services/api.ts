@@ -12,6 +12,7 @@ import type {
   StatementRefreshRuntimeStatus
 } from '../types/finance';
 import type { EtfDetailResponse, EtfMarketResponse, EtfSortKey, EtfValuation, FavoriteEtf } from '../types/etf';
+import type { FavoriteIndex, IndexDetailResponse, IndexMarket, IndexMarketResponse, IndexValuation } from '../types/index';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
@@ -169,3 +170,16 @@ export function saveFavoriteEtf(symbol: string): Promise<FavoriteEtf[]> {
 export function removeFavoriteEtf(symbol: string): Promise<FavoriteEtf[]> {
   return request<FavoriteEtf[]>(`/etfs/favorites/${encodeURIComponent(symbol)}`, { method: 'DELETE' });
 }
+
+export function getIndices(options:{q?:string;market?:'all'|IndexMarket;refresh?:boolean}={}):Promise<IndexMarketResponse> {
+  const params=new URLSearchParams({q:options.q??'',market:options.market??'all'}); if(options.refresh) params.set('refresh','true');
+  return request<IndexMarketResponse>(`/indices?${params.toString()}`);
+}
+export function getIndexDetail(market:IndexMarket,symbol:string,years=10,refresh=false):Promise<IndexDetailResponse> {
+  const params=new URLSearchParams({years:String(years)}); if(refresh) params.set('refresh','true');
+  return request<IndexDetailResponse>(`/indices/${market}/${encodeURIComponent(symbol)}?${params.toString()}`);
+}
+export function getFavoriteIndices():Promise<FavoriteIndex[]> { return request<FavoriteIndex[]>('/indices/favorites'); }
+export function saveFavoriteIndex(market:IndexMarket,symbol:string):Promise<FavoriteIndex[]> { return request<FavoriteIndex[]>(`/indices/favorites/${market}/${encodeURIComponent(symbol)}`,{method:'POST'}); }
+export function removeFavoriteIndex(market:IndexMarket,symbol:string):Promise<FavoriteIndex[]> { return request<FavoriteIndex[]>(`/indices/favorites/${market}/${encodeURIComponent(symbol)}`,{method:'DELETE'}); }
+export function getIndexValuation(market:IndexMarket,symbol:string,refresh=false):Promise<IndexValuation> { const suffix=refresh?'?refresh=true':''; return request<IndexValuation>(`/indices/${market}/${encodeURIComponent(symbol)}/valuation${suffix}`); }
