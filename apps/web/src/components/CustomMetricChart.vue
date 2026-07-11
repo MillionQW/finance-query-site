@@ -9,8 +9,8 @@ import type { FinancialStatements, StatementTable } from '../types/finance';
 
 echarts.use([AxisPointerComponent, GridComponent, LegendComponent, TooltipComponent, LineChart, CanvasRenderer]);
 
-type MetricKind = 'percent' | 'times';
-type MetricGroupKey = 'profitability' | 'growth' | 'solvency' | 'efficiency';
+type MetricKind = 'percent' | 'times' | 'judgment';
+type MetricGroupKey = 'profitability' | 'growth' | 'solvency' | 'efficiency' | 'judgment';
 
 interface MetricPoint {
   year: string;
@@ -32,7 +32,7 @@ interface MetricDefinition {
 
 interface MetricRequirement {
   label: string;
-  table: 'balance' | 'income';
+  table: 'balance' | 'income' | 'cashflow';
   aliases: string[];
 }
 
@@ -40,6 +40,7 @@ interface MetricContext {
   statements: FinancialStatements;
   balance: StatementTable | undefined;
   income: StatementTable | undefined;
+  cashflow: StatementTable | undefined;
 }
 
 interface MetricResult {
@@ -93,11 +94,13 @@ const OPERATING_PROFIT_ALIASES = ['营业利润', '经营溢利', '经营利润'
 const RECEIVABLE_ALIASES = ['应收账款', '应收帐款', '应收票据及应收账款', '应收账款及应收票据', 'ACCOUNTS RECE', 'NOTE ACCOUNTS RECE', '应收款项'];
 const GROSS_PROFIT_ALIASES = ['毛利', '毛利润', 'GROSS PROFIT'];
 const OPERATING_COST_ALIASES = ['营业成本', '销售成本', '收入成本', '主营业务成本', 'OPERATE COST', 'COST OF SALES', 'COST OF REVENUE'];
+const INTEREST_EXPENSE_ALIASES = ['利息支出', 'INTEREST EXPENSE'];
 const SELLING_EXPENSE_ALIASES = ['销售费用', '销售及分销费用', 'SALE EXPENSE'];
 const ADMIN_EXPENSE_ALIASES = ['管理费用', '行政开支', 'MANAGE EXPENSE'];
 const FINANCE_EXPENSE_ALIASES = ['财务费用', '融资成本', 'FINANCE EXPENSE'];
 const NET_ASSET_ALIASES = ['净资产', '所有者权益合计', '股东权益', '总权益', '归属于母公司股东权益', 'PARENT EQUITY BALANCE', 'EQUITY BALANCE'];
 const FIXED_ASSET_ALIASES = ['固定资产', '固定资产净值', '物业厂房及设备', '物业厂房设备', 'FIXED ASSET', 'PROPERTY PLANT EQUIPMENT', 'PROPERTY PLANT AND EQUIPMENT'];
+const LONG_TERM_EQUITY_INVESTMENT_ALIASES = ['长期股权投资', 'LONG EQUITY INVEST', 'LONG TERM EQUITY INVESTMENT'];
 const INTEREST_BEARING_DEBT_GROUPS = [
   { label: '短期借款/贷款', aliases: ['短期借款', '短期贷款', 'SHORT LOAN', 'SHORT BORROWING', 'SHORT TERM BORROWING'] },
   { label: '长期借款/贷款', aliases: ['长期借款', '长期贷款', 'LONG LOAN', 'LONG BORROWING', 'LONG TERM BORROWING'] },
@@ -106,18 +109,24 @@ const INTEREST_BEARING_DEBT_GROUPS = [
   { label: '一年内到期非流动负债', aliases: ['一年内到期的非流动负债', '一年内到期非流动负债', 'NONCURRENT LIAB 1YEAR'] }
 ];
 const INTEREST_BEARING_DEBT_ALIASES = INTEREST_BEARING_DEBT_GROUPS.flatMap((group) => group.aliases);
+const OPERATING_CASHFLOW_ALIASES = ['经营活动产生的现金流量净额', '经营活动现金流量净额', 'NETCASH OPERATE'];
+const CASH_EQUIVALENT_INCREASE_ALIASES = ['现金及现金等价物净增加额', 'CCE ADD'];
+const END_CASH_EQUIVALENT_ALIASES = ['期末现金及现金等价物余额', '期末现金及等价物余额', 'END CCE', 'CASH END'];
+const INVESTMENT_CASH_INFLOW_ALIASES = ['投资活动现金流入小计', 'TOTAL INVEST INFLOW'];
+const INVESTMENT_CASH_OUTFLOW_ALIASES = ['投资活动现金流出小计', 'TOTAL INVEST OUTFLOW'];
 
 const metricGroups: Array<{ key: MetricGroupKey; label: string }> = [
   { key: 'profitability', label: '盈利能力' },
   { key: 'growth', label: '成长能力' },
   { key: 'solvency', label: '偿债能力' },
-  { key: 'efficiency', label: '营运效率' }
+  { key: 'efficiency', label: '营运效率' },
+  { key: 'judgment', label: '判断指标' }
 ];
 
 const definitions: MetricDefinition[] = [
   {
     key: 'roe',
-    label: 'ROE',
+    label: 'ROE（净资产收益率）',
     group: 'profitability',
     formula: '净利润 / 平均股东权益',
     kind: 'percent',
@@ -134,7 +143,7 @@ const definitions: MetricDefinition[] = [
   },
   {
     key: 'roa',
-    label: 'ROA',
+    label: 'ROA（总资产收益率）',
     group: 'profitability',
     formula: '净利润 / 平均总资产',
     kind: 'percent',
@@ -155,7 +164,7 @@ const definitions: MetricDefinition[] = [
     group: 'solvency',
     formula: '流动资产 / 流动负债',
     kind: 'times',
-    description: '观察短期资产覆盖短期债务的能力。',
+    description: '观察短期资产覆盖短期债务的能力。在2左右比较理想，比率过高：流动资产未能有效利用。比率过低：企业有短期偿债风险。',
     requirements: [
       { label: '流动资产', table: 'balance', aliases: CURRENT_ASSET_ALIASES },
       { label: '流动负债', table: 'balance', aliases: CURRENT_LIABILITY_ALIASES }
@@ -172,7 +181,7 @@ const definitions: MetricDefinition[] = [
     group: 'solvency',
     formula: '(流动资产 - 存货) / 流动负债',
     kind: 'times',
-    description: '剔除存货后观察短期偿债能力。',
+    description: '剔除存货后观察短期偿债能力。速动比率在1左右，比率过高：流动资产未能有效利用。比率过低：企业有短期偿债风险。',
     requirements: [
       { label: '流动资产', table: 'balance', aliases: CURRENT_ASSET_ALIASES },
       { label: '存货', table: 'balance', aliases: INVENTORY_ALIASES },
@@ -192,7 +201,7 @@ const definitions: MetricDefinition[] = [
     group: 'solvency',
     formula: '现金及现金等价物 / 有息负债',
     kind: 'times',
-    description: '观察现金对有息债务的覆盖倍数。',
+    description: '观察现金对有息债务的覆盖倍数。老唐认为的唯一安全性指标。大于等于1才理想。',
     requirements: [
       { label: '现金及现金等价物', table: 'balance', aliases: CASH_ALIASES },
       { label: '有息负债', table: 'balance', aliases: INTEREST_BEARING_DEBT_ALIASES }
@@ -260,7 +269,7 @@ const definitions: MetricDefinition[] = [
     group: 'efficiency',
     formula: '营业收入 / 应收账款平均余额',
     kind: 'times',
-    description: '观察收入回款相关资产的周转速度。',
+    description: '观察收入回款相关资产的周转速度。比率越高，说明应收账款在一个年度里转化为现金的次数越多。看营业收入增长的同时，应收账款周转率是否下降了。应收账款周转率下降，说明营业收入的增长，有放松销售政策的因素。反之，营业收入增长，应收账款周转率稳定或提高，说明营业收入的增长可靠，可信赖。',
     requirements: [
       { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES },
       { label: '应收账款', table: 'balance', aliases: RECEIVABLE_ALIASES }
@@ -304,6 +313,23 @@ const definitions: MetricDefinition[] = [
       safeDivide(
         rowValue(context.income, year, REVENUE_ALIASES),
         rowValue(context.balance, year, FIXED_ASSET_ALIASES)
+      )
+  },
+  {
+    key: 'totalAssetTurnover',
+    label: '总资产周转率',
+    group: 'efficiency',
+    formula: '营业收入 / 平均总资产',
+    kind: 'times',
+    description: '总资产周转率是综合评价企业全部资产经营质量和利用效率的重要指标。总资产周转率越大，证明同样数量的资产，产生更多的销售收入。',
+    requirements: [
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES },
+      { label: '总资产', table: 'balance', aliases: TOTAL_ASSET_ALIASES }
+    ],
+    calculate: (context, year, yearIndex) =>
+      safeDivide(
+        rowValue(context.income, year, REVENUE_ALIASES),
+        averageBalance(context.balance, year, yearIndex, TOTAL_ASSET_ALIASES)
       )
   },
   {
@@ -405,6 +431,95 @@ const definitions: MetricDefinition[] = [
     }
   },
   {
+    key: 'operatingCostRatio',
+    label: '营业成本率',
+    group: 'profitability',
+    formula: '营业成本 / 营业收入',
+    kind: 'percent',
+    description: '观察营业成本占营业收入的比例。',
+    requirements: [
+      { label: '营业成本', table: 'income', aliases: OPERATING_COST_ALIASES },
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+    ],
+    calculate: (context, year) => safeDivide(
+      absoluteValue(rowValue(context.income, year, OPERATING_COST_ALIASES)),
+      rowValue(context.income, year, REVENUE_ALIASES)
+    )
+  },
+  {
+    key: 'sellingExpenseRatio',
+    label: '销售费用率',
+    group: 'profitability',
+    formula: '销售费用 / 营业收入',
+    kind: 'percent',
+    description: '观察销售费用占营业收入的比例。',
+    requirements: [
+      { label: '销售费用', table: 'income', aliases: SELLING_EXPENSE_ALIASES },
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+    ],
+    calculate: (context, year) => safeDivide(
+      absoluteValue(rowValue(context.income, year, SELLING_EXPENSE_ALIASES)),
+      rowValue(context.income, year, REVENUE_ALIASES)
+    )
+  },
+  {
+    key: 'ebitMargin',
+    label: '息税前利润率',
+    group: 'profitability',
+    formula: '(利息支出 + 营业利润) / 营业收入',
+    kind: 'percent',
+    description: '按利息支出与营业利润之和衡量息税前利润占营业收入的比例。',
+    requirements: [
+      { label: '利息支出', table: 'income', aliases: INTEREST_EXPENSE_ALIASES },
+      { label: '营业利润', table: 'income', aliases: OPERATING_PROFIT_ALIASES },
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+    ],
+    calculate: (context, year) => {
+      const interestExpense = absoluteValue(rowValue(context.income, year, INTEREST_EXPENSE_ALIASES));
+      const operatingProfit = rowValue(context.income, year, OPERATING_PROFIT_ALIASES);
+      const ebit = interestExpense !== null && operatingProfit !== null ? interestExpense + operatingProfit : null;
+      return safeDivide(ebit, rowValue(context.income, year, REVENUE_ALIASES));
+    }
+  },
+  {
+    key: 'netAssetCashReturn',
+    label: '净资产现金回报率',
+    group: 'profitability',
+    formula: '经营活动现金流量净额 / 平均资产',
+    kind: 'percent',
+    description: '观察经营活动现金流量净额相对于平均总资产的回报水平。',
+    requirements: [
+      { label: '经营活动现金流量净额', table: 'cashflow', aliases: OPERATING_CASHFLOW_ALIASES },
+      { label: '总资产', table: 'balance', aliases: TOTAL_ASSET_ALIASES }
+    ],
+    calculate: (context, year, yearIndex) => safeDivide(
+      rowValue(context.cashflow, year, OPERATING_CASHFLOW_ALIASES),
+      averageBalance(context.balance, year, yearIndex, TOTAL_ASSET_ALIASES)
+    )
+  },
+  {
+    key: 'internalAssetReturn',
+    label: '内部资产收益率',
+    group: 'profitability',
+    formula: '营业利润 / (总资产 - 长期股权投资)',
+    kind: 'percent',
+    description: '观察剔除长期股权投资后，企业内部经营资产产生营业利润的效率。',
+    requirements: [
+      { label: '营业利润', table: 'income', aliases: OPERATING_PROFIT_ALIASES },
+      { label: '总资产', table: 'balance', aliases: TOTAL_ASSET_ALIASES },
+      { label: '长期股权投资', table: 'balance', aliases: LONG_TERM_EQUITY_INVESTMENT_ALIASES }
+    ],
+    calculate: (context, year) => {
+      const operatingProfit = rowValue(context.income, year, OPERATING_PROFIT_ALIASES);
+      const totalAssets = rowValue(context.balance, year, TOTAL_ASSET_ALIASES);
+      const longTermEquityInvestment = rowValue(context.balance, year, LONG_TERM_EQUITY_INVESTMENT_ALIASES);
+      const internalAssets = totalAssets !== null && longTermEquityInvestment !== null
+        ? totalAssets - longTermEquityInvestment
+        : null;
+      return safeDivide(operatingProfit, internalAssets);
+    }
+  },
+  {
     key: 'expenseToGrossProfitRatio',
     label: '费用率（毛利润）',
     group: 'profitability',
@@ -494,6 +609,106 @@ const definitions: MetricDefinition[] = [
         rowValue(context.balance, year, NET_ASSET_ALIASES),
         previousRowValue(context, context.balance, yearIndex, NET_ASSET_ALIASES)
       )
+  },
+  {
+    key: 'operatingCashflowAboveProfit',
+    label: '经营现金流净额 > 净利润 > 0',
+    group: 'judgment',
+    formula: '经营活动产生的现金流量净额 > 净利润 > 0',
+    kind: 'judgment',
+    description: '经营现金流净额高于正净利润时通过。',
+    requirements: [
+      { label: '经营活动产生的现金流量净额', table: 'cashflow', aliases: OPERATING_CASHFLOW_ALIASES },
+      { label: '净利润', table: 'income', aliases: NET_PROFIT_ALIASES }
+    ],
+    calculate: (context, year) => judgmentValue(
+      rowValue(context.cashflow, year, OPERATING_CASHFLOW_ALIASES),
+      rowValue(context.income, year, NET_PROFIT_ALIASES),
+      (operatingCashflow, netProfit) => operatingCashflow > netProfit && netProfit > 0
+    )
+  },
+  {
+    key: 'operatingCashflowExceedsProfit',
+    label: '经营活动现金净额 > 净利润',
+    group: 'judgment',
+    formula: '经营活动现金流量净额 > 净利润',
+    kind: 'judgment',
+    description: '如果企业获利很好，但现金流很差，必须关注：企业利润为什么没转化为现金？',
+    requirements: [
+      { label: '经营活动现金流量净额', table: 'cashflow', aliases: OPERATING_CASHFLOW_ALIASES },
+      { label: '净利润', table: 'income', aliases: NET_PROFIT_ALIASES }
+    ],
+    calculate: (context, year) => judgmentValue(
+      rowValue(context.cashflow, year, OPERATING_CASHFLOW_ALIASES),
+      rowValue(context.income, year, NET_PROFIT_ALIASES),
+      (operatingCashflow, netProfit) => operatingCashflow > netProfit
+    )
+  },
+  {
+    key: 'operatingCashflowCoversRevenue',
+    label: '经营现金流净额 ≥ 营业收入',
+    group: 'judgment',
+    formula: '经营活动现金流量净额 ≥ 营业收入',
+    kind: 'judgment',
+    description: '经营活动现金流量净额大于或等于营业收入时通过。',
+    requirements: [
+      { label: '经营活动现金流量净额', table: 'cashflow', aliases: OPERATING_CASHFLOW_ALIASES },
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+    ],
+    calculate: (context, year) => judgmentValue(
+      rowValue(context.cashflow, year, OPERATING_CASHFLOW_ALIASES),
+      rowValue(context.income, year, REVENUE_ALIASES),
+      (operatingCashflow, revenue) => operatingCashflow >= revenue
+    )
+  },
+  {
+    key: 'cashEquivalentIncreasePositive',
+    label: '现金净增加额 > 0',
+    group: 'judgment',
+    formula: '现金及现金等价物净增加额 > 0',
+    kind: 'judgment',
+    description: '现金及现金等价物净增加额为正时通过。该数值直接取自现金流量表的“现金及现金等价物净增加额”科目，并非使用货币资金或期末、期初现金余额自行计算。',
+    requirements: [
+      { label: '现金及现金等价物净增加额', table: 'cashflow', aliases: CASH_EQUIVALENT_INCREASE_ALIASES }
+    ],
+    calculate: (context, year) => {
+      const value = rowValue(context.cashflow, year, CASH_EQUIVALENT_INCREASE_ALIASES);
+      return value === null ? null : Number(value > 0);
+    }
+  },
+  {
+    key: 'endingCashAboveDebt',
+    label: '期末现金余额 > 有息负债',
+    group: 'judgment',
+    formula: '期末现金及现金等价物余额 > 有息负债',
+    kind: 'judgment',
+    description: '期末现金及现金等价物余额能够覆盖有息负债时通过。',
+    requirements: [
+      { label: '期末现金及现金等价物余额', table: 'cashflow', aliases: END_CASH_EQUIVALENT_ALIASES },
+      { label: '有息负债', table: 'balance', aliases: INTEREST_BEARING_DEBT_ALIASES }
+    ],
+    calculate: (context, year) => judgmentValue(
+      rowValue(context.cashflow, year, END_CASH_EQUIVALENT_ALIASES),
+      sumRows(context.balance, year, INTEREST_BEARING_DEBT_GROUPS).total,
+      (endingCash, debt) => endingCash > debt
+    )
+  },
+  {
+    key: 'investmentOutflowAboveInflow',
+    label: '投资现金流出 > 流入',
+    group: 'judgment',
+    formula: '投资活动现金流出 > 投资活动现金流入',
+    kind: 'judgment',
+    description: '投资活动现金流出大于流入时通过。',
+    requirements: [
+      { label: '投资活动现金流出', table: 'cashflow', aliases: INVESTMENT_CASH_OUTFLOW_ALIASES },
+      { label: '投资活动现金流入', table: 'cashflow', aliases: INVESTMENT_CASH_INFLOW_ALIASES }
+    ],
+    calculate: (context, year) => judgmentValue(
+      absoluteValue(rowValue(context.cashflow, year, INVESTMENT_CASH_OUTFLOW_ALIASES)),
+      absoluteValue(rowValue(context.cashflow, year, INVESTMENT_CASH_INFLOW_ALIASES)),
+      (outflow, inflow) => outflow > inflow
+    )
   }
 ];
 
@@ -505,7 +720,8 @@ const metricResults = computed<MetricResult[]>(() => {
   const context: MetricContext = {
     statements: props.statements,
     balance: props.statements.tables.find((table) => table.type === 'balance'),
-    income: props.statements.tables.find((table) => table.type === 'income')
+    income: props.statements.tables.find((table) => table.type === 'income'),
+    cashflow: props.statements.tables.find((table) => table.type === 'cashflow')
   };
   const years = props.activeYears.length ? props.activeYears : props.statements.years;
 
@@ -543,6 +759,10 @@ const selectedResult = computed(() =>
 
 function isCriticalMetric(result: MetricResult): boolean {
   if (result.latest === null) return false;
+  if (result.definition.kind === 'judgment') return result.latest === 0;
+  if (result.definition.key === 'cashDebtRatio') return result.latest < 1;
+  if (result.definition.key === 'currentRatio') return result.latest < 1.5;
+  if (result.definition.key === 'quickRatio') return result.latest < 0.8;
   if (result.definition.key === 'receivablesToAssets') return result.latest > 0.3;
   if (result.definition.key === 'debtRatio') return result.latest > 0.6;
   return false;
@@ -550,8 +770,16 @@ function isCriticalMetric(result: MetricResult): boolean {
 
 function isPositiveMetric(result: MetricResult): boolean {
   if (result.latest === null) return false;
+  if (result.definition.kind === 'judgment') return result.latest === 1;
   if (result.definition.key === 'grossMargin') return result.latest > 0.4;
   if (result.definition.key === 'expenseToGrossProfitRatio') return result.latest < 0.3;
+  return false;
+}
+
+function isWarningMetric(result: MetricResult): boolean {
+  if (result.latest === null) return false;
+  if (result.definition.key === 'currentRatio') return result.latest > 2.5;
+  if (result.definition.key === 'quickRatio') return result.latest > 1.2;
   return false;
 }
 
@@ -563,16 +791,24 @@ watch(activeMetricGroup, () => {
 
 const chartOption = computed<EChartsCoreOption>(() => {
   const result = selectedResult.value;
-  const seriesColor = isCriticalMetric(result) ? '#dc2626' : isPositiveMetric(result) ? '#16a34a' : '#2563eb';
+  const seriesColor = isCriticalMetric(result)
+    ? '#dc2626'
+    : isPositiveMetric(result)
+      ? '#16a34a'
+      : isWarningMetric(result)
+        ? '#d97706'
+        : '#2563eb';
   const areaColor = isCriticalMetric(result)
     ? 'rgba(220, 38, 38, 0.08)'
     : isPositiveMetric(result)
       ? 'rgba(22, 163, 74, 0.10)'
-      : 'rgba(37, 99, 235, 0.08)';
+      : isWarningMetric(result)
+        ? 'rgba(217, 119, 6, 0.09)'
+        : 'rgba(37, 99, 235, 0.08)';
   const displayPoints = result.points.slice().reverse();
   const years = displayPoints.map((point) => point.year);
   const data = displayPoints.map((point) => point.value);
-  const showRevenueGrowth = result.definition.key === 'expenseRatio';
+  const showRevenueGrowth = result.definition.key === 'expenseRatio' || result.definition.key === 'receivableTurnover';
   const revenueGrowthData = displayPoints.map((point) => {
     if (!props.statements) return null;
     const income = props.statements.tables.find((table) => table.type === 'income');
@@ -611,6 +847,7 @@ const chartOption = computed<EChartsCoreOption>(() => {
     },
     yAxis: {
       type: 'value',
+      ...(result.definition.kind === 'judgment' ? { min: 0, max: 1, interval: 1 } : {}),
       axisLabel: {
         color: '#64748b',
         fontSize: 11,
@@ -787,6 +1024,15 @@ function sumRows(
   };
 }
 
+function judgmentValue(
+  left: number | null,
+  right: number | null,
+  predicate: (left: number, right: number) => boolean
+): number | null {
+  if (left === null || right === null) return null;
+  return Number(predicate(left, right));
+}
+
 function sumRowsContaining(table: StatementTable | undefined, year: string, keyword: string) {
   const matches = table?.rows.filter((row) => row.item.includes(keyword) || row.sourceItem?.includes(keyword)) ?? [];
   const rows: FormulaDetail[] = [];
@@ -930,12 +1176,15 @@ function metricDetails(
     const revenue = rowValue(context.income, year, REVENUE_ALIASES);
     const receivable = averageBalanceDetails(context, context.balance, year, yearIndex, RECEIVABLE_ALIASES);
     const value = safeDivide(revenue, receivable.average);
+    const previousRevenue = previousRowValue(context, context.income, yearIndex, REVENUE_ALIASES);
+    const revenueGrowth = growthRate(revenue, previousRevenue);
     return {
       rows: [
         { label: '营业收入', value: revenue },
         { label: `${year} 应收账款`, value: receivable.current, note: '期末' },
         { label: `${receivable.previousYear ?? '上年'} 应收账款`, value: receivable.previous, note: '期初' },
-        { label: '应收账款平均余额', value: receivable.average, note: '(期初 + 期末) / 2' }
+        { label: '应收账款平均余额', value: receivable.average, note: '(期初 + 期末) / 2' },
+        { label: '营业收入增幅', value: revenueGrowth, kind: 'percent', note: '与上年比较' }
       ],
       expression: `${formatRawValue(revenue)} / ${formatRawValue(receivable.average)} = ${formatMetricValue(value, definition.kind)}`
     };
@@ -966,6 +1215,21 @@ function metricDetails(
         { label: '固定资产净值', value: fixedAssets }
       ],
       expression: `${formatRawValue(revenue)} / ${formatRawValue(fixedAssets)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'totalAssetTurnover') {
+    const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+    const assets = averageBalanceDetails(context, context.balance, year, yearIndex, TOTAL_ASSET_ALIASES);
+    const value = safeDivide(revenue, assets.average);
+    return {
+      rows: [
+        { label: '营业收入', value: revenue },
+        { label: `${year} 总资产`, value: assets.current, note: '期末' },
+        { label: `${assets.previousYear ?? '上年'} 总资产`, value: assets.previous, note: '期初' },
+        { label: '平均总资产', value: assets.average, note: '(期初 + 期末) / 2' }
+      ],
+      expression: `${formatRawValue(revenue)} / ${formatRawValue(assets.average)} = ${formatMetricValue(value, definition.kind)}`
     };
   }
 
@@ -1061,6 +1325,83 @@ function metricDetails(
   };
   }
 
+  if (definition.key === 'operatingCostRatio') {
+    const operatingCost = absoluteValue(rowValue(context.income, year, OPERATING_COST_ALIASES));
+    const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+    const value = safeDivide(operatingCost, revenue);
+    return {
+      rows: [
+        { label: '营业成本', value: operatingCost },
+        { label: '营业收入', value: revenue }
+      ],
+      expression: `${formatRawValue(operatingCost)} / ${formatRawValue(revenue)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'sellingExpenseRatio') {
+    const sellingExpense = absoluteValue(rowValue(context.income, year, SELLING_EXPENSE_ALIASES));
+    const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+    const value = safeDivide(sellingExpense, revenue);
+    return {
+      rows: [
+        { label: '销售费用', value: sellingExpense },
+        { label: '营业收入', value: revenue }
+      ],
+      expression: `${formatRawValue(sellingExpense)} / ${formatRawValue(revenue)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'ebitMargin') {
+    const interestExpense = absoluteValue(rowValue(context.income, year, INTEREST_EXPENSE_ALIASES));
+    const operatingProfit = rowValue(context.income, year, OPERATING_PROFIT_ALIASES);
+    const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+    const ebit = interestExpense !== null && operatingProfit !== null ? interestExpense + operatingProfit : null;
+    const value = safeDivide(ebit, revenue);
+    return {
+      rows: [
+        { label: '利息支出', value: interestExpense },
+        { label: '营业利润', value: operatingProfit },
+        { label: '息税前利润', value: ebit, note: '利息支出 + 营业利润' },
+        { label: '营业收入', value: revenue }
+      ],
+      expression: `${formatRawValue(ebit)} / ${formatRawValue(revenue)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'netAssetCashReturn') {
+    const operatingCashflow = rowValue(context.cashflow, year, OPERATING_CASHFLOW_ALIASES);
+    const assets = averageBalanceDetails(context, context.balance, year, yearIndex, TOTAL_ASSET_ALIASES);
+    const value = safeDivide(operatingCashflow, assets.average);
+    return {
+      rows: [
+        { label: '经营活动现金流量净额', value: operatingCashflow },
+        { label: `${year} 总资产`, value: assets.current, note: '期末' },
+        { label: `${assets.previousYear ?? '上年'} 总资产`, value: assets.previous, note: '期初' },
+        { label: '平均资产', value: assets.average, note: '(期初 + 期末) / 2' }
+      ],
+      expression: `${formatRawValue(operatingCashflow)} / ${formatRawValue(assets.average)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'internalAssetReturn') {
+    const operatingProfit = rowValue(context.income, year, OPERATING_PROFIT_ALIASES);
+    const totalAssets = rowValue(context.balance, year, TOTAL_ASSET_ALIASES);
+    const longTermEquityInvestment = rowValue(context.balance, year, LONG_TERM_EQUITY_INVESTMENT_ALIASES);
+    const internalAssets = totalAssets !== null && longTermEquityInvestment !== null
+      ? totalAssets - longTermEquityInvestment
+      : null;
+    const value = safeDivide(operatingProfit, internalAssets);
+    return {
+      rows: [
+        { label: '营业利润', value: operatingProfit },
+        { label: '总资产', value: totalAssets },
+        { label: '长期股权投资', value: longTermEquityInvestment },
+        { label: '内部经营资产', value: internalAssets, note: '总资产 - 长期股权投资' }
+      ],
+      expression: `${formatRawValue(operatingProfit)} / ${formatRawValue(internalAssets)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
   if (definition.key === 'expenseToGrossProfitRatio') {
     const revenue = rowValue(context.income, year, REVENUE_ALIASES);
     const selling = rowValue(context.income, year, SELLING_EXPENSE_ALIASES);
@@ -1106,6 +1447,65 @@ function metricDetails(
 
   if (definition.key === 'netAssetGrowth') {
     return growthDetails(definition, context, year, yearIndex, '净资产', context.balance, NET_ASSET_ALIASES);
+  }
+
+  if (definition.key === 'operatingCashflowAboveProfit') {
+    const operatingCashflow = rowValue(context.cashflow, year, OPERATING_CASHFLOW_ALIASES);
+    const netProfit = rowValue(context.income, year, NET_PROFIT_ALIASES);
+    const value = judgmentValue(operatingCashflow, netProfit, (cashflow, profit) => cashflow > profit && profit > 0);
+    return judgmentDetails(definition, value, [
+      { label: '经营活动产生的现金流量净额', value: operatingCashflow },
+      { label: '净利润', value: netProfit }
+    ]);
+  }
+
+  if (definition.key === 'operatingCashflowExceedsProfit') {
+    const operatingCashflow = rowValue(context.cashflow, year, OPERATING_CASHFLOW_ALIASES);
+    const netProfit = rowValue(context.income, year, NET_PROFIT_ALIASES);
+    const value = judgmentValue(operatingCashflow, netProfit, (cashflow, profit) => cashflow > profit);
+    return judgmentDetails(definition, value, [
+      { label: '经营活动现金流量净额', value: operatingCashflow },
+      { label: '净利润', value: netProfit }
+    ]);
+  }
+
+  if (definition.key === 'operatingCashflowCoversRevenue') {
+    const operatingCashflow = rowValue(context.cashflow, year, OPERATING_CASHFLOW_ALIASES);
+    const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+    const value = judgmentValue(operatingCashflow, revenue, (cashflow, operatingRevenue) => cashflow >= operatingRevenue);
+    return judgmentDetails(definition, value, [
+      { label: '经营活动现金流量净额', value: operatingCashflow },
+      { label: '营业收入', value: revenue }
+    ]);
+  }
+
+  if (definition.key === 'cashEquivalentIncreasePositive') {
+    const increase = rowValue(context.cashflow, year, CASH_EQUIVALENT_INCREASE_ALIASES);
+    const value = increase === null ? null : Number(increase > 0);
+    return judgmentDetails(definition, value, [
+      { label: '现金及现金等价物净增加额', value: increase }
+    ]);
+  }
+
+  if (definition.key === 'endingCashAboveDebt') {
+    const endingCash = rowValue(context.cashflow, year, END_CASH_EQUIVALENT_ALIASES);
+    const debt = sumRows(context.balance, year, INTEREST_BEARING_DEBT_GROUPS);
+    const value = judgmentValue(endingCash, debt.total, (cash, totalDebt) => cash > totalDebt);
+    return judgmentDetails(definition, value, [
+      { label: '期末现金及现金等价物余额', value: endingCash },
+      ...debt.rows,
+      { label: '有息负债合计', value: debt.total }
+    ]);
+  }
+
+  if (definition.key === 'investmentOutflowAboveInflow') {
+    const outflow = absoluteValue(rowValue(context.cashflow, year, INVESTMENT_CASH_OUTFLOW_ALIASES));
+    const inflow = absoluteValue(rowValue(context.cashflow, year, INVESTMENT_CASH_INFLOW_ALIASES));
+    const value = judgmentValue(outflow, inflow, (cashOutflow, cashInflow) => cashOutflow > cashInflow);
+    return judgmentDetails(definition, value, [
+      { label: '投资活动现金流出', value: outflow },
+      { label: '投资活动现金流入', value: inflow }
+    ]);
   }
 
   return {
@@ -1180,13 +1580,28 @@ function findRows(table: StatementTable | undefined, aliases: string[]) {
 function missingRequirements(definition: MetricDefinition, context: MetricContext): string[] {
   return definition.requirements
     .filter((requirement) => {
-      const table = requirement.table === 'balance' ? context.balance : context.income;
+      const table = requirement.table === 'balance'
+        ? context.balance
+        : requirement.table === 'cashflow'
+          ? context.cashflow
+          : context.income;
       if (definition.key === 'receivablesToAssets' && requirement.label === '所有“应收”科目') {
         return !table?.rows.some((row) => row.item.includes('应收') || row.sourceItem?.includes('应收'));
       }
       return !findRow(table, requirement.aliases);
     })
     .map((requirement) => requirement.label);
+}
+
+function judgmentDetails(
+  definition: MetricDefinition,
+  value: number | null,
+  rows: FormulaDetail[]
+): FormulaDetails {
+  return {
+    rows,
+    expression: `${definition.formula}：${formatMetricValue(value, definition.kind)}`
+  };
 }
 
 function metricAlerts(definition: MetricDefinition, points: MetricPoint[]): MetricAlert[] {
@@ -1280,7 +1695,7 @@ function getTooltipDataIndex(params: unknown): number {
 }
 
 function formatDetailValue(detail: FormulaDetail): string {
-  if (detail.kind === 'percent' || detail.kind === 'times') {
+  if (detail.kind === 'percent' || detail.kind === 'times' || detail.kind === 'judgment') {
     return formatMetricValue(detail.value, detail.kind);
   }
   return formatRawValue(detail.value);
@@ -1296,6 +1711,7 @@ function normalizeLabel(value: string): string {
 
 function formatMetricValue(value: number | null, kind: MetricKind): string {
   if (value === null) return '-';
+  if (kind === 'judgment') return value === 1 ? '通过' : '不通过';
   if (kind === 'percent') return `${(value * 100).toFixed(2)}%`;
   return `${value.toFixed(2)} 次`;
 }
@@ -1325,6 +1741,7 @@ function escapeHtml(value: string): string {
 }
 
 function formatAxisValue(value: number, kind: MetricKind): string {
+  if (kind === 'judgment') return value === 1 ? '通过' : '不通过';
   if (kind === 'percent') return `${(value * 100).toFixed(0)}%`;
   return value.toFixed(1);
 }
@@ -1339,7 +1756,8 @@ function formatAxisValue(value: number, kind: MetricKind): string {
       </div>
       <strong :class="{
         critical: isCriticalMetric(selectedResult),
-        positive: isPositiveMetric(selectedResult)
+        positive: isPositiveMetric(selectedResult),
+        warning: isWarningMetric(selectedResult)
       }">
         {{ formatMetricValue(selectedResult.latest, selectedResult.definition.kind) }}
       </strong>
@@ -1364,7 +1782,8 @@ function formatAxisValue(value: number, kind: MetricKind): string {
         :class="{
           active: activeMetricKey === result.definition.key,
           critical: isCriticalMetric(result),
-          positive: isPositiveMetric(result)
+          positive: isPositiveMetric(result),
+          warning: isWarningMetric(result)
         }"
         type="button"
         @click="activeMetricKey = result.definition.key"

@@ -1134,6 +1134,10 @@ button {
   color: #16a34a;
 }
 
+.custom-metric-head > strong.warning {
+  color: #d97706;
+}
+
 .metric-group-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1628,6 +1632,16 @@ button {
 
 .metric-selector button.positive span {
   color: #15803d;
+}
+
+.metric-selector button.warning {
+  border-color: rgba(217, 119, 6, 0.42);
+  color: #b45309;
+  background: #fffbeb;
+}
+
+.metric-selector button.warning span {
+  color: #b45309;
 }
 
 .peer-metric-company-select {
