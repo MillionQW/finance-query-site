@@ -16,6 +16,20 @@
 - Build: `npm run build`
 - Start production server: `npm run start`
 
+## Local AKShare Reference Repository
+
+- AKShare has been cloned locally to `D:\akshare`.
+- Remote repository: `https://github.com/akfamily/akshare.git`
+- Local documentation root: `D:\akshare\docs`
+- Public fund and ETF documentation: `D:\akshare\docs\data\fund\fund_public.md`
+- ETF implementation source: `D:\akshare\akshare\fund\fund_etf_em.py`
+- When implementing or debugging AKShare integrations, check this local repository's documentation and source before relying on memory or external summaries.
+- Search the local documentation and source with `rg`, for example:
+  - `rg -n "fund_etf_spot_em" D:\akshare\docs D:\akshare\akshare`
+- Update the local AKShare reference repository when newer API behavior needs to be checked:
+  - `git -C D:\akshare pull --ff-only`
+- The finance app still uses the AKShare version installed in `D:\finance-query-site\.venv`; cloning the reference repository does not automatically change the installed package version.
+
 ## Git
 
 - Local `main` is synchronized with `origin/main` as of this update.
