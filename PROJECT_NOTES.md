@@ -18,9 +18,11 @@
 
 ## Git
 
-- Local `main` is currently ahead of `origin/main` by multiple commits.
-- Latest known commit: `b72e187 Add cache and peer metric comparison panels`
-- Push status should be checked before continuing remote work.
+- Local `main` is synchronized with `origin/main` as of this update.
+- Latest known commit: `43feed2 Rebuild financial trend panel with ECharts`
+- Recent related commits:
+  - `86024db Add interactive statement item trends`
+  - `43feed2 Rebuild financial trend panel with ECharts`
 
 ## Implemented Features
 
@@ -46,6 +48,25 @@
 - YoY increase is red, decrease is green.
 - Hovering over a Chinese line item shows the English/source field name.
 - A-share rows preserve both Chinese display names and source field names.
+- The table has its own vertically scrollable viewport.
+- The year header remains sticky while statement rows scroll.
+- The first line-item column remains sticky during horizontal scrolling.
+- Statement line items are clickable and keyboard accessible.
+- Clicking a line item opens an ECharts trend chart between the statement tabs and table.
+- The selected table row is highlighted.
+- Clicking the selected line item again, or using the chart close button, hides the chart.
+- Switching between balance sheet, income statement, and cash-flow statement clears the previous line-item selection.
+
+## Statement Item Trend Chart
+
+- Implemented in `apps/web/src/components/StatementItemTrend.vue`.
+- Uses one ECharts Canvas instance for the currently selected statement line item.
+- Displays active years from oldest to newest.
+- Follows the statement table unit switch: original unit, `万`, or `亿`.
+- Every non-empty annual value is rendered directly above its data point.
+- Hover details retain the converted value and original raw value.
+- Missing values remain gaps instead of being connected or treated as zero.
+- The chart displays the English/source field name when it differs from the Chinese display name.
 
 ## Cache Visibility
 
@@ -116,6 +137,33 @@ If operating cost is still unavailable but revenue and gross profit are availabl
   - companies from pulled peer comparison data
   - arbitrary locally cached companies selected by the user
 - Peer/custom company comparison uses only SQLite data and does not trigger AKShare batch pulls.
+- Statement tables now use a bounded scroll area with sticky year headers.
+- Statement line items can be selected to generate an on-demand 10-year trend chart.
+- Line-item trend charts show annual values directly on the chart instead of requiring Hover.
+- The old hand-written SVG `trend-panel` was replaced with an ECharts implementation.
+
+## Core Financial Trend Panel
+
+The overview panel in `apps/web/src/components/MiniTrend.vue` now uses ECharts instead of manually generated SVG paths.
+
+- Displays up to five highlights:
+  - total assets
+  - total liabilities
+  - revenue
+  - net profit
+  - operating cash flow
+- Supports two views:
+  - `增长指数`: each series uses its first valid non-zero value as the base value of 100, making growth rates comparable across metrics with different scales.
+  - `实际金额`: shows actual financial scale and automatically chooses original units, `万`, or `亿`.
+- Native ECharts legend interaction can show or hide individual series.
+- Missing values are rendered as gaps.
+- Tooltip details include:
+  - actual amount
+  - year-over-year change
+  - base-100 growth index
+- Positive YoY values are red and negative YoY values are green.
+- The active view is component-local UI state and is not persisted in the URL or SQLite.
+- Base-100 values are comparative indices, not actual amounts. The actual-amount view should be used when financial scale matters.
 
 ## Metric Comparison APIs
 
@@ -153,6 +201,13 @@ Recently verified:
 - Peer financial chart rendering
 - Custom local-company comparison mode
 - Metric group switching
+- Sticky statement headers and independent table scrolling
+- Balance-sheet, income-statement, and cash-flow line-item selection
+- Direct annual labels in statement item trend charts
+- Core financial trend growth-index and actual-amount views
+- Core financial trend Tooltip contents and view switching
+- A-share rendering with Guizhou Maotai (`600519`)
+- Hong Kong stock rendering with Tencent (`00700`)
 - No relevant browser console error or warning during validation
 
 ## Product Decisions
