@@ -54,6 +54,90 @@
 - Company pages show the latest 60 days of announcements from AKShare/CNInfo with category filters.
 - Favorite-company announcements refresh every 12 hours in batches of two, with a request gap to reduce rate-limit risk.
 - Favorite tabs show a red dot for newly discovered announcements until that company page is opened.
+- A dedicated ETF research page is available with URL state such as `?view=etf&etf=510300`.
+
+## ETF Research Phase 1
+
+The first ETF implementation is complete and reuses the existing NestJS, Python bridge, SQLite, Vue 3, and ECharts stack.
+
+Current ETF features:
+
+- Switch between the existing company page and ETF research from the top navigation.
+- Search ETFs by code or name.
+- Filter by Shanghai or Shenzhen exchange.
+- Sort by turnover amount, change percentage, fund size, turnover rate, premium/discount rate, or code.
+- Display up to 100 matching ETFs in a sticky-header market table.
+- Preserve the selected ETF in the URL and restore it after refresh or browser navigation.
+- Display the selected ETF's:
+  - latest price and daily change
+  - IOPV
+  - premium/discount rate
+  - turnover amount
+  - turnover rate
+  - market capitalization / estimated fund scale
+  - latest share count
+- Display up to 10 years of daily price history with selectable 1-month, 3-month, 1-year, 3-year, and full-history ranges.
+- Display turnover amount when Eastmoney history data is available, otherwise clearly fall back to turnover volume from Sina.
+- Calculate from locally cached unadjusted price history:
+  - 20-day price return
+  - 60-day price return
+  - year-to-date price return
+  - annualized price return
+  - annualized volatility
+  - maximum drawdown
+  - current drawdown
+  - Sharpe ratio using a 2% annual risk-free-rate assumption
+  - period high and low
+- Save ETF favorites in SQLite.
+- Display the selected ETF's tracking-index price-to-earnings ratio without treating the ETF itself as an operating company:
+  - primary value: CSI index `PE1`, based on total shares
+  - supporting value: CSI index `PE2`, based on calculated shares
+  - tracking-index name/code and valuation date
+  - explicit unavailable state when the tracking target cannot be uniquely matched to a CSI index
+
+ETF data sources and fallback behavior:
+
+- Market quotes: `ak.fund_etf_spot_em`
+- Primary daily history: `ak.fund_etf_hist_em`
+- Daily history fallback: `ak.fund_etf_hist_sina`
+- AKShare's `基金折价率` is converted so the app's `premiumRate` is positive for a premium and negative for a discount.
+- Normal market requests use stale-while-revalidate: cached SQLite data is returned immediately while an expired market snapshot refreshes in the background.
+- Explicit refresh waits for the remote market update.
+- Market cache defaults to 3 minutes; history cache defaults to 24 hours.
+- If history refresh fails and cached history exists, the API returns stale cached history instead of an empty page.
+- ETF valuation resolves `fund_overview_em` tracking-target metadata against `index_csindex_all`, then reads `stock_zh_index_value_csindex`.
+- Valuation results load independently from price history and are cached in SQLite for 24 hours.
+
+ETF SQLite tables:
+
+- `etfs`
+- `etf_daily_prices`
+- `etf_refresh_state`
+- `favorite_etfs`
+- `etf_valuations`
+
+ETF APIs:
+
+- `GET /api/etfs`
+- `GET /api/etfs/:symbol`
+- `GET /api/etfs/:symbol/valuation`
+- `GET /api/etfs/favorites`
+- `POST /api/etfs/favorites/:symbol`
+- `DELETE /api/etfs/favorites/:symbol`
+
+ETF frontend ownership:
+
+- `apps/web/src/components/EtfPage.vue`: page state, URL synchronization, search, filters, table, metrics, and favorites.
+- `apps/web/src/components/EtfPriceChart.vue`: the single ETF history ECharts instance.
+- `apps/web/src/types/etf.ts`: frontend ETF contracts.
+
+ETF backend ownership:
+
+- `apps/api/src/finance/etf.controller.ts`
+- `apps/api/src/finance/etf.service.ts`
+- `apps/api/src/finance/etf.dto.ts`
+- `apps/api/src/finance/etf.types.ts`
+- `apps/api/src/python/akshare_bridge.py`
 
 ## Statement Table
 
@@ -222,6 +306,15 @@ Recently verified:
 - Core financial trend Tooltip contents and view switching
 - A-share rendering with Guizhou Maotai (`600519`)
 - Hong Kong stock rendering with Tencent (`00700`)
+- ETF market pull with 1,543 live market rows from AKShare
+- ETF search, exchange filter, sorting, selection, URL restoration, and top navigation
+- ETF favorite add/remove persistence
+- `510300` ten-year history with 2,428 cached trading days
+- ETF history fallback from Eastmoney to Sina
+- ETF market and history SQLite cache hits
+- ETF price/volume ECharts rendering and range switching
+- ETF risk and return metric rendering
+- ETF tracking-index PE rendering and 24-hour SQLite valuation cache
 - No relevant browser console error or warning during validation
 
 ## Product Decisions
@@ -234,6 +327,10 @@ Recently verified:
 
 ## Suggested Next Steps
 
+- Add ETF holdings and industry-allocation analysis using `fund_portfolio_hold_em` and `fund_portfolio_industry_allocation_em`.
+- Add multi-ETF comparison for normalized return, drawdown, volatility, correlation, scale, liquidity, and holdings overlap.
+- Add ETF share-change and estimated fund-flow analysis with an explicit estimation label.
+- Add ETF dividend history and alerts.
 - Add single-cache-entry delete and refresh actions to the cache management panel.
 - Add more fixed metrics to peer/custom comparison, such as ROE, gross margin, net margin, and revenue growth.
 - Persist selected peer/custom comparison companies in localStorage.

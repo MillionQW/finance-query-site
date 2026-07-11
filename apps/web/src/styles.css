@@ -2056,6 +2056,504 @@ button {
   background: #eef4ff;
 }
 
+.etf-page {
+  width: min(1480px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 22px 0 36px;
+}
+
+.etf-page-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, auto) minmax(320px, 620px) auto;
+  gap: 16px;
+  align-items: center;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.etf-page-toolbar h1,
+.etf-page-toolbar span {
+  margin: 0;
+}
+
+.etf-page-toolbar h1 {
+  color: #172033;
+  font-size: 24px;
+}
+
+.etf-page-toolbar > div:first-child > span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.etf-search-control {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 28px;
+  align-items: center;
+  height: 42px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.etf-search-control > svg {
+  justify-self: center;
+  color: var(--muted);
+}
+
+.etf-search-control input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  background: transparent;
+  font-size: 14px;
+}
+
+.etf-quote-band {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) 150px minmax(560px, 2.4fr) minmax(160px, auto);
+  gap: 20px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.etf-identity span,
+.etf-identity strong,
+.etf-quote-actions small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.etf-identity h2 {
+  margin: 4px 0;
+  color: #172033;
+  font-size: 22px;
+}
+
+.etf-live-price > strong {
+  display: block;
+  color: #172033;
+  font-size: 30px;
+  line-height: 1.05;
+}
+
+.etf-live-price > span {
+  display: block;
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.etf-quote-facts {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(74px, 1fr));
+  gap: 0;
+  margin: 0;
+}
+
+.etf-quote-facts div {
+  min-width: 0;
+  padding: 3px 14px;
+  border-left: 1px solid var(--line);
+}
+
+.etf-quote-facts dt,
+.etf-quote-facts dd {
+  margin: 0;
+}
+
+.etf-quote-facts dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.etf-quote-facts dd {
+  overflow: hidden;
+  margin-top: 5px;
+  color: #172033;
+  font-size: 14px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.etf-quote-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+}
+
+.etf-quote-actions .ghost-button {
+  border-color: var(--line);
+}
+
+.etf-analysis-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.75fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.etf-price-panel,
+.etf-risk-panel,
+.etf-market-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.etf-price-panel,
+.etf-risk-panel {
+  min-height: 390px;
+  padding: 17px 18px;
+}
+
+.etf-price-panel > header,
+.etf-risk-panel > header,
+.etf-market-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.etf-price-panel header span,
+.etf-risk-panel header span,
+.etf-market-head > div:first-child > span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.etf-price-panel h2,
+.etf-risk-panel h2,
+.etf-market-panel h2 {
+  margin: 3px 0 0;
+  color: #172033;
+  font-size: 18px;
+}
+
+.etf-range-switch,
+.etf-exchange-tabs {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.etf-range-switch button,
+.etf-exchange-tabs button {
+  height: 24px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  color: #475569;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.etf-range-switch button.active,
+.etf-range-switch button:hover,
+.etf-exchange-tabs button.active,
+.etf-exchange-tabs button:hover {
+  color: var(--blue);
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+}
+
+.etf-price-chart {
+  width: 100%;
+  height: 320px;
+  margin-top: 6px;
+}
+
+.etf-risk-panel header small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.etf-valuation-row {
+  display: grid;
+  grid-template-columns: 145px minmax(0, 1fr);
+  gap: 16px;
+  min-height: 104px;
+  margin-top: 15px;
+  padding: 14px;
+  border: 1px solid #cbd5e1;
+  border-left: 3px solid var(--blue);
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.etf-valuation-row > div:first-child > span,
+.etf-valuation-row dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.etf-valuation-row > div:first-child > strong {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-height: 42px;
+  margin-top: 5px;
+  color: #172033;
+  font-size: 30px;
+}
+
+.etf-valuation-row > div:first-child > strong small {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.etf-valuation-row dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.etf-valuation-row dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.etf-valuation-row dd {
+  margin: 0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.etf-valuation-row p {
+  align-self: center;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.etf-valuation-row.unavailable {
+  border-left-color: #94a3b8;
+}
+
+.etf-risk-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 15px;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+
+.etf-risk-grid > div {
+  min-height: 58px;
+  padding: 9px 11px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.etf-risk-grid span,
+.etf-risk-grid strong {
+  display: block;
+}
+
+.etf-risk-grid span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.etf-risk-grid strong {
+  margin-top: 5px;
+  color: #172033;
+  font-size: 16px;
+}
+
+.etf-market-panel {
+  margin-top: 14px;
+  padding: 17px 18px 18px;
+}
+
+.etf-market-head {
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.etf-market-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.etf-market-controls label {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 7px;
+  padding-left: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.etf-market-controls select {
+  height: 30px;
+  border: 0;
+  outline: 0;
+  color: #334155;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.etf-order-button {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--blue);
+  background: #fff;
+}
+
+.etf-table-wrap {
+  max-height: 520px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.etf-table {
+  width: 100%;
+  min-width: 1100px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+
+.etf-table th,
+.etf-table td {
+  height: 42px;
+  padding: 7px 11px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.etf-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  color: var(--blue);
+  background: #f8fbff;
+  font-weight: 800;
+}
+
+.etf-table th:nth-child(1),
+.etf-table th:nth-child(2),
+.etf-table td:nth-child(1),
+.etf-table td:nth-child(2) {
+  text-align: left;
+}
+
+.etf-table tbody tr {
+  cursor: pointer;
+}
+
+.etf-table tbody tr:nth-child(even) th,
+.etf-table tbody tr:nth-child(even) td {
+  background: #f9fbfe;
+}
+
+.etf-table tbody tr:hover th,
+.etf-table tbody tr:hover td,
+.etf-table tbody tr.selected th,
+.etf-table tbody tr.selected td {
+  background: #eef4ff;
+}
+
+.etf-table tbody th {
+  color: #172033;
+  font-weight: 800;
+}
+
+.etf-table tbody td:first-child button {
+  padding: 0;
+  border: 0;
+  color: var(--blue);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.etf-table-empty {
+  display: grid;
+  min-height: 120px;
+  place-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.etf-chart-tooltip {
+  min-width: 190px;
+  color: #172033;
+  font-size: 12px;
+}
+
+.etf-chart-tooltip > strong {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 13px;
+}
+
+.etf-chart-tooltip dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 14px;
+  margin: 0;
+}
+
+.etf-chart-tooltip dt,
+.etf-chart-tooltip dd {
+  margin: 0;
+}
+
+.etf-chart-tooltip dt {
+  color: var(--muted);
+}
+
+.etf-chart-tooltip dd {
+  font-weight: 800;
+  text-align: right;
+}
+
 .status-banner,
 .loading-panel,
 .empty-table,

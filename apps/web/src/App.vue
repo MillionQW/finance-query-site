@@ -20,6 +20,7 @@ import MiniTrend from './components/MiniTrend.vue';
 import PeerComparisonPanel from './components/PeerComparisonPanel.vue';
 import PeerMetricChart from './components/PeerMetricChart.vue';
 import StatementTable from './components/StatementTable.vue';
+import EtfPage from './components/EtfPage.vue';
 import {
   getCacheEntries,
   getAnnouncements,
@@ -58,7 +59,7 @@ const seedCompanies: CompanySearchResult[] = [
 ];
 
 type UrlMode = 'push' | 'replace' | 'none';
-type AppView = 'company' | 'settings';
+type AppView = 'company' | 'settings' | 'etf';
 
 const initialCompany = companyFromUrl() ?? seedCompanies[0];
 const currentView = ref<AppView>(viewFromUrl());
@@ -260,9 +261,10 @@ function companyFromUrl(): CompanySearchResult | null {
 }
 
 function viewFromUrl(): AppView {
-  return new URLSearchParams(window.location.search).get('view') === 'settings'
-    ? 'settings'
-    : 'company';
+  const view = new URLSearchParams(window.location.search).get('view');
+  if (view === 'settings') return 'settings';
+  if (view === 'etf') return 'etf';
+  return 'company';
 }
 
 function mergeCompanyList(
@@ -307,8 +309,12 @@ function syncViewUrl(view: AppView, mode: 'push' | 'replace' = 'push'): void {
   const params = new URLSearchParams(window.location.search);
   if (view === 'settings') {
     params.set('view', 'settings');
+  } else if (view === 'etf') {
+    params.set('view', 'etf');
+    if (!params.get('etf')) params.set('etf', '510300');
   } else {
     params.delete('view');
+    params.delete('etf');
   }
   const queryString = params.toString();
   const nextUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}${window.location.hash}`;
@@ -332,6 +338,12 @@ async function openCompanyPage(): Promise<void> {
   }
 }
 
+function openEtfPage(): void {
+  searchDropdownOpen.value = false;
+  syncViewUrl('etf');
+  window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
 function handleUrlNavigation(): void {
   currentView.value = viewFromUrl();
   window.scrollTo({ top: 0, behavior: 'auto' });
@@ -339,6 +351,7 @@ function handleUrlNavigation(): void {
     void Promise.all([loadRefreshStatus(), loadCacheEntries()]);
     return;
   }
+  if (currentView.value === 'etf') return;
 
   const company = companyFromUrl();
   if (!company) {
@@ -799,12 +812,19 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div v-else class="settings-topbar-title">
+      <div v-else-if="currentView === 'settings'" class="settings-topbar-title">
         <Settings :size="18" />
         <strong>系统设置</strong>
       </div>
+      <div v-else class="settings-topbar-title">
+        <TrendingUp :size="18" />
+        <strong>ETF 研究</strong>
+      </div>
 
       <nav class="top-actions" aria-label="工具">
+        <button v-if="currentView === 'company'" class="ghost-button" type="button" @click="openEtfPage">
+          <TrendingUp :size="17" />ETF
+        </button>
         <button v-if="currentView === 'company'" class="ghost-button" type="button" title="刷新财报" @click="selectedCompany && selectCompany(selectedCompany, true)">
           <RefreshCw :size="17" />刷新
         </button>
@@ -829,7 +849,10 @@ onUnmounted(() => {
         >
           <Settings :size="17" />
         </button>
-        <button v-else class="ghost-button" type="button" @click="openCompanyPage">
+        <button v-if="currentView === 'etf'" class="ghost-button" type="button" @click="openCompanyPage">
+          <ArrowLeft :size="17" />个股
+        </button>
+        <button v-else-if="currentView === 'settings'" class="ghost-button" type="button" @click="openCompanyPage">
           <ArrowLeft :size="17" />返回财报
         </button>
       </nav>
@@ -891,6 +914,8 @@ onUnmounted(() => {
           :error="cacheEntriesError"
         />
       </section>
+
+      <EtfPage v-else-if="currentView === 'etf'" />
 
       <section v-else class="content">
         <div v-if="favorites.length" class="favorite-strip" aria-label="收藏公司">

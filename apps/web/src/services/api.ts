@@ -11,6 +11,7 @@ import type {
   StatementRefreshRun,
   StatementRefreshRuntimeStatus
 } from '../types/finance';
+import type { EtfDetailResponse, EtfMarketResponse, EtfSortKey, EtfValuation, FavoriteEtf } from '../types/etf';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
@@ -125,4 +126,46 @@ export function triggerRefresh(): Promise<StatementRefreshRun> {
   return request<StatementRefreshRun>('/cache/refresh', {
     method: 'POST'
   });
+}
+
+export function getEtfs(options: {
+  q?: string;
+  limit?: number;
+  sort?: EtfSortKey;
+  order?: 'asc' | 'desc';
+  exchange?: 'all' | 'sh' | 'sz';
+  refresh?: boolean;
+} = {}): Promise<EtfMarketResponse> {
+  const params = new URLSearchParams({
+    q: options.q ?? '',
+    limit: String(options.limit ?? 80),
+    sort: options.sort ?? 'amount',
+    order: options.order ?? 'desc',
+    exchange: options.exchange ?? 'all'
+  });
+  if (options.refresh) params.set('refresh', 'true');
+  return request<EtfMarketResponse>(`/etfs?${params.toString()}`);
+}
+
+export function getEtfDetail(symbol: string, years = 10, refresh = false): Promise<EtfDetailResponse> {
+  const params = new URLSearchParams({ years: String(years) });
+  if (refresh) params.set('refresh', 'true');
+  return request<EtfDetailResponse>(`/etfs/${encodeURIComponent(symbol)}?${params.toString()}`);
+}
+
+export function getEtfValuation(symbol: string, refresh = false): Promise<EtfValuation> {
+  const suffix = refresh ? '?refresh=true' : '';
+  return request<EtfValuation>(`/etfs/${encodeURIComponent(symbol)}/valuation${suffix}`);
+}
+
+export function getFavoriteEtfs(): Promise<FavoriteEtf[]> {
+  return request<FavoriteEtf[]>('/etfs/favorites');
+}
+
+export function saveFavoriteEtf(symbol: string): Promise<FavoriteEtf[]> {
+  return request<FavoriteEtf[]>(`/etfs/favorites/${encodeURIComponent(symbol)}`, { method: 'POST' });
+}
+
+export function removeFavoriteEtf(symbol: string): Promise<FavoriteEtf[]> {
+  return request<FavoriteEtf[]>(`/etfs/favorites/${encodeURIComponent(symbol)}`, { method: 'DELETE' });
 }
