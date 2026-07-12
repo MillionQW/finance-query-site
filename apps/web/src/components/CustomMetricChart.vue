@@ -86,21 +86,25 @@ const CURRENT_ASSET_ALIASES = ['流动资产合计', '流动资产', 'CURRENT AS
 const CURRENT_LIABILITY_ALIASES = ['流动负债合计', '流动负债', 'CURRENT LIAB BALANCE', 'TOTAL CURRENT LIAB', 'TOTAL CURRENT LIABILITIES'];
 const INVENTORY_ALIASES = ['存货', 'INVENTORY'];
 const CASH_ALIASES = ['现金及等价物', '现金及现金等价物', '现金和现金等价物', '货币资金', '现金', 'CASH AND CASH EQUIVALENTS', 'CASH EQUIVALENTS', 'CASH', 'END CCE'];
-const REVENUE_ALIASES = ['营业收入', '营业总收入', '营业额', '营运收入', '收益', '收入', 'OPERATE INCOME', 'TOTAL OPERATE INCOME'];
-const OPERATING_REVENUE_ALIASES = ['营业收入', 'OPERATE INCOME'];
-const TOTAL_OPERATING_REVENUE_ALIASES = ['营业总收入', 'TOTAL OPERATE INCOME'];
+const REVENUE_ALIASES = ['营业收入', '营业额', 'OPERATE INCOME'];
+const OPERATING_REVENUE_ALIASES = ['营业收入', '营业额', 'OPERATE INCOME'];
+const TOTAL_OPERATING_REVENUE_ALIASES = ['营业总收入', '营运收入', 'TOTAL OPERATE INCOME'];
 const TOTAL_OPERATING_COST_ALIASES = ['营业总成本', 'TOTAL OPERATE COST'];
 const OPERATING_PROFIT_ALIASES = ['营业利润', '经营溢利', '经营利润', '营运利润', 'OPERATE PROFIT', 'OPERATE PROFIT BALANCE'];
 const RECEIVABLE_ALIASES = ['应收账款', '应收帐款', '应收票据及应收账款', '应收账款及应收票据', 'ACCOUNTS RECE', 'NOTE ACCOUNTS RECE', '应收款项'];
 const GROSS_PROFIT_ALIASES = ['毛利', '毛利润', 'GROSS PROFIT'];
 const OPERATING_COST_ALIASES = ['营业成本', '销售成本', '收入成本', '主营业务成本', 'OPERATE COST', 'COST OF SALES', 'COST OF REVENUE'];
-const INTEREST_EXPENSE_ALIASES = ['利息支出', 'INTEREST EXPENSE'];
+const INTEREST_EXPENSE_ALIASES = ['利息支出', '融资成本', 'INTEREST EXPENSE', 'FINANCE COSTS'];
 const SELLING_EXPENSE_ALIASES = ['销售费用', '销售及分销费用', 'SALE EXPENSE'];
 const ADMIN_EXPENSE_ALIASES = ['管理费用', '行政开支', 'MANAGE EXPENSE'];
 const FINANCE_EXPENSE_ALIASES = ['财务费用', '融资成本', 'FINANCE EXPENSE'];
 const NET_ASSET_ALIASES = ['净资产', '所有者权益合计', '股东权益', '总权益', '归属于母公司股东权益', 'PARENT EQUITY BALANCE', 'EQUITY BALANCE'];
 const FIXED_ASSET_ALIASES = ['固定资产', '固定资产净值', '物业厂房及设备', '物业厂房设备', 'FIXED ASSET', 'PROPERTY PLANT EQUIPMENT', 'PROPERTY PLANT AND EQUIPMENT'];
 const LONG_TERM_EQUITY_INVESTMENT_ALIASES = ['长期股权投资', 'LONG EQUITY INVEST', 'LONG TERM EQUITY INVESTMENT'];
+const HK_ASSOCIATE_JOINT_VENTURE_GROUPS = [
+  { label: '联营公司权益', aliases: ['联营公司权益'] },
+  { label: '合营公司权益', aliases: ['合营公司权益'] }
+];
 const INTEREST_BEARING_DEBT_GROUPS = [
   { label: '短期借款/贷款', aliases: ['短期借款', '短期贷款', 'SHORT LOAN', 'SHORT BORROWING', 'SHORT TERM BORROWING'] },
   { label: '长期借款/贷款', aliases: ['长期借款', '长期贷款', 'LONG LOAN', 'LONG BORROWING', 'LONG TERM BORROWING'] },
@@ -109,11 +113,18 @@ const INTEREST_BEARING_DEBT_GROUPS = [
   { label: '一年内到期非流动负债', aliases: ['一年内到期的非流动负债', '一年内到期非流动负债', 'NONCURRENT LIAB 1YEAR'] }
 ];
 const INTEREST_BEARING_DEBT_ALIASES = INTEREST_BEARING_DEBT_GROUPS.flatMap((group) => group.aliases);
-const OPERATING_CASHFLOW_ALIASES = ['经营活动产生的现金流量净额', '经营活动现金流量净额', 'NETCASH OPERATE'];
+const OPERATING_CASHFLOW_ALIASES = [
+  '经营活动产生的现金流量净额',
+  '经营活动现金流量净额',
+  '经营业务现金净额',
+  'NETCASH OPERATE'
+];
 const CASH_EQUIVALENT_INCREASE_ALIASES = ['现金及现金等价物净增加额', 'CCE ADD'];
-const END_CASH_EQUIVALENT_ALIASES = ['期末现金及现金等价物余额', '期末现金及等价物余额', 'END CCE', 'CASH END'];
+const BEGIN_CASH_EQUIVALENT_ALIASES = ['期初现金', '期初现金及现金等价物余额', 'BEGIN CCE', 'BEGIN CASH'];
+const END_CASH_EQUIVALENT_ALIASES = ['期末现金', '期末现金及现金等价物余额', '期末现金及等价物余额', 'END CCE', 'CASH END'];
 const INVESTMENT_CASH_INFLOW_ALIASES = ['投资活动现金流入小计', 'TOTAL INVEST INFLOW'];
 const INVESTMENT_CASH_OUTFLOW_ALIASES = ['投资活动现金流出小计', 'TOTAL INVEST OUTFLOW'];
+const HK_INVESTMENT_CASH_NET_ALIASES = ['投资业务现金净额'];
 
 const metricGroups: Array<{ key: MetricGroupKey; label: string }> = [
   { key: 'profitability', label: '盈利能力' },
@@ -442,7 +453,7 @@ const definitions: MetricDefinition[] = [
       { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
     ],
     calculate: (context, year) => safeDivide(
-      absoluteValue(rowValue(context.income, year, OPERATING_COST_ALIASES)),
+      operatingCostDetails(context, year).costAbs,
       rowValue(context.income, year, REVENUE_ALIASES)
     )
   },
@@ -512,7 +523,7 @@ const definitions: MetricDefinition[] = [
     calculate: (context, year) => {
       const operatingProfit = rowValue(context.income, year, OPERATING_PROFIT_ALIASES);
       const totalAssets = rowValue(context.balance, year, TOTAL_ASSET_ALIASES);
-      const longTermEquityInvestment = rowValue(context.balance, year, LONG_TERM_EQUITY_INVESTMENT_ALIASES);
+      const longTermEquityInvestment = longTermEquityInvestmentValue(context, year);
       const internalAssets = totalAssets !== null && longTermEquityInvestment !== null
         ? totalAssets - longTermEquityInvestment
         : null;
@@ -672,7 +683,7 @@ const definitions: MetricDefinition[] = [
       { label: '现金及现金等价物净增加额', table: 'cashflow', aliases: CASH_EQUIVALENT_INCREASE_ALIASES }
     ],
     calculate: (context, year) => {
-      const value = rowValue(context.cashflow, year, CASH_EQUIVALENT_INCREASE_ALIASES);
+      const value = cashEquivalentIncrease(context, year);
       return value === null ? null : Number(value > 0);
     }
   },
@@ -704,17 +715,98 @@ const definitions: MetricDefinition[] = [
       { label: '投资活动现金流出', table: 'cashflow', aliases: INVESTMENT_CASH_OUTFLOW_ALIASES },
       { label: '投资活动现金流入', table: 'cashflow', aliases: INVESTMENT_CASH_INFLOW_ALIASES }
     ],
-    calculate: (context, year) => judgmentValue(
-      absoluteValue(rowValue(context.cashflow, year, INVESTMENT_CASH_OUTFLOW_ALIASES)),
-      absoluteValue(rowValue(context.cashflow, year, INVESTMENT_CASH_INFLOW_ALIASES)),
-      (outflow, inflow) => outflow > inflow
-    )
+    calculate: (context, year) => {
+      if (context.statements.company.market === 'hk') {
+        const netCashflow = rowValue(context.cashflow, year, HK_INVESTMENT_CASH_NET_ALIASES);
+        return netCashflow === null ? null : Number(netCashflow < 0);
+      }
+      return judgmentValue(
+        absoluteValue(rowValue(context.cashflow, year, INVESTMENT_CASH_OUTFLOW_ALIASES)),
+        absoluteValue(rowValue(context.cashflow, year, INVESTMENT_CASH_INFLOW_ALIASES)),
+        (outflow, inflow) => outflow > inflow
+      );
+    }
   }
 ];
 
+function definitionForMarket(definition: MetricDefinition, market: 'a' | 'hk'): MetricDefinition {
+  if (market !== 'hk') return definition;
+  const operatingCashName = '经营业务现金净额';
+  const overrides: Record<string, Partial<MetricDefinition>> = {
+    internalAssetReturn: {
+      label: '内部资产收益率（港股口径）',
+      formula: '营业利润 / (总资产 - 联营公司权益 - 合营公司权益)',
+      description: '港股口径：扣除联营公司和合营公司权益后，观察内部经营资产的收益效率。'
+    },
+    netAssetCashReturn: {
+      formula: `${operatingCashName} / 平均资产`,
+      description: `观察${operatingCashName}相对于平均总资产的回报水平。`
+    },
+    operatingCashflowAboveProfit: {
+      label: `${operatingCashName} > 净利润 > 0`,
+      formula: `${operatingCashName} > 净利润 > 0`
+    },
+    operatingCashflowExceedsProfit: {
+      label: `${operatingCashName} > 净利润`,
+      formula: `${operatingCashName} > 净利润`
+    },
+    operatingCashflowCoversRevenue: {
+      label: `${operatingCashName} ≥ 营业收入`,
+      formula: `${operatingCashName} ≥ 营业收入`
+    },
+    cashEquivalentIncreasePositive: {
+      label: '期末现金 > 期初现金',
+      formula: '期末现金 - 期初现金 > 0',
+      description: '港股口径：期末现金高于期初现金时通过。'
+    },
+    endingCashAboveDebt: {
+      label: '期末现金 > 有息负债',
+      formula: '期末现金 > 有息负债'
+    },
+    investmentOutflowAboveInflow: {
+      label: '投资业务现金净额 < 0',
+      formula: '投资业务现金净额 < 0',
+      description: '港股口径：投资业务现金净额为负时，表示投资现金流出大于流入。'
+    }
+  };
+  const override = overrides[definition.key] ?? {};
+  const marketDefinition = {
+    ...definition,
+    ...override,
+    requirements: definition.requirements.map((requirement) =>
+      requirement.aliases === OPERATING_CASHFLOW_ALIASES
+        ? { ...requirement, label: operatingCashName }
+        : requirement
+    )
+  };
+  const useHongKongNames = (value: string) => value
+    .split('营业总收入').join('营运收入')
+    .split('营业成本').join('销售成本')
+    .split('营业收入').join('营业额')
+    .split('利息支出').join('融资成本')
+    .split('营业利润').join('经营溢利');
+  return {
+    ...marketDefinition,
+    label: useHongKongNames(marketDefinition.label),
+    formula: useHongKongNames(marketDefinition.formula),
+    description: useHongKongNames(marketDefinition.description),
+    requirements: marketDefinition.requirements.map((requirement) => ({
+      ...requirement,
+      label: useHongKongNames(requirement.label)
+    }))
+  };
+}
+
+const activeDefinitions = computed(() => {
+  const market = props.statements?.company.market ?? 'a';
+  return definitions
+    .filter((definition) => market !== 'hk' || definition.key !== 'tangOperatingMargin')
+    .map((definition) => definitionForMarket(definition, market));
+});
+
 const metricResults = computed<MetricResult[]>(() => {
   if (!props.statements) {
-    return definitions.map((definition) => ({ definition, points: [], latest: null, missing: [], alerts: [] }));
+    return activeDefinitions.value.map((definition) => ({ definition, points: [], latest: null, missing: [], alerts: [] }));
   }
 
   const context: MetricContext = {
@@ -725,7 +817,7 @@ const metricResults = computed<MetricResult[]>(() => {
   };
   const years = props.activeYears.length ? props.activeYears : props.statements.years;
 
-  return definitions.map((definition) => {
+  return activeDefinitions.value.map((definition) => {
     const points = years.map((year) => {
       const yearIndex = props.statements!.years.indexOf(year);
       const details = metricDetails(definition, context, year, yearIndex);
@@ -1022,6 +1114,37 @@ function sumRows(
     total: hasValue ? total : null,
     rows
   };
+}
+
+function cashEquivalentIncrease(context: MetricContext, year: string): number | null {
+  const direct = rowValue(context.cashflow, year, CASH_EQUIVALENT_INCREASE_ALIASES);
+  if (direct !== null || context.statements.company.market !== 'hk') return direct;
+  const beginning = rowValue(context.cashflow, year, BEGIN_CASH_EQUIVALENT_ALIASES);
+  const ending = rowValue(context.cashflow, year, END_CASH_EQUIVALENT_ALIASES);
+  return beginning !== null && ending !== null ? ending - beginning : null;
+}
+
+function longTermEquityInvestmentDetails(context: MetricContext, year: string) {
+  if (context.statements.company.market === 'hk') {
+    return sumRows(context.balance, year, HK_ASSOCIATE_JOINT_VENTURE_GROUPS);
+  }
+  const value = rowValue(context.balance, year, LONG_TERM_EQUITY_INVESTMENT_ALIASES);
+  return {
+    total: value,
+    rows: value === null
+      ? []
+      : [{ label: '长期股权投资', value }]
+  };
+}
+
+function longTermEquityInvestmentValue(context: MetricContext, year: string): number | null {
+  return longTermEquityInvestmentDetails(context, year).total;
+}
+
+function operatingCashflowDisplayName(context: MetricContext): string {
+  return context.statements.company.market === 'hk'
+    ? '经营业务现金净额'
+    : '经营活动现金流量净额';
 }
 
 function judgmentValue(
@@ -1356,13 +1479,15 @@ function metricDetails(
     const operatingProfit = rowValue(context.income, year, OPERATING_PROFIT_ALIASES);
     const revenue = rowValue(context.income, year, REVENUE_ALIASES);
     const ebit = interestExpense !== null && operatingProfit !== null ? interestExpense + operatingProfit : null;
+    const financingCostLabel = context.statements.company.market === 'hk' ? '融资成本' : '利息支出';
+    const operatingProfitLabel = context.statements.company.market === 'hk' ? '经营溢利' : '营业利润';
     const value = safeDivide(ebit, revenue);
     return {
       rows: [
-        { label: '利息支出', value: interestExpense },
-        { label: '营业利润', value: operatingProfit },
-        { label: '息税前利润', value: ebit, note: '利息支出 + 营业利润' },
-        { label: '营业收入', value: revenue }
+        { label: financingCostLabel, value: interestExpense },
+        { label: operatingProfitLabel, value: operatingProfit },
+        { label: '息税前利润', value: ebit, note: `${financingCostLabel} + ${operatingProfitLabel}` },
+        { label: context.statements.company.market === 'hk' ? '营业额' : '营业收入', value: revenue }
       ],
       expression: `${formatRawValue(ebit)} / ${formatRawValue(revenue)} = ${formatMetricValue(value, definition.kind)}`
     };
@@ -1374,7 +1499,7 @@ function metricDetails(
     const value = safeDivide(operatingCashflow, assets.average);
     return {
       rows: [
-        { label: '经营活动现金流量净额', value: operatingCashflow },
+        { label: operatingCashflowDisplayName(context), value: operatingCashflow },
         { label: `${year} 总资产`, value: assets.current, note: '期末' },
         { label: `${assets.previousYear ?? '上年'} 总资产`, value: assets.previous, note: '期初' },
         { label: '平均资产', value: assets.average, note: '(期初 + 期末) / 2' }
@@ -1386,7 +1511,8 @@ function metricDetails(
   if (definition.key === 'internalAssetReturn') {
     const operatingProfit = rowValue(context.income, year, OPERATING_PROFIT_ALIASES);
     const totalAssets = rowValue(context.balance, year, TOTAL_ASSET_ALIASES);
-    const longTermEquityInvestment = rowValue(context.balance, year, LONG_TERM_EQUITY_INVESTMENT_ALIASES);
+    const investment = longTermEquityInvestmentDetails(context, year);
+    const longTermEquityInvestment = investment.total;
     const internalAssets = totalAssets !== null && longTermEquityInvestment !== null
       ? totalAssets - longTermEquityInvestment
       : null;
@@ -1395,8 +1521,8 @@ function metricDetails(
       rows: [
         { label: '营业利润', value: operatingProfit },
         { label: '总资产', value: totalAssets },
-        { label: '长期股权投资', value: longTermEquityInvestment },
-        { label: '内部经营资产', value: internalAssets, note: '总资产 - 长期股权投资' }
+        ...investment.rows,
+        { label: '内部经营资产', value: internalAssets, note: context.statements.company.market === 'hk' ? '总资产 - 联营公司权益 - 合营公司权益' : '总资产 - 长期股权投资' }
       ],
       expression: `${formatRawValue(operatingProfit)} / ${formatRawValue(internalAssets)} = ${formatMetricValue(value, definition.kind)}`
     };
@@ -1454,7 +1580,7 @@ function metricDetails(
     const netProfit = rowValue(context.income, year, NET_PROFIT_ALIASES);
     const value = judgmentValue(operatingCashflow, netProfit, (cashflow, profit) => cashflow > profit && profit > 0);
     return judgmentDetails(definition, value, [
-      { label: '经营活动产生的现金流量净额', value: operatingCashflow },
+      { label: operatingCashflowDisplayName(context), value: operatingCashflow },
       { label: '净利润', value: netProfit }
     ]);
   }
@@ -1464,7 +1590,7 @@ function metricDetails(
     const netProfit = rowValue(context.income, year, NET_PROFIT_ALIASES);
     const value = judgmentValue(operatingCashflow, netProfit, (cashflow, profit) => cashflow > profit);
     return judgmentDetails(definition, value, [
-      { label: '经营活动现金流量净额', value: operatingCashflow },
+      { label: operatingCashflowDisplayName(context), value: operatingCashflow },
       { label: '净利润', value: netProfit }
     ]);
   }
@@ -1474,15 +1600,27 @@ function metricDetails(
     const revenue = rowValue(context.income, year, REVENUE_ALIASES);
     const value = judgmentValue(operatingCashflow, revenue, (cashflow, operatingRevenue) => cashflow >= operatingRevenue);
     return judgmentDetails(definition, value, [
-      { label: '经营活动现金流量净额', value: operatingCashflow },
+      { label: operatingCashflowDisplayName(context), value: operatingCashflow },
       { label: '营业收入', value: revenue }
     ]);
   }
 
   if (definition.key === 'cashEquivalentIncreasePositive') {
-    const increase = rowValue(context.cashflow, year, CASH_EQUIVALENT_INCREASE_ALIASES);
+    const increase = cashEquivalentIncrease(context, year);
+    const beginning = context.statements.company.market === 'hk'
+      ? rowValue(context.cashflow, year, BEGIN_CASH_EQUIVALENT_ALIASES)
+      : null;
+    const ending = context.statements.company.market === 'hk'
+      ? rowValue(context.cashflow, year, END_CASH_EQUIVALENT_ALIASES)
+      : null;
     const value = increase === null ? null : Number(increase > 0);
     return judgmentDetails(definition, value, [
+      ...(beginning !== null && ending !== null
+        ? [
+            { label: '期末现金', value: ending },
+            { label: '期初现金', value: beginning }
+          ]
+        : []),
       { label: '现金及现金等价物净增加额', value: increase }
     ]);
   }
@@ -1499,6 +1637,13 @@ function metricDetails(
   }
 
   if (definition.key === 'investmentOutflowAboveInflow') {
+    if (context.statements.company.market === 'hk') {
+      const netCashflow = rowValue(context.cashflow, year, HK_INVESTMENT_CASH_NET_ALIASES);
+      const value = netCashflow === null ? null : Number(netCashflow < 0);
+      return judgmentDetails(definition, value, [
+        { label: '投资业务现金净额', value: netCashflow }
+      ]);
+    }
     const outflow = absoluteValue(rowValue(context.cashflow, year, INVESTMENT_CASH_OUTFLOW_ALIASES));
     const inflow = absoluteValue(rowValue(context.cashflow, year, INVESTMENT_CASH_INFLOW_ALIASES));
     const value = judgmentValue(outflow, inflow, (cashOutflow, cashInflow) => cashOutflow > cashInflow);
@@ -1578,6 +1723,35 @@ function findRows(table: StatementTable | undefined, aliases: string[]) {
 }
 
 function missingRequirements(definition: MetricDefinition, context: MetricContext): string[] {
+  if (context.statements.company.market === 'hk' && definition.key === 'operatingCostRatio') {
+    const latestYear = context.statements.years[0];
+    return operatingCostDetails(context, latestYear).costAbs === null ? ['销售成本或毛利'] : [];
+  }
+  if (context.statements.company.market === 'hk' && definition.key === 'internalAssetReturn') {
+    const commonMissing = definition.requirements
+      .filter((requirement) => requirement.aliases !== LONG_TERM_EQUITY_INVESTMENT_ALIASES)
+      .filter((requirement) => {
+        const table = requirement.table === 'balance' ? context.balance : context.income;
+        return !findRow(table, requirement.aliases);
+      })
+      .map((requirement) => requirement.label);
+    const hasAssociateOrJointVenture = HK_ASSOCIATE_JOINT_VENTURE_GROUPS.some((group) =>
+      Boolean(findRow(context.balance, group.aliases))
+    );
+    return hasAssociateOrJointVenture
+      ? commonMissing
+      : [...commonMissing, '联营公司权益或合营公司权益'];
+  }
+  if (context.statements.company.market === 'hk' && definition.key === 'cashEquivalentIncreasePositive') {
+    return cashEquivalentIncrease(context, context.statements.years[0]) === null
+      ? ['期初现金和期末现金']
+      : [];
+  }
+  if (context.statements.company.market === 'hk' && definition.key === 'investmentOutflowAboveInflow') {
+    return findRow(context.cashflow, HK_INVESTMENT_CASH_NET_ALIASES)
+      ? []
+      : ['投资业务现金净额'];
+  }
   return definition.requirements
     .filter((requirement) => {
       const table = requirement.table === 'balance'
