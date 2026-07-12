@@ -44,7 +44,7 @@
 ## Implemented Features
 
 - Search A-share and Hong Kong stock companies.
-- Fetch the latest 10 years of financial statements.
+- Fetch all annual financial statements from the company's listing year onward.
 - Persist financial statement payloads and normalized rows into SQLite.
 - Avoid repeated AKShare pulls when cached financial statements are available.
 - Favorites are stored in SQLite.

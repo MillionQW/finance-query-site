@@ -340,6 +340,12 @@ export class FinanceStoreService implements OnModuleDestroy {
   saveStatements(payload: FinancialStatements, yearsRequested: number): void {
     const market = payload.company.market;
     const symbol = normalizeSymbol(market, payload.company.symbol);
+    if (payload.partial) {
+      const cached = this.getStatements(market, symbol, yearsRequested);
+      if (cached) {
+        payload = mergePartialStatements(cached, payload);
+      }
+    }
     const displaySymbol = payload.company.displaySymbol || makeDisplaySymbol(market, symbol);
     const yearsKey = payload.years.join(',');
     const payloadForStorage = withoutStatementCache(payload);
@@ -942,7 +948,7 @@ export class FinanceStoreService implements OnModuleDestroy {
           symbol,
           display_symbol,
           company_name AS name,
-          years_requested AS years,
+          0 AS years,
           refreshed_at,
           'cached' AS reason
         FROM financial_statement_cache
@@ -954,7 +960,7 @@ export class FinanceStoreService implements OnModuleDestroy {
           f.symbol,
           f.display_symbol,
           f.name,
-          10 AS years,
+          0 AS years,
           NULL AS refreshed_at,
           'favorite-missing-cache' AS reason
         FROM favorite_companies f
@@ -963,7 +969,7 @@ export class FinanceStoreService implements OnModuleDestroy {
           FROM financial_statement_cache c
           WHERE c.market = f.market
             AND c.symbol = f.symbol
-            AND c.years_requested = 10
+            AND c.years_requested = 0
         )
       `
       )
@@ -1678,6 +1684,45 @@ function nullableNumber(value: unknown): number | null {
 function withoutStatementCache(payload: FinancialStatements): FinancialStatements {
   const { cache: _cache, ...rest } = payload;
   return rest;
+}
+
+function mergePartialStatements(
+  cached: FinancialStatements,
+  incoming: FinancialStatements
+): FinancialStatements {
+  const years = [...new Set([...cached.years, ...incoming.years])].sort((a, b) => b.localeCompare(a));
+  const tables = incoming.tables.map((incomingTable) => {
+    const cachedTable = cached.tables.find((table) => table.type === incomingTable.type);
+    if (!cachedTable) return incomingTable;
+    const rows = new Map(
+      cachedTable.rows.map((row) => [row.sourceItem || row.item, { ...row, values: { ...row.values } }])
+    );
+    for (const row of incomingTable.rows) {
+      const key = row.sourceItem || row.item;
+      const previous = rows.get(key);
+      rows.set(key, {
+        ...previous,
+        ...row,
+        values: { ...previous?.values, ...row.values }
+      });
+    }
+    return {
+      ...incomingTable,
+      years: [...new Set([...cachedTable.years, ...incomingTable.years])].sort((a, b) => b.localeCompare(a)),
+      rows: [...rows.values()]
+    };
+  });
+
+  return {
+    ...incoming,
+    company: {
+      ...incoming.company,
+      name: incoming.company.name || cached.company.name
+    },
+    years,
+    tables,
+    fetchWarnings: [...new Set([...(cached.fetchWarnings ?? []), ...(incoming.fetchWarnings ?? [])])]
+  };
 }
 
 function withoutPeerCache(payload: PeerComparison): PeerComparison {

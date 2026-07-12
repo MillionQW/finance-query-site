@@ -25,9 +25,9 @@ export class StatementQueryDto {
   @IsOptional()
   @Transform(({ value }) => Number(value))
   @IsInt()
-  @Min(1)
-  @Max(10)
-  years = 10;
+  @Min(0)
+  @Max(200)
+  years = 0;
 
   @IsOptional()
   @Transform(({ value }) => value === true || value === 'true' || value === '1')

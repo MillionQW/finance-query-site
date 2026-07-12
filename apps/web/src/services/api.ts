@@ -47,7 +47,7 @@ export function searchCompanies(q: string, market: MarketFilter): Promise<Compan
 export function getStatements(
   market: Market,
   symbol: string,
-  years = 10,
+  years = 0,
   refresh = false
 ): Promise<FinancialStatements> {
   const params = new URLSearchParams({ market, symbol, years: String(years) });

@@ -5,7 +5,7 @@
 ## 功能
 
 - 搜索 A 股和港股公司
-- 拉取最近 10 年年度财报
+- 拉取公司自上市年开始的全部年度财报
 - 查看资产负债表、利润表、现金流量表
 - 财报首次拉取后写入本地 SQLite，后续默认直接读本地库
 - 前端提供搜索结果栏、年度筛选、关键指标趋势和明细表格
@@ -61,9 +61,9 @@ npm run start
 
 - `GET /api/health`
 - `GET /api/companies/search?q=腾讯&market=all`
-- `GET /api/finance/statements?market=hk&symbol=00700&years=10`
-- `GET /api/finance/statements?market=a&symbol=600519&years=10`
-- `GET /api/finance/statements?market=hk&symbol=00700&years=10&refresh=true` 强制重新拉取并更新 SQLite
+- `GET /api/finance/statements?market=hk&symbol=00700`
+- `GET /api/finance/statements?market=a&symbol=600519`
+- `GET /api/finance/statements?market=hk&symbol=00700&refresh=true` 强制重新拉取并更新 SQLite
 - `GET /api/cache/stats` 查看本地库统计
 
 ## 本地 SQLite 缓存

@@ -126,6 +126,9 @@ export interface FinancialStatements {
   highlights: MetricSeries[];
   fetchedAt: string;
   source: string;
+  listingYear?: number | null;
+  partial?: boolean;
+  fetchWarnings?: string[];
   cache?: {
     hit: boolean;
     refreshedAt: string;

@@ -118,7 +118,7 @@ const availableYears = computed(() => statements.value?.years ?? []);
 
 const activeYears = computed(() => {
   const chosen = selectedYears.value.length ? selectedYears.value : availableYears.value;
-  return chosen.slice(0, 10);
+  return chosen;
 });
 
 const selectedIsFavorite = computed(() => {
@@ -574,7 +574,7 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
   void loadPeerMetricComparison(company);
   void loadAnnouncements(company);
   try {
-    statements.value = await getStatements(company.market, company.symbol, 10, refresh);
+    statements.value = await getStatements(company.market, company.symbol, 0, refresh);
     if (sameCompany(company, selectedCompany.value) && statements.value.company.name) {
       const enrichedCompany = {
         ...company,
@@ -585,7 +585,7 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
       companies.value = mergeCompanyList([enrichedCompany], companies.value);
       rememberRecentCompany(enrichedCompany);
     }
-    selectedYears.value = statements.value.years.slice(0, 10);
+    selectedYears.value = [...statements.value.years];
   } catch (error) {
     statements.value = null;
     statementError.value = error instanceof Error ? error.message : '财报查询失败';
@@ -998,7 +998,7 @@ onUnmounted(() => {
             </div>
             <div>
               <span>报表范围</span>
-              <strong>最近 10 年</strong>
+              <strong>自上市年起</strong>
             </div>
             <div>
               <span>更新时间</span>

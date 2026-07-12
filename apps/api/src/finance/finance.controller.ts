@@ -39,7 +39,7 @@ export class FinanceController {
     return this.finance.getStatements(
       query.market,
       query.symbol.trim(),
-      query.years ?? 10,
+      query.years ?? 0,
       query.refresh ?? false
     );
   }
