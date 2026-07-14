@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { FinanceStoreService, normalizeSymbol } from './finance-store.service';
 import { PythonAkshareService } from './python-akshare.service';
-import { CompanySearchResult, FavoriteCompany, FinancialStatements, PeerComparison, PeerMetricComparison } from './types';
+import { CompanyInsight, CompanySearchResult, FavoriteCompany, FinancialStatements, PeerComparison, PeerMetricComparison } from './types';
 import { Market } from './dto';
 
 @Injectable()
@@ -145,6 +145,18 @@ export class FinanceService {
 
   removeFavorite(market: 'a' | 'hk', symbol: string): FavoriteCompany[] {
     return this.store.removeFavorite(market, symbol);
+  }
+
+  getCompanyInsight(market: 'a' | 'hk', symbol: string): CompanyInsight {
+    return this.store.getCompanyInsight(market, symbol);
+  }
+
+  saveCompanyInsight(
+    market: 'a' | 'hk',
+    symbol: string,
+    input: { note: string; buyPointRange: string }
+  ): CompanyInsight {
+    return this.store.saveCompanyInsight(market, symbol, input);
   }
 
   getCacheStats() {

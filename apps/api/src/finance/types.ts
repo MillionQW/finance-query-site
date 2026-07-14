@@ -17,6 +17,15 @@ export interface FavoriteCompany extends CompanySearchResult {
   hasUnreadAnnouncements: boolean;
 }
 
+export interface CompanyInsight {
+  market: Market;
+  symbol: string;
+  note: string;
+  buyPointRange: string;
+  buyPointUpdatedAt: string | null;
+  updatedAt: string | null;
+}
+
 export type AnnouncementCategory = '年报' | '业绩预告' | '权益分派' | '董事会' | '风险提示' | '其他';
 
 export interface CompanyAnnouncement {

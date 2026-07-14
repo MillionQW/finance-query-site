@@ -2,6 +2,7 @@ import type {
   CacheEntry,
   AnnouncementFeed,
   CompanySearchResult,
+  CompanyInsight,
   FavoriteCompany,
   FinancialStatements,
   Market,
@@ -112,6 +113,21 @@ export function saveFavorite(company: CompanySearchResult): Promise<FavoriteComp
 export function removeFavorite(market: Market, symbol: string): Promise<FavoriteCompany[]> {
   return request<FavoriteCompany[]>(`/favorites/${market}/${encodeURIComponent(symbol)}`, {
     method: 'DELETE'
+  });
+}
+
+export function getCompanyInsight(market: Market, symbol: string): Promise<CompanyInsight> {
+  return request<CompanyInsight>(`/finance/insights/${market}/${encodeURIComponent(symbol)}`);
+}
+
+export function saveCompanyInsight(
+  market: Market,
+  symbol: string,
+  insight: Pick<CompanyInsight, 'note' | 'buyPointRange'>
+): Promise<CompanyInsight> {
+  return request<CompanyInsight>(`/finance/insights/${market}/${encodeURIComponent(symbol)}`, {
+    method: 'PUT',
+    body: JSON.stringify(insight)
   });
 }
 

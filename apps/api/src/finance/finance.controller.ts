@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { FinanceService } from './finance.service';
 import { FinanceRefreshService } from './finance-refresh.service';
 import { AnnouncementRefreshService } from './announcement-refresh.service';
 import {
   FavoriteCompanyDto,
   FavoriteIdentityDto,
+  CompanyInsightDto,
   MetricComparisonQueryDto,
   PeerMetricQueryDto,
   PeerQueryDto,
@@ -84,6 +85,16 @@ export class FinanceController {
   @Delete('favorites/:market/:symbol')
   removeFavorite(@Param() params: FavoriteIdentityDto) {
     return this.finance.removeFavorite(params.market, params.symbol);
+  }
+
+  @Get('finance/insights/:market/:symbol')
+  getCompanyInsight(@Param() params: FavoriteIdentityDto) {
+    return this.finance.getCompanyInsight(params.market, params.symbol);
+  }
+
+  @Put('finance/insights/:market/:symbol')
+  saveCompanyInsight(@Param() params: FavoriteIdentityDto, @Body() body: CompanyInsightDto) {
+    return this.finance.saveCompanyInsight(params.market, params.symbol, body);
   }
 
   @Get('finance/announcements')

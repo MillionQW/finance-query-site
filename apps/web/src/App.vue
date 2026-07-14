@@ -11,7 +11,9 @@ import {
   Search,
   Settings,
   Star,
-  TrendingUp
+  StickyNote,
+  TrendingUp,
+  X
 } from 'lucide-vue-next';
 import CustomMetricChart from './components/CustomMetricChart.vue';
 import AnnouncementPanel from './components/AnnouncementPanel.vue';
@@ -25,6 +27,7 @@ import IndexPage from './components/IndexPage.vue';
 import {
   getCacheEntries,
   getAnnouncements,
+  getCompanyInsight,
   getFavorites,
   getMetricComparison,
   getPeerComparison,
@@ -34,11 +37,13 @@ import {
   markAnnouncementsViewed,
   removeFavorite,
   saveFavorite,
+  saveCompanyInsight,
   searchCompanies,
   triggerRefresh
 } from './services/api';
 import type {
   CompanySearchResult,
+  CompanyInsight,
   AnnouncementFeed,
   CacheEntry,
   FavoriteCompany,
@@ -61,7 +66,6 @@ const seedCompanies: CompanySearchResult[] = [
 
 type UrlMode = 'push' | 'replace' | 'none';
 type AppView = 'company' | 'settings' | 'etf' | 'index';
-
 const initialCompany = companyFromUrl() ?? seedCompanies[0];
 const currentView = ref<AppView>(viewFromUrl());
 const query = ref(initialCompany.name);
@@ -98,11 +102,17 @@ const refreshStatus = ref<StatementRefreshRuntimeStatus | null>(null);
 const cacheEntries = ref<CacheEntry[]>([]);
 const refreshTaskLoading = ref(false);
 const refreshTaskNotice = ref<string | null>(null);
+const companyInsights = ref<Record<string, CompanyInsight>>({});
+const noteDialogOpen = ref(false);
+const noteDraft = ref('');
+const buyPointDraft = ref('');
+const buyPointEditing = ref(false);
 let searchTimer: number | undefined;
 let favoriteNoticeTimer: number | undefined;
 let peerRequestId = 0;
 let peerMetricRequestId = 0;
 let announcementRequestId = 0;
+let insightRequestId = 0;
 
 const marketOptions: { value: MarketFilter; label: string }[] = [
   { value: 'all', label: '全部' },
@@ -129,6 +139,29 @@ const selectedIsFavorite = computed(() => {
 const visibleRecentCompanies = computed(() =>
   recentCompanies.value.filter((company) => !sameCompany(company, selectedCompany.value)).slice(0, 8)
 );
+
+const activeCompanyInsight = computed<CompanyInsight>(() => {
+  if (!selectedCompany.value) {
+    return { market: 'a', symbol: '', note: '', buyPointRange: '', buyPointUpdatedAt: null, updatedAt: null };
+  }
+  return companyInsights.value[companyKey(selectedCompany.value)] ?? {
+    market: selectedCompany.value.market,
+    symbol: selectedCompany.value.symbol,
+    note: '',
+    buyPointRange: '',
+    buyPointUpdatedAt: null,
+    updatedAt: null
+  };
+});
+
+const showBuyPointReminder = computed(() => {
+  const updatedAt = activeCompanyInsight.value.buyPointUpdatedAt;
+  if (!updatedAt || !activeCompanyInsight.value.buyPointRange) return false;
+  const updatedDate = new Date(updatedAt);
+  if (Number.isNaN(updatedDate.getTime())) return false;
+  const reminderDate = new Date(updatedDate.getFullYear() + 1, 5, 1);
+  return new Date() >= reminderDate;
+});
 
 const showSearchDropdown = computed(() => {
   return (
@@ -201,6 +234,81 @@ function refreshRunLabel(status?: string): string {
 
 function companyKey(company: Pick<CompanySearchResult, 'market' | 'symbol'>): string {
   return `${company.market}:${company.symbol}`;
+}
+
+function openNoteDialog(): void {
+  if (!selectedCompany.value) return;
+  noteDraft.value = activeCompanyInsight.value.note;
+  noteDialogOpen.value = true;
+}
+
+function closeNoteDialog(): void {
+  noteDialogOpen.value = false;
+}
+
+function startBuyPointEditing(): void {
+  buyPointDraft.value = activeCompanyInsight.value.buyPointRange;
+  buyPointEditing.value = true;
+}
+
+function cancelBuyPointEditing(): void {
+  buyPointDraft.value = activeCompanyInsight.value.buyPointRange;
+  buyPointEditing.value = false;
+}
+
+async function loadCompanyInsight(company: CompanySearchResult): Promise<void> {
+  const requestId = ++insightRequestId;
+  try {
+    const insight = await getCompanyInsight(company.market, company.symbol);
+    companyInsights.value = { ...companyInsights.value, [companyKey(company)]: insight };
+    if (requestId === insightRequestId && sameCompany(company, selectedCompany.value)) {
+      buyPointDraft.value = insight.buyPointRange;
+    }
+  } catch (error) {
+    if (requestId === insightRequestId) {
+      statementError.value = error instanceof Error ? error.message : '公司备注读取失败';
+    }
+  }
+}
+
+async function persistActiveCompanyInsight(input: { note: string; buyPointRange: string }): Promise<CompanyInsight | null> {
+  if (!selectedCompany.value) return null;
+  const company = selectedCompany.value;
+  try {
+    const insight = await saveCompanyInsight(company.market, company.symbol, input);
+    companyInsights.value = { ...companyInsights.value, [companyKey(company)]: insight };
+    return insight;
+  } catch (error) {
+    statementError.value = error instanceof Error ? error.message : '公司备注保存失败';
+    return null;
+  }
+}
+
+async function saveNote(): Promise<void> {
+  const saved = await persistActiveCompanyInsight({
+    note: noteDraft.value.trim(),
+    buyPointRange: activeCompanyInsight.value.buyPointRange
+  });
+  if (saved) closeNoteDialog();
+}
+
+async function saveBuyPoint(): Promise<void> {
+  if (!selectedCompany.value) return;
+  const nextValue = buyPointDraft.value.trim();
+  const current = activeCompanyInsight.value;
+  if (nextValue === current.buyPointRange) {
+    buyPointEditing.value = false;
+    return;
+  }
+  const saved = await persistActiveCompanyInsight({ note: current.note, buyPointRange: nextValue });
+  if (saved) {
+    buyPointDraft.value = saved.buyPointRange;
+    buyPointEditing.value = false;
+  }
+}
+
+function handleGlobalKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && noteDialogOpen.value) closeNoteDialog();
 }
 
 function sameCompany(
@@ -573,6 +681,7 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
   void loadPeerComparison(company);
   void loadPeerMetricComparison(company);
   void loadAnnouncements(company);
+  void loadCompanyInsight(company);
   try {
     statements.value = await getStatements(company.market, company.symbol, 0, refresh);
     if (sameCompany(company, selectedCompany.value) && statements.value.company.name) {
@@ -726,8 +835,15 @@ watch([query, market], () => {
   }, 380);
 });
 
+watch(selectedCompany, () => {
+  buyPointDraft.value = activeCompanyInsight.value.buyPointRange;
+  buyPointEditing.value = false;
+  noteDialogOpen.value = false;
+});
+
 onMounted(async () => {
   window.addEventListener('popstate', handleUrlNavigation);
+  window.addEventListener('keydown', handleGlobalKeydown);
   loadRecentCompanies();
   await Promise.all([loadRefreshStatus(), loadCacheEntries(), loadFavorites()]);
   if (currentView.value === 'company') {
@@ -740,6 +856,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('popstate', handleUrlNavigation);
+  window.removeEventListener('keydown', handleGlobalKeydown);
 });
 </script>
 
@@ -985,9 +1102,67 @@ onUnmounted(() => {
         <div class="company-card">
           <div class="company-title">
             <span class="market-badge">{{ marketLabel(selectedCompany?.market) }}</span>
-            <div>
-              <h1>{{ selectedCompany?.name ?? '选择公司' }}</h1>
-              <p>{{ selectedCompany?.displaySymbol ?? '输入公司名或股票代码开始' }}</p>
+            <div class="company-title-content">
+              <div class="company-heading-row">
+                <div class="company-name-block">
+                  <div class="company-name-line">
+                    <h1>{{ selectedCompany?.name ?? '选择公司' }}</h1>
+                    <button
+                      class="company-note-button"
+                      :class="{ 'has-note': Boolean(activeCompanyInsight.note) }"
+                      type="button"
+                      :disabled="!selectedCompany"
+                      @click="openNoteDialog"
+                    >
+                      <StickyNote :size="16" />
+                      {{ activeCompanyInsight.note ? '修改备注' : '添加备注' }}
+                    </button>
+                  </div>
+                  <p>{{ selectedCompany?.displaySymbol ?? '输入公司名或股票代码开始' }}</p>
+                </div>
+                <div class="company-note-preview" :class="{ empty: !activeCompanyInsight.note }">
+                  <span>备注</span>
+                  <p>{{ activeCompanyInsight.note || '暂无备注，点击“添加备注”记录你的看法。' }}</p>
+                </div>
+              </div>
+              <div class="buy-point-field">
+                <label :for="selectedCompany ? `buy-point-${selectedCompany.market}-${selectedCompany.symbol}` : 'buy-point'">
+                  预估买点
+                </label>
+                <template v-if="buyPointEditing">
+                  <input
+                    :id="selectedCompany ? `buy-point-${selectedCompany.market}-${selectedCompany.symbol}` : 'buy-point'"
+                    v-model="buyPointDraft"
+                    type="text"
+                    inputmode="decimal"
+                    placeholder="例如：85–95 元"
+                    :disabled="!selectedCompany"
+                    aria-label="预估买点区间"
+                    autofocus
+                    @keydown.enter.prevent="saveBuyPoint"
+                    @keydown.esc.prevent="cancelBuyPointEditing"
+                  />
+                  <button class="buy-point-save" type="button" @click="saveBuyPoint">保存</button>
+                  <button class="buy-point-cancel" type="button" @click="cancelBuyPointEditing">取消</button>
+                </template>
+                <template v-else>
+                  <strong class="buy-point-value" :class="{ empty: !activeCompanyInsight.buyPointRange }">
+                    {{ activeCompanyInsight.buyPointRange || '暂未设置' }}
+                  </strong>
+                  <button
+                    class="buy-point-edit"
+                    type="button"
+                    :disabled="!selectedCompany"
+                    @click="startBuyPointEditing"
+                  >
+                    {{ activeCompanyInsight.buyPointRange ? '修改' : '设置' }}
+                  </button>
+                </template>
+                <span v-if="showBuyPointReminder" class="buy-point-reminder">
+                  <AlertTriangle :size="14" />
+                  请更新最新预估买点
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1108,5 +1283,39 @@ onUnmounted(() => {
         <StatementTable v-else :table="activeTable" :active-years="activeYears" />
       </section>
     </main>
+
+    <div
+      v-if="noteDialogOpen"
+      class="note-dialog-backdrop"
+      role="presentation"
+      @mousedown.self="closeNoteDialog"
+    >
+      <section class="note-dialog" role="dialog" aria-modal="true" aria-labelledby="company-note-title">
+        <header>
+          <div>
+            <span>公司备注</span>
+            <h2 id="company-note-title">{{ selectedCompany?.name }}</h2>
+          </div>
+          <button type="button" aria-label="关闭备注弹窗" @click="closeNoteDialog">
+            <X :size="20" />
+          </button>
+        </header>
+        <label for="company-note-content">记录你的判断、风险点或后续关注事项</label>
+        <textarea
+          id="company-note-content"
+          v-model="noteDraft"
+          rows="8"
+          placeholder="例如：核心业务增长稳定，但需要继续观察毛利率和现金流……"
+          autofocus
+        ></textarea>
+        <footer>
+          <small>备注保存在本机 SQLite 数据库中</small>
+          <div>
+            <button class="note-dialog-cancel" type="button" @click="closeNoteDialog">取消</button>
+            <button class="note-dialog-save" type="button" @click="saveNote">保存备注</button>
+          </div>
+        </footer>
+      </section>
+    </div>
   </div>
 </template>

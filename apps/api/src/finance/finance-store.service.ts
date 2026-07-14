@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, normalize, resolve } from 'node:path';
 import {
   CompanySearchResult,
+  CompanyInsight,
   AnnouncementFeed,
   AnnouncementRefreshTarget,
   CompanyAnnouncement,
@@ -179,6 +180,51 @@ export class FinanceStoreService implements OnModuleDestroy {
       .run(market, normalizeSymbol(market, symbol));
 
     return this.getFavorites();
+  }
+
+  getCompanyInsight(market: Market, symbol: string): CompanyInsight {
+    const normalizedSymbol = normalizeSymbol(market, symbol);
+    const row = this.db.prepare(`
+      SELECT market, symbol, note, buy_point_range, buy_point_updated_at, updated_at
+      FROM company_insights
+      WHERE market = ? AND symbol = ?
+      LIMIT 1
+    `).get(market, normalizedSymbol);
+
+    return row ? this.toCompanyInsight(row) : {
+      market,
+      symbol: normalizedSymbol,
+      note: '',
+      buyPointRange: '',
+      buyPointUpdatedAt: null,
+      updatedAt: null
+    };
+  }
+
+  saveCompanyInsight(
+    market: Market,
+    symbol: string,
+    input: { note: string; buyPointRange: string }
+  ): CompanyInsight {
+    const normalizedSymbol = normalizeSymbol(market, symbol);
+    const note = input.note.trim();
+    const buyPointRange = input.buyPointRange.trim();
+    this.db.prepare(`
+      INSERT INTO company_insights (
+        market, symbol, note, buy_point_range, buy_point_updated_at, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, CASE WHEN ? = '' THEN NULL ELSE datetime('now') END, datetime('now'), datetime('now'))
+      ON CONFLICT(market, symbol) DO UPDATE SET
+        note = excluded.note,
+        buy_point_range = excluded.buy_point_range,
+        buy_point_updated_at = CASE
+          WHEN company_insights.buy_point_range <> excluded.buy_point_range
+            THEN CASE WHEN excluded.buy_point_range = '' THEN NULL ELSE datetime('now') END
+          ELSE company_insights.buy_point_updated_at
+        END,
+        updated_at = datetime('now')
+    `).run(market, normalizedSymbol, note, buyPointRange, buyPointRange);
+    return this.getCompanyInsight(market, normalizedSymbol);
   }
 
   listAnnouncementRefreshTargets(staleBefore: Date, limit: number): AnnouncementRefreshTarget[] {
@@ -1232,6 +1278,17 @@ export class FinanceStoreService implements OnModuleDestroy {
       CREATE INDEX IF NOT EXISTS idx_favorite_companies_name
         ON favorite_companies(name);
 
+      CREATE TABLE IF NOT EXISTS company_insights (
+        market TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        buy_point_range TEXT NOT NULL DEFAULT '',
+        buy_point_updated_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (market, symbol)
+      );
+
       CREATE TABLE IF NOT EXISTS company_announcements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         announcement_key TEXT NOT NULL,
@@ -1479,6 +1536,17 @@ export class FinanceStoreService implements OnModuleDestroy {
       ...company,
       symbol,
       displaySymbol: company.displaySymbol || makeDisplaySymbol(company.market, symbol)
+    };
+  }
+
+  private toCompanyInsight(row: any): CompanyInsight {
+    return {
+      market: row.market,
+      symbol: row.symbol,
+      note: row.note ?? '',
+      buyPointRange: row.buy_point_range ?? '',
+      buyPointUpdatedAt: row.buy_point_updated_at ? fromSqliteDate(row.buy_point_updated_at) : null,
+      updatedAt: row.updated_at ? fromSqliteDate(row.updated_at) : null
     };
   }
 

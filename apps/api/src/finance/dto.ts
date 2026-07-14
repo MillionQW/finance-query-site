@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export type Market = 'all' | 'a' | 'hk';
@@ -104,4 +104,14 @@ export class FavoriteIdentityDto {
   @IsString()
   @IsNotEmpty()
   symbol!: string;
+}
+
+export class CompanyInsightDto {
+  @IsString()
+  @MaxLength(10000)
+  note = '';
+
+  @IsString()
+  @MaxLength(200)
+  buyPointRange = '';
 }
