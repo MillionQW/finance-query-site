@@ -9,6 +9,7 @@ import type {
   MarketFilter,
   PeerComparison,
   PeerMetricComparison,
+  ScreenerResult,
   StatementRefreshRun,
   StatementRefreshRuntimeStatus
 } from '../types/finance';
@@ -97,6 +98,41 @@ export function getMetricComparison(
     .join(',');
   const params = new URLSearchParams({ metricKey, companies: companyKeys });
   return request<PeerMetricComparison>(`/finance/metric-comparison?${params.toString()}`);
+}
+
+export function getScreenerResults(options: {
+  markets?: string;
+  scope?: string;
+  minRoa?: number;
+  maxPe?: number;
+  minMarketCapBillion?: number;
+  limit?: number;
+  maxCandidates?: number;
+  requestGapMs?: number;
+  latestPeriod?: boolean;
+  peOnly?: boolean;
+  excludeBanks?: boolean;
+  refresh?: boolean;
+} = {}): Promise<ScreenerResult> {
+  const params = new URLSearchParams({
+    markets: options.markets ?? 'all',
+    scope: options.scope ?? 'all',
+    minRoa: String(options.minRoa ?? 25),
+    maxPe: String(options.maxPe ?? 16),
+    minMarketCapBillion: String(options.minMarketCapBillion ?? 0),
+    limit: String(options.limit ?? 80),
+    maxCandidates: String(options.maxCandidates ?? 30),
+    requestGapMs: String(options.requestGapMs ?? 1000),
+    peOnly: String(options.peOnly ?? true),
+    excludeBanks: String(options.excludeBanks ?? true)
+  });
+  if (options.latestPeriod) {
+    params.set('latestPeriod', 'true');
+  }
+  if (options.refresh) {
+    params.set('refresh', 'true');
+  }
+  return request<ScreenerResult>(`/finance/screener?${params.toString()}`);
 }
 
 export function getFavorites(): Promise<FavoriteCompany[]> {

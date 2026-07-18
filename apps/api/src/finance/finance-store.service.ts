@@ -16,6 +16,7 @@ import {
   PeerComparison,
   PeerMetricComparison,
   PeerMetricSeries,
+  ScreenerResult,
   StatementRefreshError,
   StatementRefreshRun,
   StatementRefreshStatus,
@@ -715,11 +716,74 @@ export class FinanceStoreService implements OnModuleDestroy {
     return this.getFavoriteEtfs();
   }
 
+  getScreenerCache(cacheKey: string, refreshedAfter: Date): ScreenerResult | null {
+    const row = this.db.prepare(`
+      SELECT payload_json, refreshed_at, expires_at
+      FROM screener_cache
+      WHERE cache_key = ? AND refreshed_at >= ?
+      LIMIT 1
+    `).get(cacheKey, toSqliteDate(refreshedAfter));
+    if (!row?.payload_json) {
+      return null;
+    }
+
+    const payload = JSON.parse(row.payload_json) as ScreenerResult;
+    return {
+      ...payload,
+      cache: {
+        hit: true,
+        refreshedAt: fromSqliteDate(row.refreshed_at),
+        expiresAt: fromSqliteDate(row.expires_at)
+      }
+    };
+  }
+
+  saveScreenerCache(cacheKey: string, paramsJson: string, payload: ScreenerResult, ttlDays: number): ScreenerResult {
+    const payloadForStorage = withoutScreenerCache(payload);
+    const payloadJson = JSON.stringify(payloadForStorage);
+    const payloadHash = createHash('sha256').update(payloadJson).digest('hex');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + ttlDays * 24 * 60 * 60 * 1000);
+    this.db.prepare(`
+      INSERT INTO screener_cache (
+        cache_key, params_json, source, fetched_at, payload_json, payload_hash,
+        created_at, refreshed_at, expires_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?)
+      ON CONFLICT(cache_key) DO UPDATE SET
+        params_json = excluded.params_json,
+        source = excluded.source,
+        fetched_at = excluded.fetched_at,
+        payload_json = excluded.payload_json,
+        payload_hash = excluded.payload_hash,
+        refreshed_at = datetime('now'),
+        expires_at = excluded.expires_at
+    `).run(
+      cacheKey,
+      paramsJson,
+      payloadForStorage.source,
+      payloadForStorage.fetchedAt,
+      payloadJson,
+      payloadHash,
+      toSqliteDate(expiresAt)
+    );
+
+    return {
+      ...payloadForStorage,
+      cache: {
+        hit: false,
+        refreshedAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString()
+      }
+    };
+  }
+
   getStats() {
     const companies = this.db.prepare('SELECT COUNT(*) AS count FROM companies').get().count;
     const favorites = this.db.prepare('SELECT COUNT(*) AS count FROM favorite_companies').get().count;
     const snapshots = this.db.prepare('SELECT COUNT(*) AS count FROM financial_statement_cache').get().count;
     const peerComparisons = this.db.prepare('SELECT COUNT(*) AS count FROM peer_comparison_cache').get().count;
+    const screeners = this.db.prepare('SELECT COUNT(*) AS count FROM screener_cache').get().count;
     const values = this.db.prepare('SELECT COUNT(*) AS count FROM financial_statement_values').get().count;
     const metrics = this.db.prepare('SELECT COUNT(*) AS count FROM financial_metric_values').get().count;
     return {
@@ -728,6 +792,7 @@ export class FinanceStoreService implements OnModuleDestroy {
       favorites,
       statementSnapshots: snapshots,
       peerComparisons,
+      screeners,
       statementValues: values,
       metricValues: metrics
     };
@@ -1440,6 +1505,21 @@ export class FinanceStoreService implements OnModuleDestroy {
       CREATE INDEX IF NOT EXISTS idx_peer_comparison_cache_lookup
         ON peer_comparison_cache(market, symbol, refreshed_at);
 
+      CREATE TABLE IF NOT EXISTS screener_cache (
+        cache_key TEXT PRIMARY KEY,
+        params_json TEXT NOT NULL,
+        source TEXT NOT NULL,
+        fetched_at TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        payload_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        refreshed_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_screener_cache_refreshed
+        ON screener_cache(refreshed_at);
+
       CREATE TABLE IF NOT EXISTS etfs (
         symbol TEXT PRIMARY KEY,
         display_symbol TEXT NOT NULL,
@@ -1794,6 +1874,11 @@ function mergePartialStatements(
 }
 
 function withoutPeerCache(payload: PeerComparison): PeerComparison {
+  const { cache: _cache, ...rest } = payload;
+  return rest;
+}
+
+function withoutScreenerCache(payload: ScreenerResult): ScreenerResult {
   const { cache: _cache, ...rest } = payload;
   return rest;
 }

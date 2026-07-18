@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Search,
   Settings,
+  SlidersHorizontal,
   Star,
   StickyNote,
   TrendingUp,
@@ -24,6 +25,7 @@ import PeerMetricChart from './components/PeerMetricChart.vue';
 import StatementTable from './components/StatementTable.vue';
 import EtfPage from './components/EtfPage.vue';
 import IndexPage from './components/IndexPage.vue';
+import ScreenerPage from './components/ScreenerPage.vue';
 import {
   getCacheEntries,
   getAnnouncements,
@@ -65,7 +67,7 @@ const seedCompanies: CompanySearchResult[] = [
 ];
 
 type UrlMode = 'push' | 'replace' | 'none';
-type AppView = 'company' | 'settings' | 'etf' | 'index';
+type AppView = 'company' | 'settings' | 'etf' | 'index' | 'screener';
 const initialCompany = companyFromUrl() ?? seedCompanies[0];
 const currentView = ref<AppView>(viewFromUrl());
 const query = ref(initialCompany.name);
@@ -374,6 +376,7 @@ function viewFromUrl(): AppView {
   if (view === 'settings') return 'settings';
   if (view === 'etf') return 'etf';
   if (view === 'index') return 'index';
+  if (view === 'screener') return 'screener';
   return 'company';
 }
 
@@ -426,6 +429,10 @@ function syncViewUrl(view: AppView, mode: 'push' | 'replace' = 'push'): void {
     params.set('view', 'index');
     params.delete('etf');
     if (!params.get('index')) params.set('index', 'cn:000300');
+  } else if (view === 'screener') {
+    params.set('view', 'screener');
+    params.delete('etf');
+    params.delete('index');
   } else {
     params.delete('view');
     params.delete('etf');
@@ -465,6 +472,20 @@ function openIndexPage(): void {
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
+function openScreenerPage(): void {
+  searchDropdownOpen.value = false;
+  syncViewUrl('screener');
+  window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
+async function openCompanyFromScreener(company: CompanySearchResult): Promise<void> {
+  market.value = company.market;
+  query.value = company.name;
+  companies.value = mergeCompanyList([company], companies.value);
+  syncViewUrl('company');
+  await selectCompany(company);
+}
+
 function handleUrlNavigation(): void {
   currentView.value = viewFromUrl();
   window.scrollTo({ top: 0, behavior: 'auto' });
@@ -472,7 +493,7 @@ function handleUrlNavigation(): void {
     void Promise.all([loadRefreshStatus(), loadCacheEntries()]);
     return;
   }
-  if (currentView.value === 'etf' || currentView.value === 'index') return;
+  if (currentView.value === 'etf' || currentView.value === 'index' || currentView.value === 'screener') return;
 
   const company = companyFromUrl();
   if (!company) {
@@ -950,12 +971,19 @@ onUnmounted(() => {
         <TrendingUp :size="18" />
         <strong>ETF 研究</strong>
       </div>
-      <div v-else class="settings-topbar-title">
+      <div v-else-if="currentView === 'index'" class="settings-topbar-title">
         <TrendingUp :size="18" />
         <strong>指数研究</strong>
       </div>
+      <div v-else class="settings-topbar-title">
+        <SlidersHorizontal :size="18" />
+        <strong>ROA/PE 筛选</strong>
+      </div>
 
       <nav class="top-actions" aria-label="工具">
+        <button v-if="currentView === 'company'" class="ghost-button" type="button" @click="openScreenerPage">
+          <SlidersHorizontal :size="17" />筛选
+        </button>
         <button v-if="currentView === 'company'" class="ghost-button" type="button" @click="openEtfPage">
           <TrendingUp :size="17" />ETF
         </button>
@@ -989,13 +1017,28 @@ onUnmounted(() => {
         <button v-if="currentView === 'etf'" class="ghost-button" type="button" @click="openIndexPage">
           <TrendingUp :size="17" />指数
         </button>
+        <button v-if="currentView === 'etf'" class="ghost-button" type="button" @click="openScreenerPage">
+          <SlidersHorizontal :size="17" />筛选
+        </button>
         <button v-if="currentView === 'etf'" class="ghost-button" type="button" @click="openCompanyPage">
           <ArrowLeft :size="17" />个股
         </button>
         <button v-if="currentView === 'index'" class="ghost-button" type="button" @click="openEtfPage">
           <TrendingUp :size="17" />ETF
         </button>
+        <button v-if="currentView === 'index'" class="ghost-button" type="button" @click="openScreenerPage">
+          <SlidersHorizontal :size="17" />筛选
+        </button>
         <button v-if="currentView === 'index'" class="ghost-button" type="button" @click="openCompanyPage">
+          <ArrowLeft :size="17" />个股
+        </button>
+        <button v-if="currentView === 'screener'" class="ghost-button" type="button" @click="openEtfPage">
+          <TrendingUp :size="17" />ETF
+        </button>
+        <button v-if="currentView === 'screener'" class="ghost-button" type="button" @click="openIndexPage">
+          <TrendingUp :size="17" />指数
+        </button>
+        <button v-if="currentView === 'screener'" class="ghost-button" type="button" @click="openCompanyPage">
           <ArrowLeft :size="17" />个股
         </button>
         <button v-else-if="currentView === 'settings'" class="ghost-button" type="button" @click="openCompanyPage">
@@ -1063,6 +1106,7 @@ onUnmounted(() => {
 
       <EtfPage v-else-if="currentView === 'etf'" />
       <IndexPage v-else-if="currentView === 'index'" />
+      <ScreenerPage v-else-if="currentView === 'screener'" />
 
       <section v-else class="content">
         <div v-if="favorites.length" class="favorite-strip" aria-label="收藏公司">

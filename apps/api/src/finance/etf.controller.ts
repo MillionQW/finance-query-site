@@ -1,10 +1,10 @@
-import { Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Controller, Delete, Get, Inject, Param, Post, Query } from '@nestjs/common';
 import { EtfDetailQueryDto, EtfListQueryDto } from './etf.dto';
 import { EtfService } from './etf.service';
 
 @Controller('etfs')
 export class EtfController {
-  constructor(private readonly etfs: EtfService) {}
+  constructor(@Inject(EtfService) private readonly etfs: EtfService) {}
 
   @Get()
   list(@Query() query: EtfListQueryDto) {

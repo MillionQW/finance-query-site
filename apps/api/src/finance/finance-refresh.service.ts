@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { FinanceStoreService, normalizeSymbol } from './finance-store.service';
 import { PythonAkshareService } from './python-akshare.service';
 import {
@@ -24,8 +24,8 @@ export class FinanceRefreshService implements OnModuleInit, OnModuleDestroy {
   private currentRun: StatementRefreshRun | null = null;
 
   constructor(
-    private readonly akshare: PythonAkshareService,
-    private readonly store: FinanceStoreService
+    @Inject(PythonAkshareService) private readonly akshare: PythonAkshareService,
+    @Inject(FinanceStoreService) private readonly store: FinanceStoreService
   ) {}
 
   onModuleInit(): void {

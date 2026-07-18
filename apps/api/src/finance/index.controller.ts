@@ -1,10 +1,10 @@
-import { Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Controller, Delete, Get, Inject, Param, Post, Query } from '@nestjs/common';
 import { IndexService } from './index.service';
 import { IndexMarket } from './index.types';
 
 @Controller('indices')
 export class IndexController {
-  constructor(private readonly indices: IndexService) {}
+  constructor(@Inject(IndexService) private readonly indices: IndexService) {}
   @Get() list(@Query('q') q='',@Query('market') market='all',@Query('refresh') refresh?:string) { return this.indices.list(q,market,refresh==='true'||refresh==='1'); }
   @Get('favorites') favorites() { return this.indices.favorites(); }
   @Post('favorites/:market/:symbol') save(@Param('market') market:IndexMarket,@Param('symbol') symbol:string) { return this.indices.saveFavorite(market,symbol); }

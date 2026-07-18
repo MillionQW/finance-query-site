@@ -12,6 +12,42 @@ export interface CompanySearchResult {
   changePercent?: number | null;
 }
 
+export interface ScreenerCompany extends CompanySearchResult {
+  pe: number | null;
+  roa: number | null;
+  reportDate: string | null;
+}
+
+export interface ScreenerResult {
+  items: ScreenerCompany[];
+  params: {
+    markets: Market[];
+    minRoa: number;
+    maxPe: number;
+    limit: number;
+    maxCandidates: number;
+    scope?: string;
+    minMarketCapBillion?: number;
+    requestGapMs?: number;
+    annualOnly: boolean;
+    peOnly?: boolean;
+    excludeBanks?: boolean;
+  };
+  summary: {
+    matched: number;
+    scannedCandidates: number;
+    warnings: number;
+  };
+  warnings: string[];
+  fetchedAt: string;
+  source: string;
+  cache?: {
+    hit: boolean;
+    refreshedAt: string;
+    expiresAt: string;
+  };
+}
+
 export interface FavoriteCompany extends CompanySearchResult {
   favoritedAt: string;
   updatedAt: string;

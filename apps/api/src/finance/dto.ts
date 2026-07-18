@@ -66,6 +66,74 @@ export class MetricComparisonQueryDto {
   companies!: string;
 }
 
+export class ScreenerQueryDto {
+  @IsOptional()
+  @IsString()
+  markets = 'all';
+
+  @IsOptional()
+  @IsString()
+  scope = 'all';
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  minRoa = 25;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsNumber()
+  @Min(0)
+  @Max(200)
+  maxPe = 16;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsNumber()
+  @Min(0)
+  @Max(100000)
+  minMarketCapBillion = 0;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(300)
+  limit = 80;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(800)
+  maxCandidates = 30;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  requestGapMs = 1000;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  latestPeriod = false;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  peOnly = true;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  excludeBanks = true;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  refresh = false;
+}
+
 export class FavoriteCompanyDto {
   @IsIn(['a', 'hk'])
   market!: Exclude<Market, 'all'>;

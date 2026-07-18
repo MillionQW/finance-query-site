@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { findIndex } from './index-catalog';
 import { IndexStoreService } from './index-store.service';
 import { PythonAkshareService } from './python-akshare.service';
@@ -9,7 +9,10 @@ export class IndexService {
   private readonly marketCacheMs = 3 * 60 * 1000;
   private readonly historyCacheMs = 24 * 60 * 60 * 1000;
   private marketRefreshPromise: Promise<void> | null = null;
-  constructor(private readonly akshare: PythonAkshareService, private readonly store: IndexStoreService) {}
+  constructor(
+    @Inject(PythonAkshareService) private readonly akshare: PythonAkshareService,
+    @Inject(IndexStoreService) private readonly store: IndexStoreService
+  ) {}
 
   async list(q = '', market = 'all', refresh = false): Promise<IndexMarketResponse> {
     const state = await this.ensureMarket(refresh);

@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { EtfListQueryDto } from './etf.dto';
 import { FinanceStoreService } from './finance-store.service';
 import { PythonAkshareService } from './python-akshare.service';
@@ -20,8 +20,8 @@ export class EtfService {
   private marketRefreshPromise: Promise<void> | null = null;
 
   constructor(
-    private readonly akshare: PythonAkshareService,
-    private readonly store: FinanceStoreService
+    @Inject(PythonAkshareService) private readonly akshare: PythonAkshareService,
+    @Inject(FinanceStoreService) private readonly store: FinanceStoreService
   ) {}
 
   async list(query: EtfListQueryDto): Promise<EtfMarketResponse> {

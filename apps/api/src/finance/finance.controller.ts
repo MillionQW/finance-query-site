@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Inject, Param, Post, Put, Query } from '@nestjs/common';
 import { FinanceService } from './finance.service';
 import { FinanceRefreshService } from './finance-refresh.service';
 import { AnnouncementRefreshService } from './announcement-refresh.service';
@@ -9,6 +9,7 @@ import {
   MetricComparisonQueryDto,
   PeerMetricQueryDto,
   PeerQueryDto,
+  ScreenerQueryDto,
   SearchCompaniesDto,
   StatementQueryDto
 } from './dto';
@@ -16,9 +17,9 @@ import {
 @Controller()
 export class FinanceController {
   constructor(
-    private readonly finance: FinanceService,
-    private readonly refresh: FinanceRefreshService,
-    private readonly announcements: AnnouncementRefreshService
+    @Inject(FinanceService) private readonly finance: FinanceService,
+    @Inject(FinanceRefreshService) private readonly refresh: FinanceRefreshService,
+    @Inject(AnnouncementRefreshService) private readonly announcements: AnnouncementRefreshService
   ) {}
 
   @Get('health')
@@ -62,6 +63,24 @@ export class FinanceController {
       query.metricKey.trim(),
       query.limit ?? 20
     );
+  }
+
+  @Get('finance/screener')
+  screenCompanies(@Query() query: ScreenerQueryDto) {
+    return this.finance.screenCompanies({
+      markets: query.markets,
+      scope: query.scope,
+      minRoa: query.minRoa,
+      maxPe: query.maxPe,
+      minMarketCapBillion: query.minMarketCapBillion,
+      limit: query.limit,
+      maxCandidates: query.maxCandidates,
+      requestGapMs: query.requestGapMs,
+      latestPeriod: query.latestPeriod,
+      peOnly: query.peOnly,
+      excludeBanks: query.excludeBanks,
+      refresh: query.refresh
+    });
   }
 
   @Get('finance/metric-comparison')

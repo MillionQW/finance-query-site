@@ -1,16 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { FinanceStoreService, normalizeSymbol } from './finance-store.service';
 import { PythonAkshareService } from './python-akshare.service';
-import { CompanyInsight, CompanySearchResult, FavoriteCompany, FinancialStatements, PeerComparison, PeerMetricComparison } from './types';
+import { CompanyInsight, CompanySearchResult, FavoriteCompany, FinancialStatements, PeerComparison, PeerMetricComparison, ScreenerResult } from './types';
 import { Market } from './dto';
 
 @Injectable()
 export class FinanceService {
   private readonly peerCacheDays = this.readPositiveNumber(process.env.FINANCE_PEER_CACHE_DAYS, 7);
+  private readonly screenerCacheDays = this.readPositiveNumber(process.env.FINANCE_SCREENER_CACHE_DAYS, 7);
 
   constructor(
-    private readonly akshare: PythonAkshareService,
-    private readonly store: FinanceStoreService
+    @Inject(PythonAkshareService) private readonly akshare: PythonAkshareService,
+    @Inject(FinanceStoreService) private readonly store: FinanceStoreService
   ) {}
 
   async searchCompanies(query: string, market: Market): Promise<CompanySearchResult[]> {
@@ -107,6 +109,67 @@ export class FinanceService {
     return this.store.getPeerMetricComparison(peerComparison, metricKey, limit);
   }
 
+  async screenCompanies(options: {
+    markets: string;
+    scope: string;
+    minRoa: number;
+    maxPe: number;
+    minMarketCapBillion: number;
+    limit: number;
+    maxCandidates: number;
+    requestGapMs: number;
+    latestPeriod: boolean;
+    peOnly: boolean;
+    excludeBanks: boolean;
+    refresh: boolean;
+  }): Promise<ScreenerResult> {
+    const cacheParams = this.normalizeScreenerCacheParams(options);
+    const cacheKey = this.screenerCacheKey(cacheParams);
+    const refreshedAfter = new Date(Date.now() - this.screenerCacheDays * 24 * 60 * 60 * 1000);
+    if (!options.refresh) {
+      const cached = this.store.getScreenerCache(cacheKey, refreshedAfter);
+      if (cached) {
+        return cached;
+      }
+    }
+
+    const args = [
+      'screener',
+      '--markets',
+      cacheParams.markets,
+      '--scope',
+      cacheParams.scope,
+      '--min-roa',
+      String(cacheParams.minRoa),
+      '--max-pe',
+      String(cacheParams.maxPe),
+      '--min-market-cap-billion',
+      String(cacheParams.minMarketCapBillion),
+      '--limit',
+      String(cacheParams.limit),
+      '--max-candidates',
+      String(cacheParams.maxCandidates),
+      '--request-gap-ms',
+      String(cacheParams.requestGapMs)
+    ];
+    if (cacheParams.latestPeriod) {
+      args.push('--latest-period');
+    }
+    if (cacheParams.peOnly) {
+      args.push('--pe-only');
+    }
+    if (cacheParams.excludeBanks) {
+      args.push('--exclude-banks');
+    }
+    const payload = await this.akshare.run<ScreenerResult>(args, 120_000);
+    return this.store.saveScreenerCache(
+      cacheKey,
+      JSON.stringify(cacheParams),
+      payload,
+      this.screenerCacheDays
+    );
+  }
+
   getMetricComparison(companyKeys: string, metricKey: string): PeerMetricComparison {
     const companies = companyKeys
       .split(',')
@@ -188,6 +251,40 @@ export class FinanceService {
   private readPositiveNumber(value: string | undefined, fallback: number): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  }
+
+  private normalizeScreenerCacheParams(options: {
+    markets: string;
+    scope: string;
+    minRoa: number;
+    maxPe: number;
+    minMarketCapBillion: number;
+    limit: number;
+    maxCandidates: number;
+    requestGapMs: number;
+    latestPeriod: boolean;
+    peOnly: boolean;
+    excludeBanks: boolean;
+  }) {
+    return {
+      markets: options.markets || 'all',
+      scope: options.scope || 'all',
+      minRoa: Number(options.minRoa) || 0,
+      maxPe: Number(options.maxPe) || 0,
+      minMarketCapBillion: Number(options.minMarketCapBillion) || 0,
+      limit: Math.max(1, Math.min(Number(options.limit) || 80, 300)),
+      maxCandidates: Math.max(1, Math.min(Number(options.maxCandidates) || 30, 800)),
+      requestGapMs: Math.max(0, Math.min(Number(options.requestGapMs) || 0, 10000)),
+      latestPeriod: Boolean(options.latestPeriod),
+      peOnly: Boolean(options.peOnly),
+      excludeBanks: Boolean(options.excludeBanks),
+      algorithmVersion: 3
+    };
+  }
+
+  private screenerCacheKey(params: ReturnType<FinanceService['normalizeScreenerCacheParams']>): string {
+    const serialized = JSON.stringify(params);
+    return createHash('sha256').update(serialized).digest('hex');
   }
 
   private displaySymbolFor(market: 'a' | 'hk', symbol: string): string {

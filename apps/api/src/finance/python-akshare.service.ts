@@ -19,7 +19,7 @@ export class PythonAkshareService {
   private readonly pythonBin = this.resolvePythonBin();
   private readonly bridgePath = this.resolveBridgePath();
 
-  async run<T>(args: string[]): Promise<T> {
+  async run<T>(args: string[], timeoutMs?: number): Promise<T> {
     if (!existsSync(this.bridgePath)) {
       throw new HttpException(
         `AKShare bridge not found: ${this.bridgePath}`,
@@ -27,7 +27,7 @@ export class PythonAkshareService {
       );
     }
 
-    const output = await this.spawnBridge(args);
+    const output = await this.spawnBridge(args, timeoutMs);
     let parsed: BridgeResult<T>;
     try {
       parsed = JSON.parse(output) as BridgeResult<T>;
@@ -75,7 +75,7 @@ export class PythonAkshareService {
     return candidates.find((candidate) => candidate === 'python' || existsSync(candidate)) ?? 'python';
   }
 
-  private spawnBridge(args: string[]): Promise<string> {
+  private spawnBridge(args: string[], timeoutMs?: number): Promise<string> {
     return new Promise((resolvePromise, reject) => {
       const child = spawn(this.pythonBin, [this.bridgePath, ...args], {
         cwd: resolve(__dirname, '..', '..'),
@@ -90,6 +90,31 @@ export class PythonAkshareService {
 
       let stdout = '';
       let stderr = '';
+      let settled = false;
+      const timeout = timeoutMs && timeoutMs > 0
+        ? setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            child.kill();
+            reject(
+              new HttpException(
+                {
+                  message: 'Python AKShare bridge timed out.',
+                  code: 'PYTHON_BRIDGE_TIMEOUT',
+                  detail: `Command exceeded ${timeoutMs}ms: ${args.join(' ')}`
+                },
+                HttpStatus.BAD_GATEWAY
+              )
+            );
+          }, timeoutMs)
+        : null;
+
+      const finish = <T>(callback: () => T): T | undefined => {
+        if (settled) return undefined;
+        settled = true;
+        if (timeout) clearTimeout(timeout);
+        return callback();
+      };
 
       child.stdout.setEncoding('utf8');
       child.stderr.setEncoding('utf8');
@@ -101,31 +126,35 @@ export class PythonAkshareService {
       });
 
       child.on('error', (error) => {
-        reject(
-          new HttpException(
-            `Unable to start Python: ${error.message}`,
-            HttpStatus.BAD_GATEWAY
+        finish(() =>
+          reject(
+            new HttpException(
+              `Unable to start Python: ${error.message}`,
+              HttpStatus.BAD_GATEWAY
+            )
           )
         );
       });
 
       child.on('close', (code) => {
-        if (code !== 0) {
-          this.logger.error(stderr || stdout);
-          reject(
-            new HttpException(
-              {
-                message: 'Python AKShare bridge failed.',
-                code: 'PYTHON_BRIDGE_FAILED',
-                detail: stderr || stdout
-              },
-              HttpStatus.BAD_GATEWAY
-            )
-          );
-          return;
-        }
+        finish(() => {
+          if (code !== 0) {
+            this.logger.error(stderr || stdout);
+            reject(
+              new HttpException(
+                {
+                  message: 'Python AKShare bridge failed.',
+                  code: 'PYTHON_BRIDGE_FAILED',
+                  detail: stderr || stdout
+                },
+                HttpStatus.BAD_GATEWAY
+              )
+            );
+            return;
+          }
 
-        resolvePromise(stdout.trim());
+          resolvePromise(stdout.trim());
+        });
       });
     });
   }
