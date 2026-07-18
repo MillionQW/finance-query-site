@@ -849,6 +849,22 @@ function exportCsv(): void {
   URL.revokeObjectURL(url);
 }
 
+function updatePageTitle(): void {
+  if (currentView.value === 'company' && selectedCompany.value) {
+    document.title = `${selectedCompany.value.name}（${selectedCompany.value.displaySymbol}）- 财报查询台`;
+    return;
+  }
+  const titles: Record<Exclude<AppView, 'company'>, string> = {
+    settings: '系统设置 - 财报查询台',
+    etf: 'ETF 研究 - 财报查询台',
+    index: '指数研究 - 财报查询台',
+    screener: '低 PE 筛选 - 财报查询台'
+  };
+  document.title = currentView.value === 'company'
+    ? '财报查询台'
+    : titles[currentView.value];
+}
+
 watch([query, market], () => {
   window.clearTimeout(searchTimer);
   searchTimer = window.setTimeout(() => {
@@ -861,6 +877,8 @@ watch(selectedCompany, () => {
   buyPointEditing.value = false;
   noteDialogOpen.value = false;
 });
+
+watch([currentView, selectedCompany], updatePageTitle, { immediate: true });
 
 onMounted(async () => {
   window.addEventListener('popstate', handleUrlNavigation);
