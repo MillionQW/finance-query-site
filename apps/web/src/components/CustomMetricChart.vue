@@ -91,6 +91,8 @@ const OPERATING_REVENUE_ALIASES = ['营业收入', '营业额', 'OPERATE INCOME'
 const TOTAL_OPERATING_REVENUE_ALIASES = ['营业总收入', '营运收入', 'TOTAL OPERATE INCOME'];
 const TOTAL_OPERATING_COST_ALIASES = ['营业总成本', 'TOTAL OPERATE COST'];
 const OPERATING_PROFIT_ALIASES = ['营业利润', '经营溢利', '经营利润', '营运利润', 'OPERATE PROFIT', 'OPERATE PROFIT BALANCE'];
+const TOTAL_PROFIT_ALIASES = ['利润总额', '除税前溢利', '税前利润', 'PROFIT BEFORE TAX', 'TOTAL PROFIT'];
+const INCOME_TAX_ALIASES = ['所得税费用', '所得税', '税项', 'INCOME TAX', 'TAXATION'];
 const RECEIVABLE_ALIASES = ['应收账款', '应收帐款', '应收票据及应收账款', '应收账款及应收票据', 'ACCOUNTS RECE', 'NOTE ACCOUNTS RECE', '应收款项'];
 const GROSS_PROFIT_ALIASES = ['毛利', '毛利润', 'GROSS PROFIT'];
 const OPERATING_COST_ALIASES = ['营业成本', '销售成本', '收入成本', '主营业务成本', 'OPERATE COST', 'COST OF SALES', 'COST OF REVENUE'];
@@ -168,6 +170,45 @@ const definitions: MetricDefinition[] = [
         rowValue(context.income, year, NET_PROFIT_ALIASES),
         averageBalance(context.balance, year, yearIndex, TOTAL_ASSET_ALIASES)
       )
+  },
+  {
+    key: 'roic',
+    label: 'ROIC（投入资本回报率）',
+    group: 'profitability',
+    formula: 'NOPAT / 平均投入资本',
+    kind: 'percent',
+    description: '衡量公司用股东权益和有息债务等投入资本产生税后经营利润的效率。本系统口径：NOPAT = 息税前利润 × (1 - 有效所得税率)，投入资本 = 股东权益 + 有息负债 - 现金及现金等价物。',
+    requirements: [
+      { label: '营业利润', table: 'income', aliases: OPERATING_PROFIT_ALIASES },
+      { label: '利润总额', table: 'income', aliases: TOTAL_PROFIT_ALIASES },
+      { label: '所得税费用', table: 'income', aliases: INCOME_TAX_ALIASES },
+      { label: '股东权益', table: 'balance', aliases: EQUITY_ALIASES },
+      { label: '现金及现金等价物', table: 'balance', aliases: CASH_ALIASES }
+    ],
+    calculate: (context, year, yearIndex) =>
+      safeDivide(
+        nopatValue(context, year),
+        averageInvestedCapital(context, year, yearIndex).average
+      )
+  },
+  {
+    key: 'greenblattReturnOnCapital',
+    label: 'ROC（资本回报率，《股市稳赚》推荐指标）',
+    group: 'profitability',
+    formula: 'EBIT / (营运资本 + 固定资产净值)',
+    kind: 'percent',
+    description: '《股市稳赚》神奇公式推荐指标之一，用来衡量好生意。本系统口径：资本回报率 = 息税前利润 EBIT / (营运资本 + 固定资产净值)，其中营运资本 = 流动资产 - 流动负债。',
+    requirements: [
+      { label: '营业利润', table: 'income', aliases: OPERATING_PROFIT_ALIASES },
+      { label: '流动资产', table: 'balance', aliases: CURRENT_ASSET_ALIASES },
+      { label: '流动负债', table: 'balance', aliases: CURRENT_LIABILITY_ALIASES },
+      { label: '固定资产净值', table: 'balance', aliases: FIXED_ASSET_ALIASES }
+    ],
+    calculate: (context, year) => {
+      const ebit = ebitValue(context, year);
+      const capital = greenblattCapitalDetails(context, year).capital;
+      return capital !== null && capital > 0 ? safeDivide(ebit, capital) : null;
+    }
   },
   {
     key: 'currentRatio',
@@ -1089,6 +1130,60 @@ function operatingCostDetails(context: MetricContext, year: string) {
   };
 }
 
+function effectiveTaxRate(context: MetricContext, year: string): number | null {
+  const incomeTax = absoluteValue(rowValue(context.income, year, INCOME_TAX_ALIASES));
+  const totalProfit = rowValue(context.income, year, TOTAL_PROFIT_ALIASES);
+  if (incomeTax === null || totalProfit === null || totalProfit <= 0) return null;
+  return Math.min(Math.max(incomeTax / totalProfit, 0), 1);
+}
+
+function ebitValue(context: MetricContext, year: string): number | null {
+  const operatingProfit = rowValue(context.income, year, OPERATING_PROFIT_ALIASES);
+  if (operatingProfit === null) return null;
+  const interestExpense = absoluteValue(rowValue(context.income, year, INTEREST_EXPENSE_ALIASES)) ?? 0;
+  return operatingProfit + interestExpense;
+}
+
+function nopatValue(context: MetricContext, year: string): number | null {
+  const ebit = ebitValue(context, year);
+  const taxRate = effectiveTaxRate(context, year);
+  return ebit !== null && taxRate !== null ? ebit * (1 - taxRate) : null;
+}
+
+function investedCapitalDetails(context: MetricContext, year: string) {
+  const equity = rowValue(context.balance, year, EQUITY_ALIASES);
+  const cash = rowValue(context.balance, year, CASH_ALIASES);
+  const debt = sumRows(context.balance, year, INTEREST_BEARING_DEBT_GROUPS);
+  const debtTotal = debt.total ?? 0;
+  const investedCapital = equity !== null && cash !== null
+    ? equity + debtTotal - cash
+    : null;
+  return { equity, cash, debt, debtTotal, investedCapital };
+}
+
+function averageInvestedCapital(context: MetricContext, year: string, yearIndex: number) {
+  const current = investedCapitalDetails(context, year);
+  const previousYear = context.statements.years[yearIndex + 1];
+  const previous = previousYear ? investedCapitalDetails(context, previousYear) : null;
+  const average = current.investedCapital !== null && previous !== null && previous.investedCapital !== null
+    ? (current.investedCapital + previous.investedCapital) / 2
+    : null;
+  return { current, previous, previousYear, average };
+}
+
+function greenblattCapitalDetails(context: MetricContext, year: string) {
+  const currentAssets = rowValue(context.balance, year, CURRENT_ASSET_ALIASES);
+  const currentLiabilities = rowValue(context.balance, year, CURRENT_LIABILITY_ALIASES);
+  const fixedAssets = rowValue(context.balance, year, FIXED_ASSET_ALIASES);
+  const workingCapital = currentAssets !== null && currentLiabilities !== null
+    ? currentAssets - currentLiabilities
+    : null;
+  const capital = workingCapital !== null && fixedAssets !== null
+    ? workingCapital + fixedAssets
+    : null;
+  return { currentAssets, currentLiabilities, fixedAssets, workingCapital, capital };
+}
+
 function sumRows(
   table: StatementTable | undefined,
   year: string,
@@ -1205,6 +1300,62 @@ function metricDetails(
         { label: '平均总资产', value: assets.average, note: '(期初 + 期末) / 2' }
       ],
       expression: `${formatRawValue(netProfit)} / ${formatRawValue(assets.average)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'roic') {
+    const operatingProfit = rowValue(context.income, year, OPERATING_PROFIT_ALIASES);
+    const interestExpense = absoluteValue(rowValue(context.income, year, INTEREST_EXPENSE_ALIASES));
+    const interestExpenseForEbit = interestExpense ?? 0;
+    const ebit = operatingProfit !== null ? operatingProfit + interestExpenseForEbit : null;
+    const totalProfit = rowValue(context.income, year, TOTAL_PROFIT_ALIASES);
+    const incomeTax = absoluteValue(rowValue(context.income, year, INCOME_TAX_ALIASES));
+    const taxRate = effectiveTaxRate(context, year);
+    const nopat = nopatValue(context, year);
+    const investedCapital = averageInvestedCapital(context, year, yearIndex);
+    const value = safeDivide(nopat, investedCapital.average);
+    const previousLabel = investedCapital.previousYear ?? '上年';
+    return {
+      rows: [
+        { label: '营业利润', value: operatingProfit },
+        { label: '利息支出', value: interestExpense, note: interestExpense === null ? '缺失时按 0 处理' : undefined },
+        { label: '息税前利润 EBIT', value: ebit, note: '营业利润 + 利息支出' },
+        { label: '利润总额', value: totalProfit },
+        { label: '所得税费用', value: incomeTax },
+        { label: '有效所得税率', value: taxRate, kind: 'percent', note: '所得税费用 / 利润总额' },
+        { label: '税后经营利润 NOPAT', value: nopat, note: 'EBIT × (1 - 有效所得税率)' },
+        { label: `${year} 股东权益`, value: investedCapital.current.equity, note: '期末' },
+        ...investedCapital.current.debt.rows,
+        { label: `${year} 有息负债合计`, value: investedCapital.current.debtTotal, note: '缺失时按 0 处理' },
+        { label: `${year} 现金及现金等价物`, value: investedCapital.current.cash, note: '期末' },
+        { label: `${year} 投入资本`, value: investedCapital.current.investedCapital, note: '股东权益 + 有息负债 - 现金及现金等价物' },
+        { label: `${previousLabel} 投入资本`, value: investedCapital.previous?.investedCapital ?? null, note: '期初' },
+        { label: '平均投入资本', value: investedCapital.average, note: '(期初 + 期末) / 2' }
+      ],
+      expression: `${formatRawValue(nopat)} / ${formatRawValue(investedCapital.average)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'greenblattReturnOnCapital') {
+    const operatingProfit = rowValue(context.income, year, OPERATING_PROFIT_ALIASES);
+    const interestExpense = absoluteValue(rowValue(context.income, year, INTEREST_EXPENSE_ALIASES));
+    const ebit = ebitValue(context, year);
+    const capital = greenblattCapitalDetails(context, year);
+    const value = capital.capital !== null && capital.capital > 0
+      ? safeDivide(ebit, capital.capital)
+      : null;
+    return {
+      rows: [
+        { label: '营业利润', value: operatingProfit },
+        { label: '利息支出', value: interestExpense, note: interestExpense === null ? '缺失时按 0 处理' : undefined },
+        { label: '息税前利润 EBIT', value: ebit, note: '营业利润 + 利息支出' },
+        { label: '流动资产', value: capital.currentAssets },
+        { label: '流动负债', value: capital.currentLiabilities },
+        { label: '营运资本', value: capital.workingCapital, note: '流动资产 - 流动负债' },
+        { label: '固定资产净值', value: capital.fixedAssets },
+        { label: '投入经营资本', value: capital.capital, note: '营运资本 + 固定资产净值' }
+      ],
+      expression: `${formatRawValue(ebit)} / ${formatRawValue(capital.capital)} = ${formatMetricValue(value, definition.kind)}`
     };
   }
 
