@@ -3314,6 +3314,21 @@ button {
   background: #fff;
 }
 
+.company-loading-panel {
+  min-height: 260px;
+  margin-top: 18px;
+}
+
+.company-loading-panel strong {
+  color: #172033;
+  font-size: 16px;
+}
+
+.company-loading-panel span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .rail-placeholder,
 .rail-error {
   min-height: 70px;

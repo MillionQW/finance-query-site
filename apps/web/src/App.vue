@@ -111,6 +111,7 @@ const buyPointDraft = ref('');
 const buyPointEditing = ref(false);
 let searchTimer: number | undefined;
 let favoriteNoticeTimer: number | undefined;
+let statementRequestId = 0;
 let peerRequestId = 0;
 let peerMetricRequestId = 0;
 let announcementRequestId = 0;
@@ -690,6 +691,7 @@ async function runSearch(): Promise<void> {
 }
 
 async function selectCompany(company: CompanySearchResult, refresh = false, urlMode: UrlMode = 'push'): Promise<void> {
+  const requestId = ++statementRequestId;
   companies.value = mergeCompanyList([company], companies.value);
   selectedCompany.value = company;
   rememberRecentCompany(company);
@@ -698,29 +700,42 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
   }
   statementLoading.value = true;
   statementError.value = null;
+  statements.value = null;
+  selectedYears.value = [];
+  peerComparison.value = null;
+  peerMetricComparison.value = null;
   activeStatement.value = 'balance';
   void loadPeerComparison(company);
   void loadPeerMetricComparison(company);
   void loadAnnouncements(company);
   void loadCompanyInsight(company);
   try {
-    statements.value = await getStatements(company.market, company.symbol, 0, refresh);
-    if (sameCompany(company, selectedCompany.value) && statements.value.company.name) {
+    const payload = await getStatements(company.market, company.symbol, 0, refresh);
+    if (requestId !== statementRequestId || !sameCompany(company, selectedCompany.value)) {
+      return;
+    }
+    statements.value = payload;
+    if (payload.company.name) {
       const enrichedCompany = {
         ...company,
-        displaySymbol: statements.value.company.displaySymbol || company.displaySymbol,
-        name: statements.value.company.name
+        displaySymbol: payload.company.displaySymbol || company.displaySymbol,
+        name: payload.company.name
       };
       selectedCompany.value = enrichedCompany;
       companies.value = mergeCompanyList([enrichedCompany], companies.value);
       rememberRecentCompany(enrichedCompany);
     }
-    selectedYears.value = [...statements.value.years];
+    selectedYears.value = [...payload.years];
   } catch (error) {
-    statements.value = null;
-    statementError.value = error instanceof Error ? error.message : '财报查询失败';
+    if (requestId === statementRequestId) {
+      statements.value = null;
+      selectedYears.value = [];
+      statementError.value = error instanceof Error ? error.message : '财报查询失败';
+    }
   } finally {
-    statementLoading.value = false;
+    if (requestId === statementRequestId) {
+      statementLoading.value = false;
+    }
   }
 }
 
@@ -1260,6 +1275,13 @@ onUnmounted(() => {
           :error="announcementError"
         />
 
+        <div v-if="statementLoading" class="loading-panel company-loading-panel" role="status" aria-live="polite">
+          <Loader2 class="spin-icon" :size="22" />
+          <strong>正在读取 {{ selectedCompany?.name ?? '个股' }} 财报数据</strong>
+          <span>本地没有缓存时会通过 AKShare 拉取，请稍候...</span>
+        </div>
+
+        <template v-else>
         <div v-if="statementError" class="status-banner">
           <AlertTriangle :size="18" />
           <span>{{ statementError }}</span>
@@ -1340,9 +1362,8 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div v-if="statementLoading" class="loading-panel">正在通过 AKShare 拉取财报数据...</div>
-
-        <StatementTable v-else :table="activeTable" :active-years="activeYears" />
+        <StatementTable :table="activeTable" :active-years="activeYears" />
+        </template>
       </section>
     </main>
 
