@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { ChevronDown, ChevronUp } from 'lucide-vue-next';
 import type { CompanySearchResult, PeerComparison, PeerCompany, PeerRanking } from '../types/finance';
+import { buildIndustryPositions } from '../finance/industry-position';
 
 const props = defineProps<{
   company: CompanySearchResult | null;
@@ -11,6 +12,7 @@ const props = defineProps<{
 }>();
 
 const expanded = ref(false);
+const industryPositions = computed(() => buildIndustryPositions(props.comparison));
 
 watch(
   () => props.company ? `${props.company.market}:${props.company.symbol}` : '',
@@ -95,6 +97,20 @@ function companyKey(company: PeerCompany): string {
       <span>同行数据</span>
       <strong>{{ comparison.cache.hit ? '本地缓存' : '刚刚更新' }}</strong>
       <small>缓存刷新：{{ formatDate(comparison.cache.refreshedAt) }}</small>
+    </div>
+
+    <div v-if="industryPositions.length" class="industry-position-grid" aria-label="行业相对位置">
+      <article
+        v-for="position in industryPositions"
+        :key="position.key"
+        :class="position.band"
+        :title="position.context"
+      >
+        <span>{{ position.label }}</span>
+        <strong>{{ position.percentileLabel }}</strong>
+        <em>{{ position.rankLabel }}</em>
+        <small>{{ position.context }}</small>
+      </article>
     </div>
 
     <div v-if="expanded" id="peer-comparison-content" class="peer-collapsible-content">

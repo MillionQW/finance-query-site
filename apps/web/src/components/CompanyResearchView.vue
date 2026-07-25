@@ -28,6 +28,7 @@ import type {
 } from '../types/finance';
 
 const CustomMetricChart = defineAsyncComponent(() => import('./CustomMetricChart.vue'));
+const FinancialDriverPanel = defineAsyncComponent(() => import('./FinancialDriverPanel.vue'));
 const MiniTrend = defineAsyncComponent(() => import('./MiniTrend.vue'));
 const PeriodAnalysisPanel = defineAsyncComponent(() => import('./PeriodAnalysisPanel.vue'));
 const PeerComparisonPanel = defineAsyncComponent(() => import('./PeerComparisonPanel.vue'));
@@ -251,6 +252,8 @@ defineEmits<{
         </div>
 
         <PeriodAnalysisPanel :statements="statements" />
+
+        <FinancialDriverPanel :statements="statements" />
 
         <div class="insight-grid">
           <MiniTrend :series="statements?.highlights ?? []" />

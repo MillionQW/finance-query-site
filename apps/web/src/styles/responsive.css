@@ -81,6 +81,7 @@
 
   .quote-grid,
   .peer-rank-grid,
+  .industry-position-grid,
   .metric-selector,
   .metric-cards {
     grid-template-columns: 1fr;

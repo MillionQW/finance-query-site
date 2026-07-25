@@ -250,6 +250,14 @@ ETF backend ownership:
 - Users can still switch to all announcements or a specific event category.
 - Announcement writes use an upsert so refreshing a company also upgrades previously cached classifications.
 
+## Financial Drivers and Industry Position
+
+- The driver panel decomposes DuPont ROE into net margin, asset turnover, and the equity multiplier.
+- A cash bridge follows net profit through operating cash flow and capital expenditure to free cash flow.
+- Receivables, inventory, and payables growth are compared with revenue growth, with a 10-percentage-point materiality threshold.
+- Industry ranking cards turn raw rank values into explicit percentile bands while retaining the ranking direction and valuation caveat.
+- Relative valuation position is never presented as an automatic buy or sell conclusion.
+
 ## Statement Item Trend Chart
 
 - Implemented in `apps/web/src/components/StatementItemTrend.vue`.
