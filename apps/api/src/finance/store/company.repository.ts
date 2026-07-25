@@ -238,7 +238,7 @@ export class CompanyStoreRepository extends SqliteRepository {
     const viewedAt = favorite?.announcement_viewed_at ?? favorite?.favorited_at ?? null;
     const rows = this.db.prepare(`
       SELECT announcement_key, market, symbol, display_symbol, company_name, title,
-             category, published_at, url, source, discovered_at
+             category, importance, is_routine, impact_hint, published_at, url, source, discovered_at
       FROM company_announcements
       WHERE market = ? AND symbol = ?
       ORDER BY published_at DESC, id DESC
@@ -265,10 +265,21 @@ export class CompanyStoreRepository extends SqliteRepository {
       SELECT last_error FROM announcement_refresh_state WHERE market = ? AND symbol = ? LIMIT 1
     `).get(normalized.market, normalized.symbol);
     const insert = this.db.prepare(`
-      INSERT OR IGNORE INTO company_announcements (
+      INSERT INTO company_announcements (
         announcement_key, market, symbol, display_symbol, company_name, title,
-        category, published_at, url, source, discovered_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        category, importance, is_routine, impact_hint, published_at, url, source, discovered_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(market, symbol, announcement_key) DO UPDATE SET
+        display_symbol = excluded.display_symbol,
+        company_name = excluded.company_name,
+        title = excluded.title,
+        category = excluded.category,
+        importance = excluded.importance,
+        is_routine = excluded.is_routine,
+        impact_hint = excluded.impact_hint,
+        published_at = excluded.published_at,
+        url = excluded.url,
+        source = excluded.source
     `);
 
     this.withTransaction(() => {
@@ -282,6 +293,9 @@ export class CompanyStoreRepository extends SqliteRepository {
           item.companyName || normalized.name,
           item.title,
           item.category,
+          item.importance ?? 'medium',
+          item.isRoutine ? 1 : 0,
+          item.impactHint ?? null,
           item.publishedAt,
           item.url,
           item.source
@@ -375,6 +389,9 @@ export class CompanyStoreRepository extends SqliteRepository {
       companyName: row.company_name,
       title: row.title,
       category: row.category,
+      importance: row.importance,
+      isRoutine: Boolean(row.is_routine),
+      impactHint: row.impact_hint ?? undefined,
       publishedAt: row.published_at,
       url: row.url,
       source: row.source,

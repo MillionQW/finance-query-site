@@ -1,9 +1,11 @@
 @import './styles/base.css';
 @import './styles/company-workspace.css';
+@import './styles/announcement-intelligence.css';
 @import './styles/financial-metrics.css';
 @import './styles/peers-and-statements.css';
 @import './styles/period-analysis.css';
 @import './styles/statement-trust.css';
+@import './styles/research-summary.css';
 @import './styles/research-pages.css';
 @import './styles/states.css';
 @import './styles/responsive.css';

@@ -62,7 +62,24 @@ export interface CompanyInsight {
   updatedAt: string | null;
 }
 
-export type AnnouncementCategory = '年报' | '业绩预告' | '权益分派' | '董事会' | '风险提示' | '其他';
+export type AnnouncementCategory =
+  | '定期报告'
+  | '业绩预告'
+  | '分红回购'
+  | '股权变动'
+  | '融资债务'
+  | '并购投资'
+  | '关联交易'
+  | '经营事项'
+  | '治理人事'
+  | '风险事项'
+  | '例行披露'
+  | '其他'
+  | '年报'
+  | '权益分派'
+  | '董事会'
+  | '风险提示';
+export type AnnouncementImportance = 'high' | 'medium' | 'routine';
 
 export interface CompanyAnnouncement {
   key: string;
@@ -72,6 +89,9 @@ export interface CompanyAnnouncement {
   companyName: string;
   title: string;
   category: AnnouncementCategory;
+  importance?: AnnouncementImportance;
+  isRoutine?: boolean;
+  impactHint?: string;
   publishedAt: string;
   url: string;
   source: string;

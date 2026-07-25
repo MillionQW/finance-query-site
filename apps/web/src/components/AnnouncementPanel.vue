@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Bell, ExternalLink } from 'lucide-vue-next';
-import type { AnnouncementCategory, AnnouncementFeed } from '../types/finance';
+import { Bell, CircleAlert, ExternalLink } from 'lucide-vue-next';
+import type {
+  AnnouncementCategory,
+  AnnouncementFeed,
+  CompanyAnnouncement
+} from '../types/finance';
 
 const props = defineProps<{
   feed: AnnouncementFeed | null;
@@ -9,29 +13,73 @@ const props = defineProps<{
   error: string | null;
 }>();
 
-type CategoryFilter = '全部' | AnnouncementCategory;
+type CategoryFilter = '重要' | AnnouncementCategory;
 
-const categories: CategoryFilter[] = ['全部', '年报', '业绩预告', '权益分派', '董事会', '风险提示', '其他'];
-const activeCategory = ref<CategoryFilter>('全部');
+const categoryOrder: AnnouncementCategory[] = [
+  '定期报告',
+  '业绩预告',
+  '风险事项',
+  '融资债务',
+  '股权变动',
+  '并购投资',
+  '关联交易',
+  '经营事项',
+  '分红回购',
+  '治理人事',
+  '例行披露',
+  '其他',
+  '年报',
+  '权益分派',
+  '董事会',
+  '风险提示'
+];
+const activeCategory = ref<CategoryFilter>('重要');
+
+const categories = computed<CategoryFilter[]>(() => {
+  const present = new Set((props.feed?.items ?? []).map((item) => item.category));
+  return ['重要', ...categoryOrder.filter((category) => present.has(category))];
+});
 
 const visibleItems = computed(() => {
   const items = props.feed?.items ?? [];
-  const filtered = activeCategory.value === '全部'
-    ? items
+  const filtered = activeCategory.value === '重要'
+    ? items.filter((item) => !isRoutineAnnouncement(item))
     : items.filter((item) => item.category === activeCategory.value);
-  return filtered.slice(0, 20);
+  return [...filtered]
+    .sort((left, right) => {
+      const importance = importanceRank(right) - importanceRank(left);
+      if (importance) return importance;
+      return new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime();
+    })
+    .slice(0, 12);
 });
 
 watch(
   () => props.feed ? `${props.feed.company.market}:${props.feed.company.symbol}` : '',
   () => {
-    activeCategory.value = '全部';
+    activeCategory.value = '重要';
   }
 );
 
 function categoryCount(category: CategoryFilter): number {
   const items = props.feed?.items ?? [];
-  return category === '全部' ? items.length : items.filter((item) => item.category === category).length;
+  return category === '重要'
+    ? items.filter((item) => !isRoutineAnnouncement(item)).length
+    : items.filter((item) => item.category === category).length;
+}
+
+function isRoutineAnnouncement(item: CompanyAnnouncement): boolean {
+  return Boolean(
+    item.isRoutine ||
+    item.importance === 'routine' ||
+    /翌日披露报表|月报表|证券变动月报表|通知信函|展示文件/.test(item.title)
+  );
+}
+
+function importanceRank(item: CompanyAnnouncement): number {
+  if (item.importance === 'high') return 3;
+  if (item.importance === 'routine' || isRoutineAnnouncement(item)) return 1;
+  return 2;
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -58,7 +106,7 @@ function formatDate(value: string | null | undefined): string {
         type="button"
         @click="activeCategory = category"
       >
-        {{ category }}
+        {{ category === '重要' ? '重要事件' : category }}
         <small>{{ categoryCount(category) }}</small>
       </button>
     </div>
@@ -76,8 +124,14 @@ function formatDate(value: string | null | undefined): string {
         target="_blank"
         rel="noopener noreferrer"
       >
-        <span class="announcement-category">{{ item.category }}</span>
-        <strong>{{ item.title }}</strong>
+        <span class="announcement-category" :class="item.importance">{{ item.category }}</span>
+        <span class="announcement-title-block">
+          <strong>{{ item.title }}</strong>
+          <small v-if="item.impactHint">
+            <CircleAlert :size="13" />
+            {{ item.impactHint }}
+          </small>
+        </span>
         <time :datetime="item.publishedAt">{{ formatDate(item.publishedAt) }}</time>
         <ExternalLink :size="15" />
       </a>

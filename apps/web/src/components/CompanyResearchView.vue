@@ -32,6 +32,7 @@ const MiniTrend = defineAsyncComponent(() => import('./MiniTrend.vue'));
 const PeriodAnalysisPanel = defineAsyncComponent(() => import('./PeriodAnalysisPanel.vue'));
 const PeerComparisonPanel = defineAsyncComponent(() => import('./PeerComparisonPanel.vue'));
 const PeerMetricChart = defineAsyncComponent(() => import('./PeerMetricChart.vue'));
+const ResearchSummaryPanel = defineAsyncComponent(() => import('./ResearchSummaryPanel.vue'));
 const StatementTrustPanel = defineAsyncComponent(() => import('./StatementTrustPanel.vue'));
 const StatementTable = defineAsyncComponent(() => import('./StatementTable.vue'));
 
@@ -214,6 +215,8 @@ defineEmits<{
           <strong>{{ statementCacheLabel }}</strong>
           <small>缓存刷新：{{ formatDate(statements?.cache?.refreshedAt) }}</small>
         </div>
+
+        <ResearchSummaryPanel :statements="statements" />
 
         <StatementTrustPanel :statements="statements" />
 

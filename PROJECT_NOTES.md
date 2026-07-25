@@ -236,6 +236,20 @@ ETF backend ownership:
 - Reporting-period table YoY compares the same period in the prior year instead of the adjacent displayed column.
 - Python regression tests cover report-period preservation and TTM calculation.
 
+## Conclusion-first Research Summary
+
+- The company page puts an explainable research summary before detailed statement panels.
+- The summary reuses the existing named metric definitions, evaluator, and four financial diagnostics instead of introducing an opaque score.
+- It presents the overall tone, data coverage, the four diagnostic dimensions, and the highest-priority evidence.
+- Every conclusion keeps its source metric or rule visible, while missing inputs remain explicitly unavailable.
+
+## Announcement Intelligence
+
+- Announcements are classified by event category, importance, routine status, and a short impact hint.
+- The default view prioritizes material events and hides repetitive routine disclosures such as monthly returns.
+- Users can still switch to all announcements or a specific event category.
+- Announcement writes use an upsert so refreshing a company also upgrades previously cached classifications.
+
 ## Statement Item Trend Chart
 
 - Implemented in `apps/web/src/components/StatementItemTrend.vue`.

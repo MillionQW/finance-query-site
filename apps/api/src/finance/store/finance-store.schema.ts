@@ -58,6 +58,9 @@ export function initializeFinanceStoreSchema(db: any): void {
         company_name TEXT NOT NULL,
         title TEXT NOT NULL,
         category TEXT NOT NULL,
+        importance TEXT NOT NULL DEFAULT 'medium',
+        is_routine INTEGER NOT NULL DEFAULT 0,
+        impact_hint TEXT,
         published_at TEXT NOT NULL,
         url TEXT NOT NULL,
         source TEXT NOT NULL,
@@ -332,6 +335,9 @@ export function initializeFinanceStoreSchema(db: any): void {
   ensureColumn(db, 'financial_statement_rows', 'source_item', 'TEXT');
   ensureColumn(db, 'financial_statement_values', 'source_item', 'TEXT');
   ensureColumn(db, 'favorite_companies', 'announcement_viewed_at', 'TEXT');
+  ensureColumn(db, 'company_announcements', 'importance', "TEXT NOT NULL DEFAULT 'medium'");
+  ensureColumn(db, 'company_announcements', 'is_routine', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn(db, 'company_announcements', 'impact_hint', 'TEXT');
   db.prepare(`
       UPDATE favorite_companies
       SET announcement_viewed_at = datetime('now')
