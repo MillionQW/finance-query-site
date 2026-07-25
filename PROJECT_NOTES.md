@@ -324,6 +324,8 @@ The application shell is also split by responsibility:
 
 Global styles keep their original cascade order through `apps/web/src/styles.css`, which imports focused modules from `apps/web/src/styles/` for the shell, company workspace, financial metrics, peers/statements, research pages, shared states, and responsive overrides.
 
+SQLite persistence is exposed through `FinanceStoreService`, while implementation details live in `apps/api/src/finance/store/`: company/announcement, statement, ETF, cache, peer comparison, and refresh repositories share one configured database connection, schema initializer, and transaction base class.
+
 ## Hong Kong Stock Field Handling
 
 For Hong Kong stock inventory turnover, if operating cost is missing, the code looks for:
