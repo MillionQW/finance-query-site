@@ -9,6 +9,9 @@ import { Market } from './dto';
 export class FinanceService {
   private readonly peerCacheDays = this.readPositiveNumber(process.env.FINANCE_PEER_CACHE_DAYS, 7);
   private readonly screenerCacheDays = this.readPositiveNumber(process.env.FINANCE_SCREENER_CACHE_DAYS, 7);
+  private readonly statementRequests = new Map<string, Promise<FinancialStatements>>();
+  private readonly peerRequests = new Map<string, Promise<PeerComparison>>();
+  private readonly screenerRequests = new Map<string, Promise<ScreenerResult>>();
 
   constructor(
     @Inject(PythonAkshareService) private readonly akshare: PythonAkshareService,
@@ -46,23 +49,38 @@ export class FinanceService {
       }
     }
 
-    const payload = await this.akshare.run<FinancialStatements>([
-      'statements',
-      '--market',
-      market,
-      '--symbol',
-      normalizedSymbol,
-      '--years',
-      String(years)
-    ]);
-    this.store.saveStatements(payload, years);
-    return {
-      ...payload,
-      cache: {
-        hit: false,
-        refreshedAt: new Date().toISOString()
-      }
-    };
+    const requestKey = `${market}:${normalizedSymbol}:${years}`;
+    const running = this.statementRequests.get(requestKey);
+    if (running) {
+      return running;
+    }
+
+    const request = this.akshare
+      .run<FinancialStatements>([
+        'statements',
+        '--market',
+        market,
+        '--symbol',
+        normalizedSymbol,
+        '--years',
+        String(years)
+      ])
+      .then((payload) => {
+        this.store.saveStatements(payload, years);
+        return {
+          ...payload,
+          cache: {
+            hit: false,
+            refreshedAt: new Date().toISOString()
+          }
+        };
+      })
+      .finally(() => {
+        this.statementRequests.delete(requestKey);
+      });
+
+    this.statementRequests.set(requestKey, request);
+    return request;
   }
 
   async getPeerComparison(
@@ -77,26 +95,36 @@ export class FinanceService {
       return this.limitPeerComparison(cached, limit);
     }
 
-    const payload = await this.akshare.run<PeerComparison>([
-      'peers',
-      '--market',
-      market,
-      '--symbol',
-      normalizedSymbol,
-      '--limit',
-      '50'
-    ]);
-    this.store.savePeerComparison(payload);
-    return this.limitPeerComparison(
-      {
-        ...payload,
-        cache: {
-          hit: false,
-          refreshedAt: new Date().toISOString()
-        }
-      },
-      limit
-    );
+    const requestKey = `${market}:${normalizedSymbol}`;
+    let request = this.peerRequests.get(requestKey);
+    if (!request) {
+      request = this.akshare
+        .run<PeerComparison>([
+          'peers',
+          '--market',
+          market,
+          '--symbol',
+          normalizedSymbol,
+          '--limit',
+          '50'
+        ])
+        .then((payload) => {
+          this.store.savePeerComparison(payload);
+          return {
+            ...payload,
+            cache: {
+              hit: false,
+              refreshedAt: new Date().toISOString()
+            }
+          };
+        })
+        .finally(() => {
+          this.peerRequests.delete(requestKey);
+        });
+      this.peerRequests.set(requestKey, request);
+    }
+
+    return this.limitPeerComparison(await request, limit);
   }
 
   async getPeerMetricComparison(
@@ -133,6 +161,11 @@ export class FinanceService {
       }
     }
 
+    const running = this.screenerRequests.get(cacheKey);
+    if (running) {
+      return running;
+    }
+
     const args = [
       'screener',
       '--markets',
@@ -161,13 +194,21 @@ export class FinanceService {
     if (cacheParams.excludeBanks) {
       args.push('--exclude-banks');
     }
-    const payload = await this.akshare.run<ScreenerResult>(args, 120_000);
-    return this.store.saveScreenerCache(
-      cacheKey,
-      JSON.stringify(cacheParams),
-      payload,
-      this.screenerCacheDays
-    );
+    const request = this.akshare
+      .run<ScreenerResult>(args, 120_000)
+      .then((payload) =>
+        this.store.saveScreenerCache(
+          cacheKey,
+          JSON.stringify(cacheParams),
+          payload,
+          this.screenerCacheDays
+        )
+      )
+      .finally(() => {
+        this.screenerRequests.delete(cacheKey);
+      });
+    this.screenerRequests.set(cacheKey, request);
+    return request;
   }
 
   getMetricComparison(companyKeys: string, metricKey: string): PeerMetricComparison {

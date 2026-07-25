@@ -20,3 +20,4 @@ server.out.log
 server.err.log
 verification-*.png
 design/
+.build-stamp

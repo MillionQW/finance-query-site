@@ -7,6 +7,9 @@
 - 搜索 A 股和港股公司
 - 拉取公司自上市年开始的全部年度财报
 - 查看资产负债表、利润表、现金流量表
+- 查看 ETF、主要指数、同行对比和估值数据
+- 使用 ROA、PE、市值等条件筛选公司
+- 保存收藏、公司备注、买点区间并跟踪公告
 - 财报首次拉取后写入本地 SQLite，后续默认直接读本地库
 - 前端提供搜索结果栏、年度筛选、关键指标趋势和明细表格
 
@@ -22,15 +25,18 @@ NestJS 可以跑这个项目。AKShare 是 Python 库，所以这里采用 NestJ
 ## 安装
 
 ```powershell
-npm install
+npm ci
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r apps/api/requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r apps/api/requirements.lock.txt
 ```
 
-项目会优先使用根目录下的 `.venv\Scripts\python.exe`。如果本机 `python` 不是你要用的解释器，也可以手动设置：
+需要 Node.js 22.5 或更高版本，推荐 Python 3.12。`requirements.lock.txt`
+用于复现当前已验证的 Python 环境；需要升级 AKShare 时再更新锁文件。
 
-```powershell
-$env:PYTHON_BIN="C:\Python312\python.exe"
+项目会优先使用根目录下的 `.venv\Scripts\python.exe`。如果本机 `python` 不是你要用的解释器，也可以在 `.env` 中设置：
+
+```dotenv
+PYTHON_BIN=C:\Python312\python.exe
 ```
 
 ## 开发运行
@@ -57,6 +63,28 @@ npm run start
 
 打开 `http://localhost:3000`。
 
+Windows 下也可以直接运行 `start-finance-site.cmd`。脚本会在源码或依赖配置更新后自动重新构建，避免继续运行旧产物。
+
+## 配置
+
+复制 `.env.example` 为 `.env` 后即可覆盖默认配置。服务和开发页面默认只监听本机回环地址；如需局域网访问，应显式设置 `HOST`、`WEB_ORIGIN`，并自行增加身份认证。
+
+常用配置：
+
+- `HOST`、`PORT`：API 监听地址和端口。
+- `WEB_ORIGIN`：允许的前端来源，多个来源用逗号分隔。
+- `AKSHARE_TIMEOUT_MS`：单个 Python 数据任务的总超时。
+- `FINANCE_DB_PATH`：SQLite 数据库路径。
+- `FINANCE_REFRESH_*`、`ANNOUNCEMENT_*`：后台刷新频率。
+
+## 质量检查
+
+```powershell
+npm test
+npm run typecheck
+npm run build
+```
+
 ## API
 
 - `GET /api/health`
@@ -71,7 +99,7 @@ npm run start
 数据库位置默认是：
 
 ```text
-D:\finance-query-site\data\finance.sqlite
+data\finance.sqlite
 ```
 
 写入策略：

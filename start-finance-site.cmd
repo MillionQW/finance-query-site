@@ -20,12 +20,18 @@ if not errorlevel 1 (
 
 if not exist "node_modules" (
   echo Installing Node.js dependencies...
-  call npm.cmd install
+  call npm.cmd ci
   if errorlevel 1 goto :failed
 )
 
 if not exist "apps\web\dist\index.html" goto :build
 if not exist "apps\api\dist\main.js" goto :build
+if not exist ".build-stamp" goto :build
+powershell.exe -NoProfile -Command "$builtAt = (Get-Item '.build-stamp').LastWriteTimeUtc; $inputs = @(Get-ChildItem 'apps\web\src', 'apps\api\src' -Recurse -File) + @(Get-Item 'package.json', 'package-lock.json', 'apps\web\package.json', 'apps\api\package.json', 'apps\web\vite.config.ts', 'apps\web\tsconfig.json', 'apps\api\tsconfig.json', 'apps\api\tsconfig.build.json'); foreach ($input in $inputs) { if ($input.LastWriteTimeUtc -gt $builtAt) { exit 1 } }; exit 0" >nul 2>&1
+if errorlevel 1 (
+  echo Source changes detected. Rebuilding...
+  goto :build
+)
 goto :start
 
 :build
