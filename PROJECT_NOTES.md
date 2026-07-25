@@ -418,6 +418,26 @@ Announcement refresh defaults:
 - request gap within a batch: 3 seconds
 - announcement lookback: 60 days
 
+## File Size and Responsibility Guardrails
+
+Avoid allowing a source file to become the default home for unrelated behavior. File size is a review signal rather than the only design rule, but use these limits for handwritten source:
+
+- Aim to keep components, services, repositories, composables, and command modules below 500 lines.
+- At 500 lines, review whether the file contains more than one independently named responsibility.
+- Files above 800 lines should normally be split before adding more behavior.
+- Do not introduce handwritten source files above 1,000 lines without documenting why a cohesive split is impractical.
+- Declarative catalogs, generated code, migrations, and schema definitions may exceed the target when splitting would make navigation or ordering worse; keep their entry point small and group the content by domain where possible.
+
+Preferred split boundaries:
+
+- Vue: separate application orchestration, page composition, reusable presentation, and pure domain calculations.
+- NestJS/SQLite: keep injected services as stable facades and move persistence into domain repositories.
+- Python bridges: keep the executable entry point thin and place each command family in a separate module.
+- CSS: preserve cascade order through a small import file and split rules by page or feature.
+- Tests: colocate regression coverage with extracted pure logic and add a facade smoke test when introducing delegation.
+
+During review, treat repeated unrelated imports, long groups of independent state, large conditional dispatch blocks, and multiple external data domains in one file as stronger split signals than line count alone. New features should extend the focused module that owns the behavior instead of growing an application shell, compatibility entry point, or storage facade again.
+
 ## Validation
 
 Recently verified:

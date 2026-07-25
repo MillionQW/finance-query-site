@@ -88,6 +88,8 @@ npm run typecheck
 npm run build
 ```
 
+代码评审还应遵守 [PROJECT_NOTES.md](./PROJECT_NOTES.md#file-size-and-responsibility-guardrails) 中的文件规模与职责边界约束，避免应用外壳、存储门面和命令入口再次膨胀成巨型文件。
+
 ## API
 
 - `GET /api/health`
