@@ -14,6 +14,9 @@ export function isGrowthGapMetric(metricKey: string): boolean {
 export function isCriticalMetric(result: MetricResult): boolean {
   if (result.latest === null) return false;
   if (result.definition.kind === 'judgment') return result.latest === 0;
+  if (result.definition.key === 'roic' || result.definition.key === 'netMargin') return result.latest < 0;
+  if (result.definition.key === 'revenueGrowth') return result.latest < -0.2;
+  if (result.definition.key === 'operatingProfitGrowth') return result.latest < -0.3;
   if (result.definition.key === 'cashDebtRatio') return result.latest < 1;
   if (result.definition.key === 'currentRatio') return result.latest < 1.5;
   if (result.definition.key === 'quickRatio') return result.latest < 0.8;
@@ -22,6 +25,7 @@ export function isCriticalMetric(result: MetricResult): boolean {
   if (result.definition.key === 'assetLiabilityRatio') return result.latest > 0.8;
   if (result.definition.key === 'operatingCashConversion') return result.latest < 0.7;
   if (result.definition.key === 'cumulativeCashConversion3y') return result.latest < 0.8;
+  if (result.definition.key === 'cashCollectionRatio') return result.latest < 0.8;
   if (result.definition.key === 'freeCashFlow' || result.definition.key === 'freeCashFlowMargin') return result.latest < 0;
   if (result.definition.key === 'accrualRatio') return result.latest > 0.1;
   if (result.definition.key === 'deductedProfitRatio') return result.latest >= 0 && result.latest < 0.5;
@@ -41,9 +45,13 @@ export function isCriticalMetric(result: MetricResult): boolean {
 export function isPositiveMetric(result: MetricResult): boolean {
   if (result.latest === null) return false;
   if (result.definition.kind === 'judgment') return result.latest === 1;
+  if (result.definition.key === 'roic') return result.latest >= 0.12;
+  if (result.definition.key === 'netMargin') return result.latest >= 0.1;
+  if (result.definition.key === 'revenueGrowth' || result.definition.key === 'operatingProfitGrowth') return result.latest >= 0.1;
   if (result.definition.key === 'grossMargin') return result.latest > 0.4;
   if (result.definition.key === 'expenseToGrossProfitRatio') return result.latest < 0.3;
   if (result.definition.key === 'operatingCashConversion' || result.definition.key === 'cumulativeCashConversion3y') return result.latest >= 1;
+  if (result.definition.key === 'cashCollectionRatio') return result.latest >= 1;
   if (result.definition.key === 'freeCashFlowMargin') return result.latest >= 0.1;
   if (result.definition.key === 'accrualRatio') return result.latest <= 0;
   if (result.definition.key === 'deductedProfitRatio') return result.latest >= 0.9;
@@ -57,11 +65,17 @@ export function isPositiveMetric(result: MetricResult): boolean {
 
 export function isWarningMetric(result: MetricResult): boolean {
   if (result.latest === null) return false;
+  if (result.definition.key === 'roic') return result.latest >= 0 && result.latest < 0.05;
+  if (result.definition.key === 'netMargin') return result.latest >= 0 && result.latest < 0.03;
+  if (result.definition.key === 'revenueGrowth') return result.latest >= -0.2 && result.latest < 0;
+  if (result.definition.key === 'operatingProfitGrowth') return result.latest >= -0.3 && result.latest < 0;
   if (result.definition.key === 'currentRatio') return result.latest > 2.5;
   if (result.definition.key === 'quickRatio') return result.latest > 1.2;
   if (result.definition.key === 'assetLiabilityRatio') return result.latest > 0.7 && result.latest <= 0.8;
   if (result.definition.key === 'operatingCashConversion') return result.latest >= 0.7 && result.latest < 1;
   if (result.definition.key === 'cumulativeCashConversion3y') return result.latest >= 0.8 && result.latest < 1;
+  if (result.definition.key === 'cashCollectionRatio') return result.latest >= 0.8 && result.latest < 1;
+  if (result.definition.key === 'freeCashFlowMargin') return result.latest >= 0 && result.latest < 0.05;
   if (result.definition.key === 'accrualRatio') return result.latest > 0.05;
   if (result.definition.key === 'deductedProfitRatio') return result.latest >= 0.5 && result.latest < 0.9;
   if (result.definition.key === 'interestCoverage') return result.latest >= 1 && result.latest < 3;

@@ -1421,6 +1421,153 @@ button {
   color: #d97706;
 }
 
+.financial-diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.financial-diagnostic-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.financial-diagnostic-card.positive {
+  border-left-color: #16a34a;
+  background: #f7fef9;
+}
+
+.financial-diagnostic-card.warning {
+  border-left-color: #d97706;
+  background: #fffaf0;
+}
+
+.financial-diagnostic-card.danger {
+  border-left-color: #dc2626;
+  background: #fff8f8;
+}
+
+.financial-diagnostic-card.neutral {
+  border-left-color: #94a3b8;
+}
+
+.financial-diagnostic-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.financial-diagnostic-card header span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.financial-diagnostic-card h4 {
+  margin: 3px 0 0;
+  color: #0f172a;
+  font-size: 17px;
+}
+
+.financial-diagnostic-card header > strong {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #475569;
+  background: #e2e8f0;
+  font-size: 12px;
+}
+
+.financial-diagnostic-card.positive header > strong {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.financial-diagnostic-card.warning header > strong {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.financial-diagnostic-card.danger header > strong {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.financial-diagnostic-card > p {
+  min-height: 42px;
+  margin: 10px 0 12px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.diagnostic-metric-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.diagnostic-metric-list button {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  color: #334155;
+  background: #fff;
+  text-align: left;
+}
+
+.diagnostic-metric-list button:hover,
+.diagnostic-metric-list button:focus-visible {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.diagnostic-metric-list button.warning {
+  border-color: #fcd34d;
+}
+
+.diagnostic-metric-list button.danger {
+  border-color: #fca5a5;
+}
+
+.diagnostic-metric-list button.positive {
+  border-color: #86efac;
+}
+
+.diagnostic-metric-list span,
+.diagnostic-metric-list strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagnostic-metric-list span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.diagnostic-metric-list strong {
+  margin-top: 5px;
+  font-size: 14px;
+}
+
+.financial-diagnostic-card > small {
+  display: block;
+  margin-top: 10px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
 .metric-group-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -3438,6 +3585,10 @@ button {
     display: flex;
     overflow-x: auto;
     padding-bottom: 2px;
+  }
+
+  .financial-diagnostic-grid {
+    grid-template-columns: 1fr;
   }
 
   .metric-selector button {

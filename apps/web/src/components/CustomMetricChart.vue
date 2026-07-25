@@ -81,6 +81,12 @@ import {
   isWarningMetric,
   metricAlerts
 } from '../finance/financial-metric-alerts';
+import {
+  buildFinancialDiagnostics
+} from '../finance/financial-diagnostics';
+import type {
+  DiagnosticMetric
+} from '../finance/financial-diagnostics';
 import type {
   FormulaDetail,
   FormulaDetails,
@@ -1290,6 +1296,8 @@ const metricResults = computed<MetricResult[]>(() => {
   });
 });
 
+const diagnosticSections = computed(() => buildFinancialDiagnostics(metricResults.value));
+
 const groupedMetricResults = computed(() =>
   metricResults.value.filter((result) => result.definition.group === activeMetricGroup.value)
 );
@@ -1305,6 +1313,11 @@ watch(activeMetricGroup, () => {
   if (current?.definition.group === activeMetricGroup.value) return;
   activeMetricKey.value = groupedMetricResults.value[0]?.definition.key ?? metricResults.value[0]?.definition.key ?? 'roe';
 });
+
+function selectDiagnosticMetric(metric: DiagnosticMetric): void {
+  activeMetricGroup.value = metric.group;
+  activeMetricKey.value = metric.metricKey;
+}
 
 const chartOption = computed<EChartsCoreOption>(() => {
   const result = selectedResult.value;
@@ -2849,6 +2862,37 @@ function formatAxisValue(value: number, kind: MetricKind): string {
       }">
         {{ formatMetricValue(selectedResult.latest, selectedResult.definition.kind) }}
       </strong>
+    </div>
+
+    <div class="financial-diagnostic-grid" aria-label="企业财务诊断">
+      <article
+        v-for="section in diagnosticSections"
+        :key="section.key"
+        :class="['financial-diagnostic-card', section.tone]"
+      >
+        <header>
+          <div>
+            <span>{{ section.eyebrow }}</span>
+            <h4>{{ section.title }}</h4>
+          </div>
+          <strong>{{ section.status }}</strong>
+        </header>
+        <p>{{ section.summary }}</p>
+        <div v-if="section.metrics.length" class="diagnostic-metric-list">
+          <button
+            v-for="metric in section.metrics"
+            :key="metric.metricKey"
+            :class="metric.tone"
+            type="button"
+            :aria-label="`查看${metric.label}明细`"
+            @click="selectDiagnosticMetric(metric)"
+          >
+            <span>{{ metric.label }}</span>
+            <strong>{{ formatMetricValue(metric.value, metric.kind) }}</strong>
+          </button>
+        </div>
+        <small>数据覆盖 {{ section.availableCount }}/{{ section.totalCount }} 项 · 点击指标查看明细</small>
+      </article>
     </div>
 
     <div class="metric-group-tabs" aria-label="指标分组">

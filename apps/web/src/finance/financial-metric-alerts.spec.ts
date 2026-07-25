@@ -88,6 +88,18 @@ test('metric state classification keeps danger, warning, and positive thresholds
   assert.equal(isWarningMetric(result('roicVolatility5y', 0.07)), true);
 });
 
+test('diagnostic metrics distinguish contraction, weak margins, and cash collection', () => {
+  assert.equal(isCriticalMetric(result('revenueGrowth', -0.25)), true);
+  assert.equal(isWarningMetric(result('revenueGrowth', -0.08)), true);
+  assert.equal(isPositiveMetric(result('revenueGrowth', 0.15)), true);
+  assert.equal(isCriticalMetric(result('operatingProfitGrowth', -0.4)), true);
+  assert.equal(isWarningMetric(result('roic', 0.03)), true);
+  assert.equal(isPositiveMetric(result('roic', 0.15)), true);
+  assert.equal(isCriticalMetric(result('netMargin', -0.02)), true);
+  assert.equal(isWarningMetric(result('freeCashFlowMargin', 0.03)), true);
+  assert.equal(isWarningMetric(result('cashCollectionRatio', 0.9, 'times')), true);
+});
+
 test('profitability stability alerts explain low incremental returns and high volatility', () => {
   const incrementalAlerts = metricAlerts(
     definition('incrementalRoic3y'),
