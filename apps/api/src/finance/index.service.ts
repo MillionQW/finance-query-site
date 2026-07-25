@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { findIndex } from './index-catalog';
 import { IndexStoreService } from './index-store.service';
 import { PythonAkshareService } from './python-akshare.service';
+import { SingleFlight } from './single-flight';
 import { IndexDetailResponse, IndexHistoryPayload, IndexHistoryPoint, IndexMarket, IndexMarketResponse, IndexMetrics, IndexQuote, IndexValuation } from './index.types';
 
 @Injectable()
@@ -9,6 +10,7 @@ export class IndexService {
   private readonly marketCacheMs = 3 * 60 * 1000;
   private readonly historyCacheMs = 24 * 60 * 60 * 1000;
   private marketRefreshPromise: Promise<void> | null = null;
+  private readonly remoteRequests = new SingleFlight();
   constructor(
     @Inject(PythonAkshareService) private readonly akshare: PythonAkshareService,
     @Inject(IndexStoreService) private readonly store: IndexStoreService
@@ -33,8 +35,10 @@ export class IndexService {
     let historyStale = false;
     if (!historyHit) {
       try {
-        const payload = await this.akshare.run<IndexHistoryPayload>(['index-history','--market',market,'--symbol',catalog.symbol,'--provider-symbol',catalog.historySymbol,'--name',catalog.name,'--years',String(years)]);
-        this.store.saveHistory(payload);
+        await this.remoteRequests.run(`history:${market}:${catalog.symbol}:${years}`, async () => {
+          const payload = await this.akshare.run<IndexHistoryPayload>(['index-history','--market',market,'--symbol',catalog.symbol,'--provider-symbol',catalog.historySymbol,'--name',catalog.name,'--years',String(years)]);
+          this.store.saveHistory(payload);
+        });
         history = this.store.getHistory(market, catalog.symbol, startDate);
         quote = this.store.getQuote(catalog.market, catalog.symbol) ?? quote;
       } catch (error) {
@@ -56,7 +60,13 @@ export class IndexService {
     if(!refresh&&cached&&fresh(cached.fetchedAt,24*60*60*1000)) return cached;
     const supported=market==='cn'&&item.historySymbol.startsWith('csi');
     if(!supported){const value:IndexValuation={market,symbol:item.symbol,name:item.name,peTotalShares:null,peCalculatedShares:null,valuationDate:null,available:false,unavailableReason:'当前数据源暂不提供该指数的同口径市盈率',fetchedAt:new Date().toISOString(),source:'Index catalog coverage'};this.store.saveValuation(value);return value;}
-    try { const value=await this.akshare.run<IndexValuation>(['index-valuation','--market',market,'--symbol',item.symbol,'--name',item.name]); this.store.saveValuation(value); return value; }
+    try {
+      return await this.remoteRequests.run(`valuation:${market}:${item.symbol}`, async () => {
+        const value=await this.akshare.run<IndexValuation>(['index-valuation','--market',market,'--symbol',item.symbol,'--name',item.name]);
+        this.store.saveValuation(value);
+        return value;
+      });
+    }
     catch(error){if(cached)return cached;throw error;}
   }
 

@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { EtfListQueryDto } from './etf.dto';
 import { FinanceStoreService } from './finance-store.service';
 import { PythonAkshareService } from './python-akshare.service';
+import { SingleFlight } from './single-flight';
 import {
   EtfDetailResponse,
   EtfHistoryPayload,
@@ -18,6 +19,7 @@ export class EtfService {
   private readonly marketCacheMinutes = this.readPositiveNumber(process.env.ETF_MARKET_CACHE_MINUTES, 3);
   private readonly historyCacheHours = this.readPositiveNumber(process.env.ETF_HISTORY_CACHE_HOURS, 24);
   private marketRefreshPromise: Promise<void> | null = null;
+  private readonly remoteRequests = new SingleFlight();
 
   constructor(
     @Inject(PythonAkshareService) private readonly akshare: PythonAkshareService,
@@ -58,14 +60,16 @@ export class EtfService {
 
     if (!historyHit) {
       try {
-        const payload = await this.akshare.run<EtfHistoryPayload>([
-          'etf-history',
-          '--symbol',
-          symbol,
-          '--years',
-          String(years)
-        ]);
-        this.store.saveEtfHistory(payload);
+        await this.remoteRequests.run(`history:${symbol}:${years}`, async () => {
+          const payload = await this.akshare.run<EtfHistoryPayload>([
+            'etf-history',
+            '--symbol',
+            symbol,
+            '--years',
+            String(years)
+          ]);
+          this.store.saveEtfHistory(payload);
+        });
         history = this.store.getEtfHistory(symbol, startDate);
         historyHit = false;
       } catch (error) {
@@ -104,9 +108,11 @@ export class EtfService {
     if (!refresh && cached && new Date(cached.fetchedAt).getTime() >= freshAfter) return cached;
 
     try {
-      const valuation = await this.akshare.run<EtfValuation>(['etf-valuation', '--symbol', symbol]);
-      this.store.saveEtfValuation(valuation);
-      return valuation;
+      return await this.remoteRequests.run(`valuation:${symbol}`, async () => {
+        const valuation = await this.akshare.run<EtfValuation>(['etf-valuation', '--symbol', symbol]);
+        this.store.saveEtfValuation(valuation);
+        return valuation;
+      });
     } catch (error) {
       if (cached) return cached;
       throw error;
