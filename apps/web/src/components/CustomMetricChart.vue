@@ -6,68 +6,84 @@ import { LineChart } from 'echarts/charts';
 import { CanvasRenderer } from 'echarts/renderers';
 import type { ECharts, EChartsCoreOption } from 'echarts/core';
 import type { FinancialStatements, StatementTable } from '../types/finance';
+import {
+  ACCOUNTS_PAYABLE_ALIASES,
+  ADMIN_EXPENSE_ALIASES,
+  BEGIN_CASH_EQUIVALENT_ALIASES,
+  CAPITAL_EXPENDITURE_ALIASES,
+  CASH_ALIASES,
+  CASH_EQUIVALENT_INCREASE_ALIASES,
+  COMBINED_CAPITAL_EXPENDITURE_ALIASES,
+  CURRENT_ASSET_ALIASES,
+  CURRENT_LIABILITY_ALIASES,
+  CUSTOMER_CASH_RECEIPTS_ALIASES,
+  DEDUCTED_NET_PROFIT_ALIASES,
+  END_CASH_EQUIVALENT_ALIASES,
+  EQUITY_ALIASES,
+  FINANCE_EXPENSE_ALIASES,
+  FIXED_ASSET_ALIASES,
+  FIXED_ASSET_CAPEX_ALIASES,
+  GROSS_PROFIT_ALIASES,
+  HK_ASSOCIATE_JOINT_VENTURE_GROUPS,
+  HK_INVESTMENT_CASH_NET_ALIASES,
+  INCOME_TAX_ALIASES,
+  INTEREST_BEARING_DEBT_ALIASES,
+  INTEREST_BEARING_DEBT_GROUPS,
+  INTEREST_EXPENSE_ALIASES,
+  INTANGIBLE_ASSET_CAPEX_ALIASES,
+  INVENTORY_ALIASES,
+  INVESTMENT_CASH_INFLOW_ALIASES,
+  INVESTMENT_CASH_OUTFLOW_ALIASES,
+  LONG_TERM_EQUITY_INVESTMENT_ALIASES,
+  NET_ASSET_ALIASES,
+  NET_PROFIT_ALIASES,
+  OPERATING_CASHFLOW_ALIASES,
+  OPERATING_COST_ALIASES,
+  OPERATING_PROFIT_ALIASES,
+  OPERATING_REVENUE_ALIASES,
+  RECEIVABLE_ALIASES,
+  REVENUE_ALIASES,
+  SELLING_EXPENSE_ALIASES,
+  TOTAL_ASSET_ALIASES,
+  TOTAL_LIABILITY_ALIASES,
+  TOTAL_OPERATING_COST_ALIASES,
+  TOTAL_OPERATING_REVENUE_ALIASES,
+  TOTAL_PROFIT_ALIASES
+} from '../finance/financial-metric-fields';
+import {
+  absoluteValue,
+  calculateCashConversionCycle,
+  calculateFreeCashFlow,
+  calculateRollingRatio,
+  findRow,
+  findRows,
+  formatMetricValue,
+  formatRawValue,
+  growthGapValue,
+  growthRate,
+  rowValue,
+  safeDivide,
+  sumAbsolute,
+  toNumber
+} from '../finance/financial-metric-engine';
+import {
+  isCriticalMetric,
+  isPositiveMetric,
+  isWarningMetric,
+  metricAlerts
+} from '../finance/financial-metric-alerts';
+import type {
+  FormulaDetail,
+  FormulaDetails,
+  MetricContext,
+  MetricDefinition,
+  MetricGroupKey,
+  MetricKind,
+  MetricPoint,
+  MetricResult
+} from '../finance/financial-metric-types';
 
 echarts.use([AxisPointerComponent, GridComponent, LegendComponent, TooltipComponent, LineChart, CanvasRenderer]);
-
-type MetricKind = 'percent' | 'times' | 'amount' | 'days' | 'judgment';
-type MetricGroupKey = 'profitability' | 'cashQuality' | 'growth' | 'solvency' | 'efficiency' | 'judgment';
-
-interface MetricPoint {
-  year: string;
-  value: number | null;
-  details: FormulaDetail[];
-  expression: string;
-}
-
-interface MetricDefinition {
-  key: string;
-  label: string;
-  group: MetricGroupKey;
-  formula: string;
-  kind: MetricKind;
-  description: string;
-  calculate: (context: MetricContext, year: string, yearIndex: number) => number | null;
-  requirements: MetricRequirement[];
-}
-
-interface MetricRequirement {
-  label: string;
-  table: 'balance' | 'income' | 'cashflow';
-  aliases: string[];
-}
-
-interface MetricContext {
-  statements: FinancialStatements;
-  balance: StatementTable | undefined;
-  income: StatementTable | undefined;
-  cashflow: StatementTable | undefined;
-}
-
-interface MetricResult {
-  definition: MetricDefinition;
-  points: MetricPoint[];
-  latest: number | null;
-  missing: string[];
-  alerts: MetricAlert[];
-}
-
-interface MetricAlert {
-  year?: string;
-  message: string;
-  tone: 'warning' | 'danger';
-}
-
-interface FormulaDetail {
-  label: string;
-  value: number | null;
-  kind?: MetricKind | 'number';
-  note?: string;
-}
-
-interface FormulaDetails {
-  rows: FormulaDetail[];
-  expression: string;
-}
 
 const props = defineProps<{
   statements: FinancialStatements | null;
@@ -78,78 +94,6 @@ const activeMetricKey = ref('roe');
 const activeMetricGroup = ref<MetricGroupKey>('profitability');
 const chartElement = ref<HTMLDivElement | null>(null);
 const chart = shallowRef<ECharts | null>(null);
-
-const NET_PROFIT_ALIASES = ['归属于母公司股东的净利润', '股东应占溢利', '股东应占盈利', '净利润', '除税后溢利', 'PARENT NETPROFIT', 'NETPROFIT'];
-const EQUITY_ALIASES = ['归属于母公司股东权益', '股东权益', '所有者权益合计', '总权益', '净资产', 'PARENT EQUITY BALANCE', 'EQUITY BALANCE'];
-const TOTAL_ASSET_ALIASES = ['资产总计', '总资产', 'TOTAL ASSETS'];
-const TOTAL_LIABILITY_ALIASES = ['负债合计', '负债总计', '总负债', 'TOTAL LIABILITIES', 'TOTAL LIAB'];
-const CURRENT_ASSET_ALIASES = ['流动资产合计', '流动资产', 'CURRENT ASSET BALANCE', 'TOTAL CURRENT ASSETS'];
-const CURRENT_LIABILITY_ALIASES = ['流动负债合计', '流动负债', 'CURRENT LIAB BALANCE', 'TOTAL CURRENT LIAB', 'TOTAL CURRENT LIABILITIES'];
-const INVENTORY_ALIASES = ['存货', 'INVENTORY'];
-const CASH_ALIASES = ['现金及等价物', '现金及现金等价物', '现金和现金等价物', '货币资金', '现金', 'CASH AND CASH EQUIVALENTS', 'CASH EQUIVALENTS', 'CASH', 'END CCE'];
-const REVENUE_ALIASES = ['营业收入', '营业额', 'OPERATE INCOME'];
-const OPERATING_REVENUE_ALIASES = ['营业收入', '营业额', 'OPERATE INCOME'];
-const TOTAL_OPERATING_REVENUE_ALIASES = ['营业总收入', '营运收入', 'TOTAL OPERATE INCOME'];
-const TOTAL_OPERATING_COST_ALIASES = ['营业总成本', 'TOTAL OPERATE COST'];
-const OPERATING_PROFIT_ALIASES = ['营业利润', '经营溢利', '经营利润', '营运利润', 'OPERATE PROFIT', 'OPERATE PROFIT BALANCE'];
-const TOTAL_PROFIT_ALIASES = ['利润总额', '除税前溢利', '税前利润', 'PROFIT BEFORE TAX', 'TOTAL PROFIT'];
-const INCOME_TAX_ALIASES = ['所得税费用', '所得税', '税项', 'INCOME TAX', 'TAXATION'];
-const DEDUCTED_NET_PROFIT_ALIASES = ['扣除非经常性损益后的净利润', '扣除非经常性损益后的归属于母公司股东的净利润', '扣非归母净利润', 'DEDUCT PARENT NETPROFIT'];
-const RECEIVABLE_ALIASES = ['应收账款', '应收帐款', '应收票据及应收账款', '应收账款及应收票据', 'ACCOUNTS RECE', 'NOTE ACCOUNTS RECE', '应收款项'];
-const ACCOUNTS_PAYABLE_ALIASES = ['应付账款', '应付帐款', '应付票据及应付账款', '应付账款及应付票据', 'ACCOUNTS PAYABLE', 'NOTE ACCOUNTS PAYABLE', '应付款项'];
-const GROSS_PROFIT_ALIASES = ['毛利', '毛利润', 'GROSS PROFIT'];
-const OPERATING_COST_ALIASES = ['营业成本', '销售成本', '收入成本', '主营业务成本', 'OPERATE COST', 'COST OF SALES', 'COST OF REVENUE'];
-const INTEREST_EXPENSE_ALIASES = ['利息支出', '融资成本', 'INTEREST EXPENSE', 'FINANCE COSTS'];
-const SELLING_EXPENSE_ALIASES = ['销售费用', '销售及分销费用', 'SALE EXPENSE'];
-const ADMIN_EXPENSE_ALIASES = ['管理费用', '行政开支', 'MANAGE EXPENSE'];
-const FINANCE_EXPENSE_ALIASES = ['财务费用', '融资成本', 'FINANCE EXPENSE'];
-const NET_ASSET_ALIASES = ['净资产', '所有者权益合计', '股东权益', '总权益', '归属于母公司股东权益', 'PARENT EQUITY BALANCE', 'EQUITY BALANCE'];
-const FIXED_ASSET_ALIASES = ['固定资产', '固定资产净值', '物业厂房及设备', '物业厂房设备', 'FIXED ASSET', 'PROPERTY PLANT EQUIPMENT', 'PROPERTY PLANT AND EQUIPMENT'];
-const LONG_TERM_EQUITY_INVESTMENT_ALIASES = ['长期股权投资', 'LONG EQUITY INVEST', 'LONG TERM EQUITY INVESTMENT'];
-const HK_ASSOCIATE_JOINT_VENTURE_GROUPS = [
-  { label: '联营公司权益', aliases: ['联营公司权益'] },
-  { label: '合营公司权益', aliases: ['合营公司权益'] }
-];
-const INTEREST_BEARING_DEBT_GROUPS = [
-  { label: '短期借款/贷款', aliases: ['短期借款', '短期贷款', 'SHORT LOAN', 'SHORT BORROWING', 'SHORT TERM BORROWING'] },
-  { label: '长期借款/贷款', aliases: ['长期借款', '长期贷款', 'LONG LOAN', 'LONG BORROWING', 'LONG TERM BORROWING'] },
-  { label: '应付债券', aliases: ['应付债券', '发行债券', 'BOND PAYABLE', 'BONDS PAYABLE'] },
-  { label: '租赁负债', aliases: ['租赁负债', '融资租赁负债', 'LEASE LIAB', 'LEASE LIABILITY'] },
-  { label: '一年内到期非流动负债', aliases: ['一年内到期的非流动负债', '一年内到期非流动负债', 'NONCURRENT LIAB 1YEAR'] }
-];
-const INTEREST_BEARING_DEBT_ALIASES = INTEREST_BEARING_DEBT_GROUPS.flatMap((group) => group.aliases);
-const OPERATING_CASHFLOW_ALIASES = [
-  '经营活动产生的现金流量净额',
-  '经营活动现金流量净额',
-  '经营业务现金净额',
-  'NETCASH OPERATE'
-];
-const CUSTOMER_CASH_RECEIPTS_ALIASES = [
-  '销售商品、提供劳务收到的现金',
-  '销售商品提供劳务收到的现金',
-  '客户合约现金流入',
-  'SALES SERVICES'
-];
-const COMBINED_CAPITAL_EXPENDITURE_ALIASES = [
-  '购建固定资产、无形资产和其他长期资产支付的现金',
-  '购建固定资产无形资产和其他长期资产支付的现金',
-  '购买物业厂房及设备支付的现金',
-  '购买固定资产支付的现金',
-  'CONSTRUCT LONG ASSET'
-];
-const FIXED_ASSET_CAPEX_ALIASES = ['购建固定资产'];
-const INTANGIBLE_ASSET_CAPEX_ALIASES = ['购建无形资产及其他资产'];
-const CAPITAL_EXPENDITURE_ALIASES = [
-  ...COMBINED_CAPITAL_EXPENDITURE_ALIASES,
-  ...FIXED_ASSET_CAPEX_ALIASES,
-  ...INTANGIBLE_ASSET_CAPEX_ALIASES
-];
-const CASH_EQUIVALENT_INCREASE_ALIASES = ['现金及现金等价物净增加额', 'CCE ADD'];
-const BEGIN_CASH_EQUIVALENT_ALIASES = ['期初现金', '期初现金及现金等价物余额', 'BEGIN CCE', 'BEGIN CASH'];
-const END_CASH_EQUIVALENT_ALIASES = ['期末现金', '期末现金及现金等价物余额', '期末现金及等价物余额', 'END CCE', 'CASH END'];
-const INVESTMENT_CASH_INFLOW_ALIASES = ['投资活动现金流入小计', 'TOTAL INVEST INFLOW'];
-const INVESTMENT_CASH_OUTFLOW_ALIASES = ['投资活动现金流出小计', 'TOTAL INVEST OUTFLOW'];
-const HK_INVESTMENT_CASH_NET_ALIASES = ['投资业务现金净额'];
 
 const metricGroups: Array<{ key: MetricGroupKey; label: string }> = [
   { key: 'profitability', label: '盈利能力' },
@@ -1170,66 +1114,6 @@ const selectedResult = computed(() =>
   metricResults.value[0]
 );
 
-function isCriticalMetric(result: MetricResult): boolean {
-  if (result.latest === null) return false;
-  if (result.definition.kind === 'judgment') return result.latest === 0;
-  if (result.definition.key === 'cashDebtRatio') return result.latest < 1;
-  if (result.definition.key === 'currentRatio') return result.latest < 1.5;
-  if (result.definition.key === 'quickRatio') return result.latest < 0.8;
-  if (result.definition.key === 'receivablesToAssets') return result.latest > 0.3;
-  if (result.definition.key === 'debtRatio') return result.latest > 0.5;
-  if (result.definition.key === 'assetLiabilityRatio') return result.latest > 0.8;
-  if (result.definition.key === 'operatingCashConversion') return result.latest < 0.7;
-  if (result.definition.key === 'cumulativeCashConversion3y') return result.latest < 0.8;
-  if (result.definition.key === 'freeCashFlow' || result.definition.key === 'freeCashFlowMargin') return result.latest < 0;
-  if (result.definition.key === 'accrualRatio') return result.latest > 0.1;
-  if (result.definition.key === 'deductedProfitRatio') return result.latest >= 0 && result.latest < 0.5;
-  if (result.definition.key === 'interestCoverage') return result.latest < 1;
-  if (result.definition.key === 'netDebtToOperatingCash') return result.latest > 5;
-  if (isGrowthGapMetric(result.definition.key)) return result.latest > 0.2;
-  return false;
-}
-
-function isPositiveMetric(result: MetricResult): boolean {
-  if (result.latest === null) return false;
-  if (result.definition.kind === 'judgment') return result.latest === 1;
-  if (result.definition.key === 'grossMargin') return result.latest > 0.4;
-  if (result.definition.key === 'expenseToGrossProfitRatio') return result.latest < 0.3;
-  if (result.definition.key === 'operatingCashConversion' || result.definition.key === 'cumulativeCashConversion3y') return result.latest >= 1;
-  if (result.definition.key === 'freeCashFlowMargin') return result.latest >= 0.1;
-  if (result.definition.key === 'accrualRatio') return result.latest <= 0;
-  if (result.definition.key === 'deductedProfitRatio') return result.latest >= 0.9;
-  if (result.definition.key === 'interestCoverage') return result.latest >= 5;
-  if (result.definition.key === 'netDebtToOperatingCash') return result.latest < 2;
-  if (isGrowthGapMetric(result.definition.key)) return result.latest <= 0;
-  return false;
-}
-
-function isWarningMetric(result: MetricResult): boolean {
-  if (result.latest === null) return false;
-  if (result.definition.key === 'currentRatio') return result.latest > 2.5;
-  if (result.definition.key === 'quickRatio') return result.latest > 1.2;
-  if (result.definition.key === 'assetLiabilityRatio') return result.latest > 0.7 && result.latest <= 0.8;
-  if (result.definition.key === 'operatingCashConversion') return result.latest >= 0.7 && result.latest < 1;
-  if (result.definition.key === 'cumulativeCashConversion3y') return result.latest >= 0.8 && result.latest < 1;
-  if (result.definition.key === 'accrualRatio') return result.latest > 0.05;
-  if (result.definition.key === 'deductedProfitRatio') return result.latest >= 0.5 && result.latest < 0.9;
-  if (result.definition.key === 'interestCoverage') return result.latest >= 1 && result.latest < 3;
-  if (result.definition.key === 'netDebtToOperatingCash') return result.latest >= 3 && result.latest <= 5;
-  if (isGrowthGapMetric(result.definition.key)) return result.latest > 0.1 && result.latest <= 0.2;
-  return false;
-}
-
-function isGrowthGapMetric(metricKey: string): boolean {
-  return [
-    'receivablesRevenueGrowthGap',
-    'inventoryRevenueGrowthGap',
-    'profitCashflowGrowthGap',
-    'assetRevenueGrowthGap',
-    'debtCashflowGrowthGap'
-  ].includes(metricKey);
-}
-
 watch(activeMetricGroup, () => {
   const current = metricResults.value.find((result) => result.definition.key === activeMetricKey.value);
   if (current?.definition.group === activeMetricGroup.value) return;
@@ -1375,11 +1259,6 @@ function resizeChart(): void {
   chart.value?.resize();
 }
 
-function rowValue(table: StatementTable | undefined, year: string, aliases: string[]): number | null {
-  const row = findRow(table, aliases);
-  return toNumber(row?.values[year]);
-}
-
 function averageBalance(
   table: StatementTable | undefined,
   year: string,
@@ -1405,15 +1284,6 @@ function previousRowValue(
 ): number | null {
   const previousYear = context.statements.years[yearIndex + 1];
   return previousYear ? rowValue(table, previousYear, aliases) : null;
-}
-
-function growthRate(current: number | null, previous: number | null): number | null {
-  if (current === null || previous === null || previous === 0) return null;
-  return (current - previous) / Math.abs(previous);
-}
-
-function absoluteValue(value: number | null): number | null {
-  return value === null ? null : Math.abs(value);
 }
 
 function operatingCostDetails(context: MetricContext, year: string) {
@@ -1449,44 +1319,31 @@ function freeCashFlowDetails(context: MetricContext, year: string) {
   const combinedCapitalExpenditure = rowValue(context.cashflow, year, COMBINED_CAPITAL_EXPENDITURE_ALIASES);
   const fixedAssetCapitalExpenditure = rowValue(context.cashflow, year, FIXED_ASSET_CAPEX_ALIASES);
   const intangibleCapitalExpenditure = rowValue(context.cashflow, year, INTANGIBLE_ASSET_CAPEX_ALIASES);
-  const separateCapitalExpenditure = [fixedAssetCapitalExpenditure, intangibleCapitalExpenditure]
-    .filter((value): value is number => value !== null)
-    .reduce((total, value) => total + Math.abs(value), 0);
-  const capitalExpenditure = combinedCapitalExpenditure !== null
-    ? Math.abs(combinedCapitalExpenditure)
-    : separateCapitalExpenditure > 0
-      ? separateCapitalExpenditure
-      : null;
-  const freeCashFlow = operatingCashflow !== null && capitalExpenditure !== null
-    ? operatingCashflow - capitalExpenditure
-    : null;
+  const calculated = calculateFreeCashFlow(
+    operatingCashflow,
+    combinedCapitalExpenditure,
+    [fixedAssetCapitalExpenditure, intangibleCapitalExpenditure]
+  );
   return {
     operatingCashflow,
     combinedCapitalExpenditure,
     fixedAssetCapitalExpenditure,
     intangibleCapitalExpenditure,
-    capitalExpenditure,
-    freeCashFlow
+    capitalExpenditure: calculated.capitalExpenditure,
+    freeCashFlow: calculated.freeCashFlow
   };
 }
 
 function rollingCashConversionDetails(context: MetricContext, yearIndex: number, windowSize: number) {
   const years = context.statements.years.slice(yearIndex, yearIndex + windowSize);
-  if (yearIndex < 0 || years.length < windowSize) {
-    return { years, operatingCashflowTotal: null, netProfitTotal: null, value: null };
-  }
-  const operatingCashflows = years.map((year) => rowValue(context.cashflow, year, OPERATING_CASHFLOW_ALIASES));
-  const netProfits = years.map((year) => rowValue(context.income, year, NET_PROFIT_ALIASES));
-  if (operatingCashflows.some((value) => value === null) || netProfits.some((value) => value === null)) {
-    return { years, operatingCashflowTotal: null, netProfitTotal: null, value: null };
-  }
-  const operatingCashflowTotal = operatingCashflows.reduce<number>((total, value) => total + (value ?? 0), 0);
-  const netProfitTotal = netProfits.reduce<number>((total, value) => total + (value ?? 0), 0);
+  const operatingCashflows = context.statements.years.map((year) => rowValue(context.cashflow, year, OPERATING_CASHFLOW_ALIASES));
+  const netProfits = context.statements.years.map((year) => rowValue(context.income, year, NET_PROFIT_ALIASES));
+  const calculated = calculateRollingRatio(operatingCashflows, netProfits, yearIndex, windowSize);
   return {
     years,
-    operatingCashflowTotal,
-    netProfitTotal,
-    value: safeDivide(operatingCashflowTotal, netProfitTotal)
+    operatingCashflowTotal: calculated.numeratorTotal,
+    netProfitTotal: calculated.denominatorTotal,
+    value: calculated.value
   };
 }
 
@@ -1496,26 +1353,14 @@ function cashConversionCycleDetails(context: MetricContext, year: string, yearIn
   const receivable = averageBalanceDetails(context, context.balance, year, yearIndex, RECEIVABLE_ALIASES);
   const inventory = averageBalanceDetails(context, context.balance, year, yearIndex, INVENTORY_ALIASES);
   const payable = averageBalanceDetails(context, context.balance, year, yearIndex, ACCOUNTS_PAYABLE_ALIASES);
-  const receivableDays = safeDivide(receivable.average === null ? null : receivable.average * 365, revenue);
-  const inventoryDays = safeDivide(inventory.average === null ? null : inventory.average * 365, cost.costAbs);
-  const payableDays = safeDivide(payable.average === null ? null : payable.average * 365, cost.costAbs);
-  const cycle = receivableDays !== null && inventoryDays !== null && payableDays !== null
-    ? receivableDays + inventoryDays - payableDays
-    : null;
-  return { revenue, cost, receivable, inventory, payable, receivableDays, inventoryDays, payableDays, cycle };
-}
-
-function growthGapValue(
-  primaryCurrent: number | null,
-  primaryPrevious: number | null,
-  benchmarkCurrent: number | null,
-  benchmarkPrevious: number | null
-): number | null {
-  const primaryGrowth = growthRate(primaryCurrent, primaryPrevious);
-  const benchmarkGrowth = growthRate(benchmarkCurrent, benchmarkPrevious);
-  return primaryGrowth !== null && benchmarkGrowth !== null
-    ? primaryGrowth - benchmarkGrowth
-    : null;
+  const calculated = calculateCashConversionCycle(
+    revenue,
+    cost.costAbs,
+    receivable.average,
+    inventory.average,
+    payable.average
+  );
+  return { revenue, cost, receivable, inventory, payable, ...calculated };
 }
 
 function effectiveTaxRate(context: MetricContext, year: string): number | null {
@@ -2470,30 +2315,6 @@ function growthGapDetails(
   };
 }
 
-function findRow(table: StatementTable | undefined, aliases: string[]) {
-  if (!table) return undefined;
-  const normalizedAliases = aliases.map(normalizeLabel);
-  const rows = table.rows.map((row) => ({
-    row,
-    item: normalizeLabel(row.item)
-  }));
-  const exact = rows.find(({ item }) => normalizedAliases.some((alias) => item === alias));
-  if (exact) return exact.row;
-
-  return rows.find(({ item }) => {
-    return normalizedAliases.some((alias) => alias.length >= 6 && item.startsWith(alias));
-  })?.row;
-}
-
-function findRows(table: StatementTable | undefined, aliases: string[]) {
-  if (!table) return [];
-  const normalizedAliases = aliases.map(normalizeLabel);
-  return table.rows.filter((row) => {
-    const item = normalizeLabel(row.item);
-    return normalizedAliases.some((alias) => item === alias || (alias.length >= 6 && item.startsWith(alias)));
-  });
-}
-
 function missingRequirements(definition: MetricDefinition, context: MetricContext): string[] {
   if (context.statements.company.market === 'hk' && definition.key === 'operatingCostRatio') {
     const latestYear = context.statements.years[0];
@@ -2550,133 +2371,6 @@ function judgmentDetails(
   };
 }
 
-function metricAlerts(definition: MetricDefinition, points: MetricPoint[]): MetricAlert[] {
-  const alerts: MetricAlert[] = [];
-  const missingYears = points.filter((point) => point.value === null).map((point) => point.year);
-  if (missingYears.length) {
-    alerts.push({
-      message: `${missingYears.join('、')} 无法计算，通常是公式科目缺失或分母为 0。`,
-      tone: 'warning'
-    });
-  }
-
-  const validPoints = points.filter((point) => point.value !== null);
-  const latest = validPoints[0];
-  const previous = validPoints[1];
-  if (latest?.value !== null && latest?.value !== undefined) {
-    if (isGrowthGapMetric(definition.key) && latest.value > 0.1) {
-      const persistent = previous?.value !== null && previous?.value !== undefined && previous.value > 0.1;
-      alerts.push({
-        year: latest.year,
-        message: persistent
-          ? `${latest.year} 与上一年连续出现超过10个百分点的增长背离，建议核查变化原因。`
-          : `${latest.year} 增长背离达到 ${formatMetricValue(latest.value, 'percent')}，建议核查变化原因。`,
-        tone: latest.value > 0.2 || persistent ? 'danger' : 'warning'
-      });
-    }
-    if (definition.key === 'operatingCashConversion' && latest.value < 1) {
-      alerts.push({
-        year: latest.year,
-        message: `${latest.year} 每1元净利润仅转化为 ${formatMetricValue(latest.value, 'times')} 经营现金。`,
-        tone: latest.value < 0.7 ? 'danger' : 'warning'
-      });
-    }
-    if (definition.key === 'cumulativeCashConversion3y' && latest.value < 1) {
-      alerts.push({
-        year: latest.year,
-        message: `截至${latest.year}的三年累计利润尚未等额转化为经营现金。`,
-        tone: latest.value < 0.8 ? 'danger' : 'warning'
-      });
-    }
-    if (definition.key === 'freeCashFlowMargin' && latest.value < 0) {
-      alerts.push({
-        year: latest.year,
-        message: `${latest.year} 自由现金流为负，需判断是主动扩产还是经营造血不足。`,
-        tone: 'warning'
-      });
-    }
-    if (definition.key === 'accrualRatio' && latest.value > 0.05) {
-      alerts.push({
-        year: latest.year,
-        message: `${latest.year} 应计利润率为 ${formatMetricValue(latest.value, 'percent')}，利润对非现金项目的依赖较高。`,
-        tone: latest.value > 0.1 ? 'danger' : 'warning'
-      });
-    }
-    if (definition.key === 'deductedProfitRatio' && latest.value >= 0 && latest.value < 0.9) {
-      alerts.push({
-        year: latest.year,
-        message: `${latest.year} 扣非利润占比为 ${formatMetricValue(latest.value, 'percent')}，需检查非经常损益来源。`,
-        tone: latest.value < 0.5 ? 'danger' : 'warning'
-      });
-    }
-    if (definition.key === 'interestCoverage' && latest.value < 3) {
-      alerts.push({
-        year: latest.year,
-        message: `${latest.year} 利息保障倍数为 ${formatMetricValue(latest.value, 'times')}，偿息安全边际偏低。`,
-        tone: latest.value < 1 ? 'danger' : 'warning'
-      });
-    }
-    if (definition.key === 'netDebtToOperatingCash' && latest.value > 3) {
-      alerts.push({
-        year: latest.year,
-        message: `${latest.year} 净债务相当于 ${formatMetricValue(latest.value, 'times')} 年经营现金流。`,
-        tone: latest.value > 5 ? 'danger' : 'warning'
-      });
-    }
-    if (
-      definition.key === 'cashConversionCycle' &&
-      previous?.value !== null &&
-      previous?.value !== undefined &&
-      latest.value - previous.value > 30
-    ) {
-      alerts.push({
-        year: latest.year,
-        message: `${latest.year} 现金循环周期较上一年拉长 ${formatMetricValue(latest.value - previous.value, 'days')}。`,
-        tone: 'warning'
-      });
-    }
-  }
-
-  for (const point of points) {
-    if (point.value === null) continue;
-    if (definition.kind === 'percent' && Math.abs(point.value) >= 10) {
-      alerts.push({
-        year: point.year,
-        message: `${point.year} 数值达到 ${formatMetricValue(point.value, definition.kind)}，建议核对公式明细。`,
-        tone: 'danger'
-      });
-    }
-    if (definition.kind === 'times' && Math.abs(point.value) >= 100) {
-      alerts.push({
-        year: point.year,
-        message: `${point.year} 倍数达到 ${formatMetricValue(point.value, definition.kind)}，可能由分母过小导致。`,
-        tone: 'warning'
-      });
-    }
-  }
-
-  return alerts.slice(0, 3);
-}
-
-function toNumber(value: number | string | null | undefined): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value !== 'string') return null;
-  const normalized = value.replace(/,/g, '').trim();
-  if (!normalized || normalized === '-') return null;
-  const numeric = Number(normalized);
-  return Number.isFinite(numeric) ? numeric : null;
-}
-
-function safeDivide(numerator: number | null, denominator: number | null): number | null {
-  if (numerator === null || denominator === null || denominator === 0) return null;
-  return numerator / denominator;
-}
-
-function sumAbsolute(values: Array<number | null>): number | null {
-  if (values.some((value) => value === null)) return null;
-  return values.reduce<number>((total, value) => total + Math.abs(value ?? 0), 0);
-}
-
 function formatTooltip(
   params: unknown,
   result: MetricResult,
@@ -2722,38 +2416,6 @@ function formatDetailValue(detail: FormulaDetail): string {
     return formatMetricValue(detail.value, detail.kind);
   }
   return formatRawValue(detail.value);
-}
-
-function normalizeLabel(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[()（）\s_、，,]/g, '')
-    .replace(/帐/g, '账')
-    .replace(/凈/g, '净');
-}
-
-function formatMetricValue(value: number | null, kind: MetricKind): string {
-  if (value === null) return '-';
-  if (kind === 'judgment') return value === 1 ? '通过' : '不通过';
-  if (kind === 'percent') return `${(value * 100).toFixed(2)}%`;
-  if (kind === 'amount') return formatRawValue(value);
-  if (kind === 'days') return `${value.toFixed(1)} 天`;
-  return `${value.toFixed(2)} 次`;
-}
-
-function formatRawValue(value: number | null): string {
-  if (value === null) return '-';
-  const abs = Math.abs(value);
-  if (abs >= 1_000_000_000_000) {
-    return `${(value / 1_000_000_000_000).toFixed(2)}万亿`;
-  }
-  if (abs >= 100_000_000) {
-    return `${(value / 100_000_000).toFixed(2)}亿`;
-  }
-  if (abs >= 10_000) {
-    return `${(value / 10_000).toFixed(2)}万`;
-  }
-  return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value);
 }
 
 function escapeHtml(value: string): string {

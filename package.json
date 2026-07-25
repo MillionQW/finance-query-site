@@ -11,7 +11,7 @@
     "dev:web": "npm run dev --workspace @finance-query/web",
     "build": "npm run build --workspace @finance-query/web && npm run build --workspace @finance-query/api && node -e \"require('node:fs').writeFileSync('.build-stamp', new Date().toISOString())\"",
     "start": "npm run start:prod --workspace @finance-query/api",
-    "test": "npm run test --workspace @finance-query/api",
+    "test": "npm run test --workspace @finance-query/web && npm run test --workspace @finance-query/api",
     "typecheck": "npm run typecheck --workspace @finance-query/web && npm run typecheck --workspace @finance-query/api"
   },
   "packageManager": "npm@10",

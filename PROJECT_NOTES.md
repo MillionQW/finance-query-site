@@ -284,6 +284,14 @@ Current fixed metrics:
 The financial metric panel groups cash conversion and free-cash-flow metrics under `现金质量`.
 Growth-divergence metrics display warning or danger states when the latest gap exceeds 10 or 20 percentage points, and persistent two-year gaps are promoted to danger alerts.
 
+Financial metric code is split by responsibility:
+
+- `apps/web/src/finance/financial-metric-fields.ts`: A-share and Hong Kong statement-field aliases.
+- `apps/web/src/finance/financial-metric-engine.ts`: pure parsing, ratio, rolling-window, free-cash-flow, growth-gap, and cash-cycle calculations.
+- `apps/web/src/finance/financial-metric-alerts.ts`: metric state classification and explainable warning rules.
+- `apps/web/src/finance/*.spec.ts`: formula, field-matching, cross-market, missing-data, and alert regression tests.
+- `apps/web/src/components/CustomMetricChart.vue`: metric catalog, chart preparation, and presentation details.
+
 ## Hong Kong Stock Field Handling
 
 For Hong Kong stock inventory turnover, if operating cost is missing, the code looks for:
