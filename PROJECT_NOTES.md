@@ -298,6 +298,8 @@ The panel also provides four explainable diagnostic summaries: `赚钱能力`, `
 Each summary is derived from named fixed metrics, shows its data coverage and triggered condition, and links back to the selected metric's trend, formula, and alerts; it does not use an opaque composite score.
 Cross-year diagnostic evidence detects consecutive profitability declines, repeated revenue or operating-profit contraction, persistently weak profit-to-cash conversion, consecutive negative free cash flow, and rapid increases in leverage or goodwill exposure.
 Trend rules require complete adjacent calendar years, so missing or hidden years are not silently treated as consecutive observations.
+When a fixed absolute rule exists, the selected metric detail shows the exact risk, concern, and strong thresholds and highlights the currently matched band.
+Metrics that require industry-relative interpretation do not receive invented absolute thresholds.
 
 Financial metric code is split by responsibility:
 
@@ -305,6 +307,7 @@ Financial metric code is split by responsibility:
 - `apps/web/src/finance/financial-metric-engine.ts`: pure parsing, ratio, rolling-window, free-cash-flow, growth-gap, and cash-cycle calculations.
 - `apps/web/src/finance/financial-metric-alerts.ts`: metric state classification and explainable warning rules.
 - `apps/web/src/finance/financial-diagnostics.ts`: transparent aggregation for the four diagnostic summaries.
+- `apps/web/src/finance/financial-metric-thresholds.ts`: visible threshold descriptions kept in step with metric-state rules.
 - `apps/web/src/finance/*.spec.ts`: formula, field-matching, cross-market, missing-data, and alert regression tests.
 - `apps/web/src/components/CustomMetricChart.vue`: metric catalog, chart preparation, and presentation details.
 

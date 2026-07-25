@@ -87,6 +87,9 @@ import {
 import type {
   DiagnosticMetric
 } from '../finance/financial-diagnostics';
+import {
+  metricThresholdGuide
+} from '../finance/financial-metric-thresholds';
 import type {
   FormulaDetail,
   FormulaDetails,
@@ -1307,6 +1310,8 @@ const selectedResult = computed(() =>
   groupedMetricResults.value[0] ??
   metricResults.value[0]
 );
+
+const selectedThresholdGuide = computed(() => metricThresholdGuide(selectedResult.value));
 
 watch(activeMetricGroup, () => {
   const current = metricResults.value.find((result) => result.definition.key === activeMetricKey.value);
@@ -2941,6 +2946,27 @@ function formatAxisValue(value: number, kind: MetricKind): string {
     <div class="formula-row">
       <span>{{ selectedResult.definition.formula }}</span>
       <small>{{ selectedResult.definition.description }}</small>
+    </div>
+
+    <div v-if="selectedThresholdGuide" class="metric-threshold-guide">
+      <div class="metric-threshold-head">
+        <strong>判断阈值</strong>
+        <small>基于单项指标的固定规则，不代表行业排名或综合评分</small>
+      </div>
+      <div class="metric-threshold-bands">
+        <div
+          v-for="band in selectedThresholdGuide.bands"
+          :key="`${band.tone}-${band.condition}`"
+          :class="[
+            'metric-threshold-band',
+            band.tone,
+            { active: selectedThresholdGuide.activeTone === band.tone }
+          ]"
+        >
+          <span>{{ band.label }}</span>
+          <strong>{{ band.condition }}</strong>
+        </div>
+      </div>
     </div>
 
     <div v-if="selectedResult.missing.length" class="metric-warning">

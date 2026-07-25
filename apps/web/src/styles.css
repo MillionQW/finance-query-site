@@ -1690,6 +1690,80 @@ button {
   text-align: right;
 }
 
+.metric-threshold-guide {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.metric-threshold-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.metric-threshold-head > strong {
+  color: #334155;
+  font-size: 13px;
+}
+
+.metric-threshold-head > small {
+  color: #94a3b8;
+  text-align: right;
+}
+
+.metric-threshold-bands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.metric-threshold-band {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  color: #64748b;
+  background: #fff;
+  font-size: 12px;
+}
+
+.metric-threshold-band span {
+  font-weight: 800;
+}
+
+.metric-threshold-band strong {
+  color: #334155;
+}
+
+.metric-threshold-band.active {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.06);
+}
+
+.metric-threshold-band.danger.active {
+  border-color: #fca5a5;
+  color: #991b1b;
+  background: #fef2f2;
+}
+
+.metric-threshold-band.warning.active {
+  border-color: #fcd34d;
+  color: #92400e;
+  background: #fffbeb;
+}
+
+.metric-threshold-band.positive.active {
+  border-color: #86efac;
+  color: #166534;
+  background: #f0fdf4;
+}
+
 .metric-warning {
   margin-top: 10px;
   padding: 10px 12px;
@@ -3632,6 +3706,16 @@ button {
   }
 
   .formula-row small {
+    text-align: left;
+  }
+
+  .metric-threshold-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .metric-threshold-head > small {
     text-align: left;
   }
 
