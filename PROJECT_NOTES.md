@@ -296,6 +296,8 @@ The financial metric panel groups cash conversion and free-cash-flow metrics und
 Growth-divergence metrics display warning or danger states when the latest gap exceeds 10 or 20 percentage points, and persistent two-year gaps are promoted to danger alerts.
 The panel also provides four explainable diagnostic summaries: `赚钱能力`, `增长质量`, `现金创造`, and `财务风险`.
 Each summary is derived from named fixed metrics, shows its data coverage and triggered condition, and links back to the selected metric's trend, formula, and alerts; it does not use an opaque composite score.
+Cross-year diagnostic evidence detects consecutive profitability declines, repeated revenue or operating-profit contraction, persistently weak profit-to-cash conversion, consecutive negative free cash flow, and rapid increases in leverage or goodwill exposure.
+Trend rules require complete adjacent calendar years, so missing or hidden years are not silently treated as consecutive observations.
 
 Financial metric code is split by responsibility:
 

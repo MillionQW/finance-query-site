@@ -1314,7 +1314,7 @@ watch(activeMetricGroup, () => {
   activeMetricKey.value = groupedMetricResults.value[0]?.definition.key ?? metricResults.value[0]?.definition.key ?? 'roe';
 });
 
-function selectDiagnosticMetric(metric: DiagnosticMetric): void {
+function selectDiagnosticMetric(metric: Pick<DiagnosticMetric, 'group' | 'metricKey'>): void {
   activeMetricGroup.value = metric.group;
   activeMetricKey.value = metric.metricKey;
 }
@@ -2878,6 +2878,17 @@ function formatAxisValue(value: number, kind: MetricKind): string {
           <strong>{{ section.status }}</strong>
         </header>
         <p>{{ section.summary }}</p>
+        <div v-if="section.signals.length" class="diagnostic-signal-list">
+          <button
+            v-for="signal in section.signals"
+            :key="`${signal.metricKey}-${signal.message}`"
+            :class="signal.tone"
+            type="button"
+            @click="selectDiagnosticMetric(signal)"
+          >
+            {{ signal.message }}
+          </button>
+        </div>
         <div v-if="section.metrics.length" class="diagnostic-metric-list">
           <button
             v-for="metric in section.metrics"

@@ -3,6 +3,7 @@ import {
   isPositiveMetric,
   isWarningMetric
 } from './financial-metric-alerts';
+import { formatMetricValue } from './financial-metric-engine';
 import type {
   MetricGroupKey,
   MetricKind,
@@ -30,6 +31,14 @@ export interface FinancialDiagnostic {
   availableCount: number;
   totalCount: number;
   metrics: DiagnosticMetric[];
+  signals: DiagnosticSignal[];
+}
+
+export interface DiagnosticSignal {
+  metricKey: string;
+  group: MetricGroupKey;
+  message: string;
+  tone: 'warning' | 'danger';
 }
 
 interface DiagnosticConfig {
@@ -86,9 +95,13 @@ export function buildFinancialDiagnostics(results: MetricResult[]): FinancialDia
     const neutral = available.filter((result) =>
       !isCriticalMetric(result) && !isWarningMetric(result) && !isPositiveMetric(result)
     );
-    const tone: DiagnosticTone = critical.length
+    const signals = configuredResults.flatMap(trendSignalsFor);
+    const dangerSignals = signals.filter((signal) => signal.tone === 'danger');
+    const warningSignals = signals.filter((signal) => signal.tone === 'warning');
+    const orderedSignals = [...dangerSignals, ...warningSignals];
+    const tone: DiagnosticTone = critical.length || dangerSignals.length
       ? 'danger'
-      : warning.length
+      : warning.length || warningSignals.length
         ? 'warning'
         : available.length >= 2
           ? 'positive'
@@ -100,15 +113,28 @@ export function buildFinancialDiagnostics(results: MetricResult[]): FinancialDia
         : tone === 'positive'
           ? '稳健'
           : '数据不足';
-    const prioritized = [...critical, ...warning, ...positive, ...neutral];
-    const primaryRisk = [...critical, ...warning][0];
-    const explicitAlert = primaryRisk?.alerts.find((alert) => alert.year)?.message;
+    const signalPriority = new Map(
+      signals.map((signal) => [signal.metricKey, signal.tone === 'danger' ? 4 : 2])
+    );
+    const prioritized = [...available].sort((left, right) =>
+      metricPriority(right, signalPriority) - metricPriority(left, signalPriority)
+    );
+    const primaryCritical = critical[0];
+    const primaryWarning = warning[0];
+    const criticalAlert = primaryCritical?.alerts.find((alert) => alert.year)?.message;
+    const warningAlert = primaryWarning?.alerts.find((alert) => alert.year)?.message;
     const summary = tone === 'neutral'
       ? '可计算指标不足，请检查财报科目或历史年限。'
-      : explicitAlert ??
-        (primaryRisk
-          ? `${primaryRisk.definition.label}触发${tone === 'danger' ? '风险' : '关注'}条件，建议查看指标明细。`
-          : config.stableSummary);
+      : primaryCritical
+        ? criticalAlert ??
+          dangerSignals[0]?.message ??
+          `${primaryCritical.definition.label}触发风险条件，建议查看指标明细。`
+        : dangerSignals[0]?.message ??
+          (primaryWarning
+            ? warningAlert ??
+              warningSignals[0]?.message ??
+              `${primaryWarning.definition.label}触发关注条件，建议查看指标明细。`
+            : warningSignals[0]?.message ?? config.stableSummary);
 
     return {
       key: config.key,
@@ -126,9 +152,19 @@ export function buildFinancialDiagnostics(results: MetricResult[]): FinancialDia
         kind: result.definition.kind,
         group: result.definition.group,
         tone: metricTone(result)
-      }))
+      })),
+      signals: orderedSignals.slice(0, 3)
     };
   });
+}
+
+function metricPriority(result: MetricResult, signalPriority: Map<string, number>): number {
+  if (isCriticalMetric(result)) return 5;
+  const trendPriority = signalPriority.get(result.definition.key) ?? 0;
+  if (trendPriority) return trendPriority;
+  if (isWarningMetric(result)) return 3;
+  if (isPositiveMetric(result)) return 1;
+  return 0;
 }
 
 function metricTone(result: MetricResult): DiagnosticTone {
@@ -136,4 +172,102 @@ function metricTone(result: MetricResult): DiagnosticTone {
   if (isWarningMetric(result)) return 'warning';
   if (isPositiveMetric(result)) return 'positive';
   return 'neutral';
+}
+
+function trendSignalsFor(result: MetricResult): DiagnosticSignal[] {
+  const threeYearValues = recentConsecutivePoints(result, 3);
+  const twoYearValues = recentConsecutivePoints(result, 2);
+  const signal = (
+    message: string,
+    tone: DiagnosticSignal['tone']
+  ): DiagnosticSignal => ({
+    metricKey: result.definition.key,
+    group: result.definition.group,
+    message,
+    tone
+  });
+
+  if (
+    (result.definition.key === 'roic' || result.definition.key === 'netMargin') &&
+    threeYearValues &&
+    threeYearValues[0].value < threeYearValues[1].value &&
+    threeYearValues[1].value < threeYearValues[2].value
+  ) {
+    const decline = threeYearValues[2].value - threeYearValues[0].value;
+    if (decline >= 0.03) {
+      return [signal(
+        `${threeYearValues[2].year}至${threeYearValues[0].year}，${result.definition.label}连续下降 ${formatMetricValue(decline, 'percent')}。`,
+        decline >= 0.08 ? 'danger' : 'warning'
+      )];
+    }
+  }
+
+  if (
+    (result.definition.key === 'revenueGrowth' || result.definition.key === 'operatingProfitGrowth') &&
+    twoYearValues &&
+    twoYearValues.every((point) => point.value < 0)
+  ) {
+    return [signal(
+      `${twoYearValues[1].year}和${twoYearValues[0].year}，${result.definition.label}连续为负。`,
+      'danger'
+    )];
+  }
+
+  if (result.definition.key === 'operatingCashConversion') {
+    if (threeYearValues?.every((point) => point.value < 1)) {
+      return [signal(
+        `${threeYearValues[2].year}至${threeYearValues[0].year}，利润连续三年未能等额转化为经营现金。`,
+        'danger'
+      )];
+    }
+    if (twoYearValues?.every((point) => point.value < 1)) {
+      return [signal(
+        `${twoYearValues[1].year}和${twoYearValues[0].year}，利润连续两年未能等额转化为经营现金。`,
+        'warning'
+      )];
+    }
+  }
+
+  if (
+    result.definition.key === 'freeCashFlowMargin' &&
+    twoYearValues?.every((point) => point.value < 0)
+  ) {
+    return [signal(
+      `${twoYearValues[1].year}和${twoYearValues[0].year}，自由现金流率连续为负。`,
+      'danger'
+    )];
+  }
+
+  if (
+    (result.definition.key === 'assetLiabilityRatio' || result.definition.key === 'goodwillToEquity') &&
+    threeYearValues
+  ) {
+    const increase = threeYearValues[0].value - threeYearValues[2].value;
+    const warningThreshold = result.definition.key === 'assetLiabilityRatio' ? 0.1 : 0.15;
+    const dangerThreshold = result.definition.key === 'assetLiabilityRatio' ? 0.2 : 0.3;
+    if (increase >= warningThreshold) {
+      return [signal(
+        `${threeYearValues[2].year}至${threeYearValues[0].year}，${result.definition.label}上升 ${formatMetricValue(increase, 'percent')}。`,
+        increase >= dangerThreshold ? 'danger' : 'warning'
+      )];
+    }
+  }
+
+  return [];
+}
+
+function recentConsecutivePoints(
+  result: MetricResult,
+  count: number
+): Array<{ year: string; value: number }> | null {
+  const points = result.points.slice(0, count);
+  if (points.length < count || points.some((point) => point.value === null)) return null;
+  const years = points.map((point) => Number.parseInt(point.year, 10));
+  if (
+    years.some((year) => !Number.isFinite(year)) ||
+    years.slice(1).some((year, index) => years[index] - year !== 1)
+  ) {
+    return null;
+  }
+  return points.map((point) => ({ year: point.year, value: point.value as number }));
 }
