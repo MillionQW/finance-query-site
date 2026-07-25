@@ -34,6 +34,7 @@ const PeriodAnalysisPanel = defineAsyncComponent(() => import('./PeriodAnalysisP
 const PeerComparisonPanel = defineAsyncComponent(() => import('./PeerComparisonPanel.vue'));
 const PeerMetricChart = defineAsyncComponent(() => import('./PeerMetricChart.vue'));
 const ResearchSummaryPanel = defineAsyncComponent(() => import('./ResearchSummaryPanel.vue'));
+const ResearchDossierPanel = defineAsyncComponent(() => import('./ResearchDossierPanel.vue'));
 const StatementTrustPanel = defineAsyncComponent(() => import('./StatementTrustPanel.vue'));
 const StatementTable = defineAsyncComponent(() => import('./StatementTable.vue'));
 
@@ -132,7 +133,13 @@ defineEmits<{
                     <h1>{{ selectedCompany?.name ?? '选择公司' }}</h1>
                     <button
                       class="company-note-button"
-                      :class="{ 'has-note': Boolean(activeCompanyInsight.note) }"
+                      :class="{ 'has-note': Boolean(
+                        activeCompanyInsight.note ||
+                        activeCompanyInsight.thesis ||
+                        activeCompanyInsight.risks ||
+                        activeCompanyInsight.catalysts ||
+                        activeCompanyInsight.questions
+                      ) }"
                       type="button"
                       :disabled="!selectedCompany"
                       aria-haspopup="dialog"
@@ -140,7 +147,7 @@ defineEmits<{
                       @click="$emit('openNote')"
                     >
                       <StickyNote :size="16" />
-                      {{ activeCompanyInsight.note ? '修改备注' : '添加备注' }}
+                      {{ activeCompanyInsight.thesis ? '编辑研究档案' : '建立研究档案' }}
                     </button>
                   </div>
                   <p>{{ selectedCompany?.displaySymbol ?? '输入公司名或股票代码开始' }}</p>
@@ -218,6 +225,8 @@ defineEmits<{
         </div>
 
         <ResearchSummaryPanel :statements="statements" />
+
+        <ResearchDossierPanel :insight="activeCompanyInsight" @edit="$emit('openNote')" />
 
         <StatementTrustPanel :statements="statements" />
 

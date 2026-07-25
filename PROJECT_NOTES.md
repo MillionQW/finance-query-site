@@ -258,6 +258,13 @@ ETF backend ownership:
 - Industry ranking cards turn raw rank values into explicit percentile bands while retaining the ranking direction and valuation caveat.
 - Relative valuation position is never presented as an automatic buy or sell conclusion.
 
+## Research Dossier
+
+- Company insights now keep separate fields for the core thesis, risks, catalysts, open questions, and free-form notes.
+- Existing notes and buy-point ranges remain backward compatible.
+- Schema startup migrations add the dossier columns to existing local databases without replacing prior rows.
+- The company page shows dossier completion and concise previews, with a single editor for all research fields.
+
 ## Statement Item Trend Chart
 
 - Implemented in `apps/web/src/components/StatementItemTrend.vue`.

@@ -31,9 +31,18 @@ test('store facade coordinates company, favorite, and insight repositories', () 
 
     store.saveCompanyInsight('a', '600519', {
       note: '关注现金流',
+      thesis: '品牌和渠道形成长期壁垒',
+      risks: '需求波动',
+      catalysts: '渠道改革',
+      questions: '批价能否稳定',
       buyPointRange: '1300-1400'
     });
-    assert.equal(store.getCompanyInsight('a', '600519').note, '关注现金流');
+    const insight = store.getCompanyInsight('a', '600519');
+    assert.equal(insight.note, '关注现金流');
+    assert.equal(insight.thesis, '品牌和渠道形成长期壁垒');
+    assert.equal(insight.risks, '需求波动');
+    assert.equal(insight.catalysts, '渠道改革');
+    assert.equal(insight.questions, '批价能否稳定');
   } finally {
     store?.onModuleDestroy();
     if (previousPath === undefined) {

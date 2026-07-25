@@ -155,7 +155,8 @@ export class CompanyStoreRepository extends SqliteRepository {
   getCompanyInsight(market: Market, symbol: string): CompanyInsight {
     const normalizedSymbol = normalizeSymbol(market, symbol);
     const row = this.db.prepare(`
-      SELECT market, symbol, note, buy_point_range, buy_point_updated_at, updated_at
+      SELECT market, symbol, note, thesis, risks, catalysts, questions,
+             buy_point_range, buy_point_updated_at, updated_at
       FROM company_insights
       WHERE market = ? AND symbol = ?
       LIMIT 1
@@ -165,6 +166,10 @@ export class CompanyStoreRepository extends SqliteRepository {
       market,
       symbol: normalizedSymbol,
       note: '',
+      thesis: '',
+      risks: '',
+      catalysts: '',
+      questions: '',
       buyPointRange: '',
       buyPointUpdatedAt: null,
       updatedAt: null
@@ -174,18 +179,34 @@ export class CompanyStoreRepository extends SqliteRepository {
   saveCompanyInsight(
     market: Market,
     symbol: string,
-    input: { note: string; buyPointRange: string }
+    input: {
+      note: string;
+      buyPointRange: string;
+      thesis?: string;
+      risks?: string;
+      catalysts?: string;
+      questions?: string;
+    }
   ): CompanyInsight {
     const normalizedSymbol = normalizeSymbol(market, symbol);
     const note = input.note.trim();
+    const thesis = (input.thesis ?? '').trim();
+    const risks = (input.risks ?? '').trim();
+    const catalysts = (input.catalysts ?? '').trim();
+    const questions = (input.questions ?? '').trim();
     const buyPointRange = input.buyPointRange.trim();
     this.db.prepare(`
       INSERT INTO company_insights (
-        market, symbol, note, buy_point_range, buy_point_updated_at, created_at, updated_at
+        market, symbol, note, thesis, risks, catalysts, questions,
+        buy_point_range, buy_point_updated_at, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, CASE WHEN ? = '' THEN NULL ELSE datetime('now') END, datetime('now'), datetime('now'))
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = '' THEN NULL ELSE datetime('now') END, datetime('now'), datetime('now'))
       ON CONFLICT(market, symbol) DO UPDATE SET
         note = excluded.note,
+        thesis = excluded.thesis,
+        risks = excluded.risks,
+        catalysts = excluded.catalysts,
+        questions = excluded.questions,
         buy_point_range = excluded.buy_point_range,
         buy_point_updated_at = CASE
           WHEN company_insights.buy_point_range <> excluded.buy_point_range
@@ -193,7 +214,17 @@ export class CompanyStoreRepository extends SqliteRepository {
           ELSE company_insights.buy_point_updated_at
         END,
         updated_at = datetime('now')
-    `).run(market, normalizedSymbol, note, buyPointRange, buyPointRange);
+    `).run(
+      market,
+      normalizedSymbol,
+      note,
+      thesis,
+      risks,
+      catalysts,
+      questions,
+      buyPointRange,
+      buyPointRange
+    );
     return this.getCompanyInsight(market, normalizedSymbol);
   }
 
@@ -351,6 +382,10 @@ export class CompanyStoreRepository extends SqliteRepository {
       market: row.market,
       symbol: row.symbol,
       note: row.note ?? '',
+      thesis: row.thesis ?? '',
+      risks: row.risks ?? '',
+      catalysts: row.catalysts ?? '',
+      questions: row.questions ?? '',
       buyPointRange: row.buy_point_range ?? '',
       buyPointUpdatedAt: row.buy_point_updated_at ? fromSqliteDate(row.buy_point_updated_at) : null,
       updatedAt: row.updated_at ? fromSqliteDate(row.updated_at) : null

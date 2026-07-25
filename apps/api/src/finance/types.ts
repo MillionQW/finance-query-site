@@ -57,6 +57,10 @@ export interface CompanyInsight {
   market: Market;
   symbol: string;
   note: string;
+  thesis: string;
+  risks: string;
+  catalysts: string;
+  questions: string;
   buyPointRange: string;
   buyPointUpdatedAt: string | null;
   updatedAt: string | null;

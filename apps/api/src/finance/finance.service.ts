@@ -259,7 +259,14 @@ export class FinanceService {
   saveCompanyInsight(
     market: 'a' | 'hk',
     symbol: string,
-    input: { note: string; buyPointRange: string }
+    input: {
+      note: string;
+      buyPointRange: string;
+      thesis?: string;
+      risks?: string;
+      catalysts?: string;
+      questions?: string;
+    }
   ): CompanyInsight {
     return this.store.saveCompanyInsight(market, symbol, input);
   }

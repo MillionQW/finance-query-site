@@ -1,0 +1,138 @@
+.dossier-panel {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+}
+
+.dossier-panel > header,
+.dossier-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.dossier-panel > header > div > span,
+.dossier-actions small,
+.dossier-grid span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.dossier-panel h3 {
+  margin: 4px 0 0;
+}
+
+.dossier-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.dossier-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.dossier-grid article {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--panel-muted);
+}
+
+.dossier-grid article svg {
+  grid-row: 1 / span 2;
+  color: var(--primary);
+}
+
+.dossier-grid p {
+  overflow: hidden;
+  display: -webkit-box;
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.dossier-grid article.empty {
+  border-style: dashed;
+}
+
+.dossier-grid article.empty p {
+  color: var(--muted);
+}
+
+.note-dialog {
+  width: min(820px, calc(100vw - 32px));
+  max-height: min(820px, calc(100vh - 40px));
+  overflow-y: auto;
+}
+
+.dossier-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px 0;
+}
+
+.dossier-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.dossier-form textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.55;
+}
+
+.dossier-form textarea:focus {
+  border-color: var(--primary);
+  outline: 3px solid rgba(49, 88, 214, 0.12);
+}
+
+.dossier-general-note {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 680px) {
+  .dossier-panel > header,
+  .dossier-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dossier-grid,
+  .dossier-form {
+    grid-template-columns: 1fr;
+  }
+
+  .dossier-general-note {
+    grid-column: auto;
+  }
+}

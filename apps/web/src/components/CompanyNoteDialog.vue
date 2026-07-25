@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
 import { X } from 'lucide-vue-next';
+import type { CompanyInsightDraft } from '../types/finance';
 
 const props = defineProps<{
   open: boolean;
   companyName?: string;
 }>();
-const note = defineModel<string>('note', { required: true });
+const draft = defineModel<CompanyInsightDraft>({ required: true });
 defineEmits<{ close: []; save: [] }>();
 
 const dialog = ref<HTMLElement | null>(null);
-const textarea = ref<HTMLTextAreaElement | null>(null);
+const firstField = ref<HTMLTextAreaElement | null>(null);
 
 watch(() => props.open, (open) => {
-  if (open) void nextTick(() => textarea.value?.focus());
+  if (open) void nextTick(() => firstField.value?.focus());
 });
 
 function trapFocus(event: KeyboardEvent): void {
@@ -50,26 +51,61 @@ function trapFocus(event: KeyboardEvent): void {
     >
       <header>
         <div>
-          <span>公司备注</span>
+          <span>研究档案</span>
           <h2 id="company-note-title">{{ companyName }}</h2>
         </div>
         <button type="button" aria-label="关闭备注弹窗" @click="$emit('close')">
           <X :size="20" />
         </button>
       </header>
-      <label for="company-note-content">记录你的判断、风险点或后续关注事项</label>
-      <textarea
-        id="company-note-content"
-        ref="textarea"
-        v-model="note"
-        rows="8"
-        placeholder="例如：核心业务增长稳定，但需要继续观察毛利率和现金流……"
-      ></textarea>
+      <div class="dossier-form">
+        <label>
+          <span>核心论点</span>
+          <textarea
+            ref="firstField"
+            v-model="draft.thesis"
+            rows="3"
+            placeholder="为什么值得持续研究？核心竞争力和长期价值来自哪里？"
+          ></textarea>
+        </label>
+        <label>
+          <span>主要风险</span>
+          <textarea
+            v-model="draft.risks"
+            rows="3"
+            placeholder="哪些变化会削弱论点？需要关注哪些财务或经营风险？"
+          ></textarea>
+        </label>
+        <label>
+          <span>潜在催化剂</span>
+          <textarea
+            v-model="draft.catalysts"
+            rows="3"
+            placeholder="哪些事件可能推动盈利、估值或市场认知变化？"
+          ></textarea>
+        </label>
+        <label>
+          <span>待验证问题</span>
+          <textarea
+            v-model="draft.questions"
+            rows="3"
+            placeholder="下一份财报、公告或调研中需要验证什么？"
+          ></textarea>
+        </label>
+        <label class="dossier-general-note">
+          <span>自由备注</span>
+          <textarea
+            v-model="draft.note"
+            rows="4"
+            placeholder="补充记录估值假设、会议纪要或其他观察……"
+          ></textarea>
+        </label>
+      </div>
       <footer>
-        <small>备注保存在本机 SQLite 数据库中</small>
+        <small>研究档案保存在本机 SQLite 数据库中</small>
         <div>
           <button class="note-dialog-cancel" type="button" @click="$emit('close')">取消</button>
-          <button class="note-dialog-save" type="button" @click="$emit('save')">保存备注</button>
+          <button class="note-dialog-save" type="button" @click="$emit('save')">保存档案</button>
         </div>
       </footer>
     </section>

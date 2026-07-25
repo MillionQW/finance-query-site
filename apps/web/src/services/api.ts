@@ -3,6 +3,7 @@ import type {
   AnnouncementFeed,
   CompanySearchResult,
   CompanyInsight,
+  CompanyInsightDraft,
   FavoriteCompany,
   FinancialStatements,
   Market,
@@ -202,7 +203,7 @@ export function getCompanyInsight(
 export function saveCompanyInsight(
   market: Market,
   symbol: string,
-  insight: Pick<CompanyInsight, 'note' | 'buyPointRange'>
+  insight: CompanyInsightDraft & Pick<CompanyInsight, 'buyPointRange'>
 ): Promise<CompanyInsight> {
   return request<CompanyInsight>(`/finance/insights/${market}/${encodeURIComponent(symbol)}`, {
     method: 'PUT',

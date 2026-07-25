@@ -59,10 +59,19 @@ export interface CompanyInsight {
   market: Market;
   symbol: string;
   note: string;
+  thesis: string;
+  risks: string;
+  catalysts: string;
+  questions: string;
   buyPointRange: string;
   buyPointUpdatedAt: string | null;
   updatedAt: string | null;
 }
+
+export type CompanyInsightDraft = Pick<
+  CompanyInsight,
+  'note' | 'thesis' | 'risks' | 'catalysts' | 'questions'
+>;
 
 export type AnnouncementCategory =
   | '定期报告'

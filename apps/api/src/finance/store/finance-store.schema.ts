@@ -42,6 +42,10 @@ export function initializeFinanceStoreSchema(db: any): void {
         market TEXT NOT NULL,
         symbol TEXT NOT NULL,
         note TEXT NOT NULL DEFAULT '',
+        thesis TEXT NOT NULL DEFAULT '',
+        risks TEXT NOT NULL DEFAULT '',
+        catalysts TEXT NOT NULL DEFAULT '',
+        questions TEXT NOT NULL DEFAULT '',
         buy_point_range TEXT NOT NULL DEFAULT '',
         buy_point_updated_at TEXT,
         created_at TEXT NOT NULL,
@@ -338,6 +342,10 @@ export function initializeFinanceStoreSchema(db: any): void {
   ensureColumn(db, 'company_announcements', 'importance', "TEXT NOT NULL DEFAULT 'medium'");
   ensureColumn(db, 'company_announcements', 'is_routine', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn(db, 'company_announcements', 'impact_hint', 'TEXT');
+  ensureColumn(db, 'company_insights', 'thesis', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, 'company_insights', 'risks', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, 'company_insights', 'catalysts', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, 'company_insights', 'questions', "TEXT NOT NULL DEFAULT ''");
   db.prepare(`
       UPDATE favorite_companies
       SET announcement_viewed_at = datetime('now')

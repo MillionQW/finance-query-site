@@ -24,6 +24,7 @@ import {
 import type {
   CompanySearchResult,
   CompanyInsight,
+  CompanyInsightDraft,
   AnnouncementFeed,
   CacheEntry,
   FavoriteCompany,
@@ -96,7 +97,13 @@ const refreshTaskLoading = ref(false);
 const refreshTaskNotice = ref<string | null>(null);
 const companyInsights = ref<Record<string, CompanyInsight>>({});
 const noteDialogOpen = ref(false);
-const noteDraft = ref('');
+const insightDraft = ref<CompanyInsightDraft>({
+  note: '',
+  thesis: '',
+  risks: '',
+  catalysts: '',
+  questions: ''
+});
 const buyPointDraft = ref('');
 const buyPointEditing = ref(false);
 let favoriteNoticeTimer: number | undefined;
@@ -137,12 +144,27 @@ const visibleRecentCompanies = computed(() =>
 
 const activeCompanyInsight = computed<CompanyInsight>(() => {
   if (!selectedCompany.value) {
-    return { market: 'a', symbol: '', note: '', buyPointRange: '', buyPointUpdatedAt: null, updatedAt: null };
+    return {
+      market: 'a',
+      symbol: '',
+      note: '',
+      thesis: '',
+      risks: '',
+      catalysts: '',
+      questions: '',
+      buyPointRange: '',
+      buyPointUpdatedAt: null,
+      updatedAt: null
+    };
   }
   return companyInsights.value[companyKey(selectedCompany.value)] ?? {
     market: selectedCompany.value.market,
     symbol: selectedCompany.value.symbol,
     note: '',
+    thesis: '',
+    risks: '',
+    catalysts: '',
+    questions: '',
     buyPointRange: '',
     buyPointUpdatedAt: null,
     updatedAt: null
@@ -203,7 +225,13 @@ function openNoteDialog(): void {
   noteDialogReturnFocus = document.activeElement instanceof HTMLElement
     ? document.activeElement
     : null;
-  noteDraft.value = activeCompanyInsight.value.note;
+  insightDraft.value = {
+    note: activeCompanyInsight.value.note,
+    thesis: activeCompanyInsight.value.thesis,
+    risks: activeCompanyInsight.value.risks,
+    catalysts: activeCompanyInsight.value.catalysts,
+    questions: activeCompanyInsight.value.questions
+  };
   noteDialogOpen.value = true;
 }
 
@@ -239,7 +267,9 @@ async function loadCompanyInsight(company: CompanySearchResult, signal?: AbortSi
   }
 }
 
-async function persistActiveCompanyInsight(input: { note: string; buyPointRange: string }): Promise<CompanyInsight | null> {
+async function persistActiveCompanyInsight(
+  input: CompanyInsightDraft & { buyPointRange: string }
+): Promise<CompanyInsight | null> {
   if (!selectedCompany.value) return null;
   const company = selectedCompany.value;
   try {
@@ -254,7 +284,11 @@ async function persistActiveCompanyInsight(input: { note: string; buyPointRange:
 
 async function saveNote(): Promise<void> {
   const saved = await persistActiveCompanyInsight({
-    note: noteDraft.value.trim(),
+    note: insightDraft.value.note.trim(),
+    thesis: insightDraft.value.thesis.trim(),
+    risks: insightDraft.value.risks.trim(),
+    catalysts: insightDraft.value.catalysts.trim(),
+    questions: insightDraft.value.questions.trim(),
     buyPointRange: activeCompanyInsight.value.buyPointRange
   });
   if (saved) closeNoteDialog();
@@ -268,7 +302,14 @@ async function saveBuyPoint(): Promise<void> {
     buyPointEditing.value = false;
     return;
   }
-  const saved = await persistActiveCompanyInsight({ note: current.note, buyPointRange: nextValue });
+  const saved = await persistActiveCompanyInsight({
+    note: current.note,
+    thesis: current.thesis,
+    risks: current.risks,
+    catalysts: current.catalysts,
+    questions: current.questions,
+    buyPointRange: nextValue
+  });
   if (saved) {
     buyPointDraft.value = saved.buyPointRange;
     buyPointEditing.value = false;
@@ -885,7 +926,7 @@ onUnmounted(() => {
     </main>
 
     <CompanyNoteDialog
-      v-model:note="noteDraft"
+      v-model="insightDraft"
       :open="noteDialogOpen"
       :company-name="selectedCompany?.name"
       @close="closeNoteDialog"

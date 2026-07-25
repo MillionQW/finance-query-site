@@ -180,6 +180,22 @@ export class CompanyInsightDto {
   note = '';
 
   @IsString()
+  @MaxLength(10000)
+  thesis = '';
+
+  @IsString()
+  @MaxLength(10000)
+  risks = '';
+
+  @IsString()
+  @MaxLength(10000)
+  catalysts = '';
+
+  @IsString()
+  @MaxLength(10000)
+  questions = '';
+
+  @IsString()
   @MaxLength(200)
   buyPointRange = '';
 }

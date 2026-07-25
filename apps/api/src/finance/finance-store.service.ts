@@ -91,7 +91,14 @@ export class FinanceStoreService implements OnModuleDestroy {
   saveCompanyInsight(
     market: Market,
     symbol: string,
-    input: { note: string; buyPointRange: string }
+    input: {
+      note: string;
+      buyPointRange: string;
+      thesis?: string;
+      risks?: string;
+      catalysts?: string;
+      questions?: string;
+    }
   ): CompanyInsight {
     return this.companyRepository.saveCompanyInsight(market, symbol, input);
   }
