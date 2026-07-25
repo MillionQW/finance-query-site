@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -97,6 +97,7 @@ const peerMetricError = ref<string | null>(null);
 const cacheEntriesError = ref<string | null>(null);
 const announcementError = ref<string | null>(null);
 const searchDropdownOpen = ref(false);
+const activeSearchIndex = ref(-1);
 const favorites = ref<FavoriteCompany[]>([]);
 const recentCompanies = ref<CompanySearchResult[]>([]);
 const favoriteLoading = ref(false);
@@ -107,6 +108,8 @@ const refreshTaskLoading = ref(false);
 const refreshTaskNotice = ref<string | null>(null);
 const companyInsights = ref<Record<string, CompanyInsight>>({});
 const noteDialogOpen = ref(false);
+const noteDialog = ref<HTMLElement | null>(null);
+const noteTextarea = ref<HTMLTextAreaElement | null>(null);
 const noteDraft = ref('');
 const buyPointDraft = ref('');
 const buyPointEditing = ref(false);
@@ -117,6 +120,8 @@ let peerMetricRequestId = 0;
 let announcementRequestId = 0;
 let insightRequestId = 0;
 let companyRequestController: AbortController | null = null;
+let searchRequestController: AbortController | null = null;
+let noteDialogReturnFocus: HTMLElement | null = null;
 
 const marketOptions: { value: MarketFilter; label: string }[] = [
   { value: 'all', label: '全部' },
@@ -172,6 +177,11 @@ const showSearchDropdown = computed(() => {
     searchDropdownOpen.value &&
     (searchLoading.value || Boolean(searchError.value) || query.value.trim().length > 0 || companies.value.length > 0)
   );
+});
+
+const activeSearchDescendant = computed(() => {
+  const company = companies.value[activeSearchIndex.value];
+  return company ? searchOptionId(company) : undefined;
 });
 
 const summaryCards = computed(() => {
@@ -246,12 +256,35 @@ function companyKey(company: Pick<CompanySearchResult, 'market' | 'symbol'>): st
 
 function openNoteDialog(): void {
   if (!selectedCompany.value) return;
+  noteDialogReturnFocus = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : null;
   noteDraft.value = activeCompanyInsight.value.note;
   noteDialogOpen.value = true;
+  void nextTick(() => noteTextarea.value?.focus());
 }
 
 function closeNoteDialog(): void {
   noteDialogOpen.value = false;
+  const returnFocus = noteDialogReturnFocus;
+  noteDialogReturnFocus = null;
+  void nextTick(() => returnFocus?.focus());
+}
+
+function trapNoteDialogFocus(event: KeyboardEvent): void {
+  const focusable = noteDialog.value?.querySelectorAll<HTMLElement>(
+    'button:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'
+  );
+  if (!focusable?.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function startBuyPointEditing(): void {
@@ -627,22 +660,67 @@ function openSearchDropdown(): void {
   searchDropdownOpen.value = true;
 }
 
+function resetSearchSelection(): void {
+  activeSearchIndex.value = -1;
+}
+
+function handleSearchInput(): void {
+  resetSearchSelection();
+  searchRequestController?.abort();
+}
+
+function closeSearchDropdown(): void {
+  searchDropdownOpen.value = false;
+  resetSearchSelection();
+}
+
 function handleSearchFocusOut(event: FocusEvent): void {
   const current = event.currentTarget;
   const next = event.relatedTarget;
   if (current instanceof HTMLElement && next instanceof Node && current.contains(next)) {
     return;
   }
-  searchDropdownOpen.value = false;
+  closeSearchDropdown();
 }
 
 function submitSearch(): void {
   searchDropdownOpen.value = true;
+  resetSearchSelection();
   void runSearch();
 }
 
+function handleSearchEnter(): void {
+  const activeCompany = companies.value[activeSearchIndex.value];
+  if (searchDropdownOpen.value && activeCompany) {
+    selectSearchCompany(activeCompany);
+    return;
+  }
+  submitSearch();
+}
+
+function moveSearchSelection(direction: 1 | -1): void {
+  searchDropdownOpen.value = true;
+  if (searchLoading.value || searchError.value || !companies.value.length) return;
+  const count = companies.value.length;
+  activeSearchIndex.value = activeSearchIndex.value < 0
+    ? (direction > 0 ? 0 : count - 1)
+    : (activeSearchIndex.value + direction + count) % count;
+}
+
+function selectSearchMarket(value: MarketFilter): void {
+  if (market.value === value) return;
+  market.value = value;
+  submitSearch();
+}
+
+function searchOptionId(company: CompanySearchResult): string {
+  return `company-search-option-${company.market}-${company.symbol.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+}
+
 function selectSearchCompany(company: CompanySearchResult): void {
-  searchDropdownOpen.value = false;
+  searchRequestController?.abort();
+  searchRequestController = null;
+  closeSearchDropdown();
   void selectCompany(company);
 }
 
@@ -668,29 +746,41 @@ async function toggleFavorite(): Promise<void> {
 }
 
 async function runSearch(): Promise<void> {
+  searchRequestController?.abort();
+  searchRequestController = null;
   const text = query.value.trim();
   if (!text) {
-    companies.value = seedCompanies;
+    companies.value = seedCompanies.filter(
+      (company) => market.value === 'all' || company.market === market.value
+    );
     searchError.value = null;
+    searchLoading.value = false;
     return;
   }
 
+  const requestController = new AbortController();
+  searchRequestController = requestController;
   searchLoading.value = true;
   searchError.value = null;
   try {
-    const results = await searchCompanies(text, market.value);
+    const results = await searchCompanies(text, market.value, requestController.signal);
+    if (requestController.signal.aborted) return;
     companies.value = results;
     if (results.length && !selectedCompany.value) {
       await selectCompany(results[0]);
     }
   } catch (error) {
+    if (isAbortError(error)) return;
     searchError.value = error instanceof Error ? error.message : '搜索失败';
     companies.value = seedCompanies.filter(
       (company) =>
         market.value === 'all' || company.market === market.value
     );
   } finally {
-    searchLoading.value = false;
+    if (searchRequestController === requestController) {
+      searchRequestController = null;
+      searchLoading.value = false;
+    }
   }
 }
 
@@ -913,6 +1003,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   companyRequestController?.abort();
+  searchRequestController?.abort();
   window.removeEventListener('popstate', handleUrlNavigation);
   window.removeEventListener('keydown', handleGlobalKeydown);
 });
@@ -934,7 +1025,16 @@ onUnmounted(() => {
             type="search"
             placeholder="公司/代码，例如：腾讯、00700、600519"
             aria-label="搜索公司或股票代码"
-            @keydown.enter.prevent="submitSearch"
+            role="combobox"
+            aria-autocomplete="list"
+            :aria-expanded="showSearchDropdown"
+            aria-controls="company-search-results"
+            :aria-activedescendant="activeSearchDescendant"
+            @input="handleSearchInput"
+            @keydown.enter.prevent="handleSearchEnter"
+            @keydown.down.prevent="moveSearchSelection(1)"
+            @keydown.up.prevent="moveSearchSelection(-1)"
+            @keydown.esc.prevent="closeSearchDropdown"
           />
           <button type="button" :disabled="searchLoading" @click="submitSearch">
             <Loader2 v-if="searchLoading" class="spin-icon" :size="15" />
@@ -942,14 +1042,15 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <div v-if="showSearchDropdown" class="search-dropdown" role="listbox" aria-label="搜索结果">
+        <div v-if="showSearchDropdown" class="search-dropdown">
           <div class="search-market-tabs" aria-label="市场筛选">
             <button
               v-for="item in marketOptions"
               :key="item.value"
               :class="{ active: market === item.value }"
               type="button"
-              @click="market = item.value"
+              :aria-pressed="market === item.value"
+              @click="selectSearchMarket(item.value)"
             >
               {{ item.label }}
             </button>
@@ -962,15 +1063,27 @@ onUnmounted(() => {
           <div v-else-if="searchError" class="search-dropdown-state error">
             {{ searchError }}
           </div>
-          <div v-else-if="companies.length" class="search-results">
+          <div
+            v-else-if="companies.length"
+            id="company-search-results"
+            class="search-results"
+            role="listbox"
+            aria-label="搜索结果"
+          >
             <button
-              v-for="company in companies"
+              v-for="(company, index) in companies"
+              :id="searchOptionId(company)"
               :key="`${company.market}-${company.symbol}`"
               class="search-result-row"
-              :class="{ active: selectedCompany?.market === company.market && selectedCompany?.symbol === company.symbol }"
+              :class="{
+                active:
+                  activeSearchIndex === index ||
+                  (selectedCompany?.market === company.market && selectedCompany?.symbol === company.symbol)
+              }"
               type="button"
               role="option"
-              :aria-selected="selectedCompany?.market === company.market && selectedCompany?.symbol === company.symbol"
+              :aria-selected="activeSearchIndex === index"
+              @mouseenter="activeSearchIndex = index"
               @click="selectSearchCompany(company)"
             >
               <span class="company-logo" :data-market="company.market">{{ company.name.slice(0, 1) }}</span>
@@ -1193,6 +1306,8 @@ onUnmounted(() => {
                       :class="{ 'has-note': Boolean(activeCompanyInsight.note) }"
                       type="button"
                       :disabled="!selectedCompany"
+                      aria-haspopup="dialog"
+                      :aria-expanded="noteDialogOpen"
                       @click="openNoteDialog"
                     >
                       <StickyNote :size="16" />
@@ -1377,7 +1492,14 @@ onUnmounted(() => {
       role="presentation"
       @mousedown.self="closeNoteDialog"
     >
-      <section class="note-dialog" role="dialog" aria-modal="true" aria-labelledby="company-note-title">
+      <section
+        ref="noteDialog"
+        class="note-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="company-note-title"
+        @keydown.tab="trapNoteDialogFocus"
+      >
         <header>
           <div>
             <span>公司备注</span>
@@ -1390,10 +1512,10 @@ onUnmounted(() => {
         <label for="company-note-content">记录你的判断、风险点或后续关注事项</label>
         <textarea
           id="company-note-content"
+          ref="noteTextarea"
           v-model="noteDraft"
           rows="8"
           placeholder="例如：核心业务增长稳定，但需要继续观察毛利率和现金流……"
-          autofocus
         ></textarea>
         <footer>
           <small>备注保存在本机 SQLite 数据库中</small>

@@ -63,9 +63,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 }
 
-export function searchCompanies(q: string, market: MarketFilter): Promise<CompanySearchResult[]> {
+export function searchCompanies(
+  q: string,
+  market: MarketFilter,
+  signal?: AbortSignal
+): Promise<CompanySearchResult[]> {
   const params = new URLSearchParams({ q, market });
-  return request<CompanySearchResult[]>(`/companies/search?${params.toString()}`);
+  return request<CompanySearchResult[]>(`/companies/search?${params.toString()}`, { signal });
 }
 
 export function getStatements(
