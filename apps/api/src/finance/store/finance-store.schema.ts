@@ -98,6 +98,40 @@ export function initializeFinanceStoreSchema(db: any): void {
       CREATE INDEX IF NOT EXISTS idx_statement_cache_lookup
         ON financial_statement_cache(market, symbol, years_requested);
 
+      CREATE TABLE IF NOT EXISTS financial_statement_versions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        market TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        years_requested INTEGER NOT NULL,
+        schema_version INTEGER NOT NULL,
+        payload_hash TEXT NOT NULL,
+        source TEXT NOT NULL,
+        fetched_at TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (market, symbol, years_requested, payload_hash)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_statement_versions_lookup
+        ON financial_statement_versions(market, symbol, years_requested, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS statement_revision_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        market TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        years_requested INTEGER NOT NULL,
+        previous_version_id INTEGER NOT NULL REFERENCES financial_statement_versions(id),
+        current_version_id INTEGER NOT NULL REFERENCES financial_statement_versions(id),
+        changed_count INTEGER NOT NULL,
+        material_change_count INTEGER NOT NULL,
+        changes_json TEXT NOT NULL,
+        detected_at TEXT NOT NULL,
+        UNIQUE (previous_version_id, current_version_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_statement_revisions_lookup
+        ON statement_revision_events(market, symbol, years_requested, detected_at DESC);
+
       CREATE TABLE IF NOT EXISTS financial_statement_rows (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         snapshot_id INTEGER NOT NULL REFERENCES financial_statement_cache(id) ON DELETE CASCADE,

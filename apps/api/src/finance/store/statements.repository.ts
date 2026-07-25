@@ -1,8 +1,11 @@
-import { createHash } from 'node:crypto';
 import type {
   FinancialStatements,
   Market
 } from '../types';
+import {
+  evaluateStatementQuality,
+  hashStatementData
+} from '../statement-analysis';
 import { CompanyStoreRepository } from './company.repository';
 import {
   fromSqliteDate,
@@ -12,10 +15,14 @@ import {
   withoutStatementCache
 } from './finance-store.utils';
 import { SqliteRepository } from './sqlite.repository';
+import { StatementVersionRepository } from './statement-version.repository';
 
 export class StatementStoreRepository extends SqliteRepository {
+  private readonly versions: StatementVersionRepository;
+
   constructor(db: any, private readonly companies: CompanyStoreRepository) {
     super(db);
+    this.versions = new StatementVersionRepository(db);
   }
 
   getStatements(market: Market, symbol: string, years: number): FinancialStatements | null {
@@ -41,6 +48,14 @@ export class StatementStoreRepository extends SqliteRepository {
     }
     return {
       ...payload,
+      quality: evaluateStatementQuality(payload),
+      revision: this.versions.getLatestRevision(market, normalizedSymbol, years),
+      version: this.versions.getSummary(
+        market,
+        normalizedSymbol,
+        years,
+        hashStatementData(payload)
+      ),
       cache: {
         hit: true,
         refreshedAt: fromSqliteDate(row.refreshed_at)
@@ -61,7 +76,6 @@ export class StatementStoreRepository extends SqliteRepository {
     const yearsKey = payload.years.join(',');
     const payloadForStorage = withoutStatementCache(payload);
     const payloadJson = JSON.stringify(payloadForStorage);
-    const payloadHash = createHash('sha256').update(payloadJson).digest('hex');
 
     this.withTransaction(() => {
       this.companies.upsertCompanies([
@@ -79,13 +93,30 @@ export class StatementStoreRepository extends SqliteRepository {
       const existing = this.db
         .prepare(
           `
-          SELECT id
+          SELECT id, payload_json, source, fetched_at
           FROM financial_statement_cache
           WHERE market = ? AND symbol = ? AND years_requested = ?
           LIMIT 1
         `
         )
         .get(market, symbol, yearsRequested);
+      const payloadHash = this.versions.captureTransition(
+        market,
+        symbol,
+        yearsRequested,
+        existing?.payload_json
+          ? {
+              payload: JSON.parse(existing.payload_json) as FinancialStatements,
+              source: existing.source,
+              fetchedAt: existing.fetched_at
+            }
+          : null,
+        {
+          payload: payloadForStorage,
+          source: payload.source,
+          fetchedAt: payload.fetchedAt
+        }
+      );
 
       let snapshotId: number;
       if (existing?.id) {

@@ -36,7 +36,13 @@ export function nullableNumber(value: unknown): number | null {
 }
 
 export function withoutStatementCache(payload: FinancialStatements): FinancialStatements {
-  const { cache: _cache, ...rest } = payload;
+  const {
+    cache: _cache,
+    quality: _quality,
+    revision: _revision,
+    version: _version,
+    ...rest
+  } = payload;
   return rest;
 }
 

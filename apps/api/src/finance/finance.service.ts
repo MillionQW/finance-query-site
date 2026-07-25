@@ -67,8 +67,9 @@ export class FinanceService {
       ])
       .then((payload) => {
         this.store.saveStatements(payload, years);
+        const stored = this.store.getStatements(market, normalizedSymbol, years);
         return {
-          ...payload,
+          ...(stored ?? payload),
           cache: {
             hit: false,
             refreshedAt: new Date().toISOString()

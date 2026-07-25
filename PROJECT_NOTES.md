@@ -255,6 +255,24 @@ ETF backend ownership:
   - refresh time
 - Peer comparison cache status is also shown in the UI.
 
+## Statement Versions and Data Quality
+
+- Statement content uses a stable data hash that excludes fetch timestamps and UI-only metadata.
+- Every distinct statement payload is retained in `financial_statement_versions`; repeated pulls with identical financial data do not create duplicate versions.
+- Changes to overlapping annual/reporting-period values are stored in `statement_revision_events`.
+- Revision events keep the changed item, statement, period, old/new values, percentage change, and a materiality flag.
+- Runtime statement responses include:
+  - immutable version count
+  - latest revision summary
+  - a transparent data-quality score
+- Quality checks cover:
+  - three-statement availability
+  - latest-year key-metric coverage
+  - assets = liabilities + equity
+  - beginning cash + net increase = ending cash
+  - reporting-period statement coverage
+- Unavailable checks reduce the visible coverage percentage but do not silently count as failures.
+
 ## Fixed Metric Charts
 
 The app intentionally does not include a user-editable formula builder. A previous attempt was removed because A-share and Hong Kong stock fields are not universal enough. Future formulas should be implemented directly in code after the user specifies them.

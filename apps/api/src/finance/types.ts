@@ -149,6 +149,51 @@ export interface PeriodMetricSeries {
   points: PeriodMetricPoint[];
 }
 
+export type StatementQualityStatus = 'pass' | 'warning' | 'fail' | 'unavailable';
+
+export interface StatementQualityCheck {
+  key: string;
+  label: string;
+  status: StatementQualityStatus;
+  detail: string;
+}
+
+export interface StatementQualitySummary {
+  score: number;
+  tone: 'good' | 'attention' | 'risk';
+  coveragePercent: number;
+  checks: StatementQualityCheck[];
+}
+
+export interface StatementRevisionChange {
+  scope: 'annual' | 'reporting-period';
+  statementType: StatementTable['type'];
+  item: string;
+  sourceItem: string;
+  period: string;
+  previousValue: number;
+  currentValue: number;
+  changeAmount: number;
+  changePercent: number | null;
+  material: boolean;
+}
+
+export interface StatementRevisionSummary {
+  detectedAt: string;
+  previousFetchedAt: string;
+  currentFetchedAt: string;
+  changedCount: number;
+  materialChangeCount: number;
+  changes: StatementRevisionChange[];
+}
+
+export interface StatementVersionSummary {
+  count: number;
+  currentHash: string;
+  firstSeenAt: string | null;
+  lastChangedAt: string | null;
+}
+
 export interface PeerCompany {
   market: Market;
   symbol: string;
@@ -258,6 +303,9 @@ export interface FinancialStatements {
   periodTables?: PeriodStatementTable[];
   periodHighlights?: PeriodMetricSeries[];
   ttmHighlights?: PeriodMetricSeries[];
+  quality?: StatementQualitySummary;
+  revision?: StatementRevisionSummary | null;
+  version?: StatementVersionSummary;
   fetchedAt: string;
   source: string;
   listingYear?: number | null;
