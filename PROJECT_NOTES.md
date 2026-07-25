@@ -326,6 +326,8 @@ Global styles keep their original cascade order through `apps/web/src/styles.css
 
 SQLite persistence is exposed through `FinanceStoreService`, while implementation details live in `apps/api/src/finance/store/`: company/announcement, statement, ETF, cache, peer comparison, and refresh repositories share one configured database connection, schema initializer, and transaction base class.
 
+`apps/api/src/python/akshare_bridge.py` remains the stable subprocess entry point. Command implementations are grouped under `apps/api/src/python/finance_bridge/` into shared normalization/runtime code plus search, screener, peer, statement, announcement, ETF, and index modules.
+
 ## Hong Kong Stock Field Handling
 
 For Hong Kong stock inventory turnover, if operating cost is missing, the code looks for:
