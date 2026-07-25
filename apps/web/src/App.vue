@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -16,16 +16,7 @@ import {
   TrendingUp,
   X
 } from 'lucide-vue-next';
-import CustomMetricChart from './components/CustomMetricChart.vue';
 import AnnouncementPanel from './components/AnnouncementPanel.vue';
-import CacheManagerPanel from './components/CacheManagerPanel.vue';
-import MiniTrend from './components/MiniTrend.vue';
-import PeerComparisonPanel from './components/PeerComparisonPanel.vue';
-import PeerMetricChart from './components/PeerMetricChart.vue';
-import StatementTable from './components/StatementTable.vue';
-import EtfPage from './components/EtfPage.vue';
-import IndexPage from './components/IndexPage.vue';
-import ScreenerPage from './components/ScreenerPage.vue';
 import {
   getCacheEntries,
   getAnnouncements,
@@ -57,6 +48,16 @@ import type {
   StatementRefreshRuntimeStatus,
   StatementType
 } from './types/finance';
+
+const CacheManagerPanel = defineAsyncComponent(() => import('./components/CacheManagerPanel.vue'));
+const CustomMetricChart = defineAsyncComponent(() => import('./components/CustomMetricChart.vue'));
+const EtfPage = defineAsyncComponent(() => import('./components/EtfPage.vue'));
+const IndexPage = defineAsyncComponent(() => import('./components/IndexPage.vue'));
+const MiniTrend = defineAsyncComponent(() => import('./components/MiniTrend.vue'));
+const PeerComparisonPanel = defineAsyncComponent(() => import('./components/PeerComparisonPanel.vue'));
+const PeerMetricChart = defineAsyncComponent(() => import('./components/PeerMetricChart.vue'));
+const ScreenerPage = defineAsyncComponent(() => import('./components/ScreenerPage.vue'));
+const StatementTable = defineAsyncComponent(() => import('./components/StatementTable.vue'));
 
 const seedCompanies: CompanySearchResult[] = [
   { market: 'hk', symbol: '00700', displaySymbol: '00700.HK', name: '腾讯控股', source: 'seed' },
@@ -109,7 +110,6 @@ const noteDialogOpen = ref(false);
 const noteDraft = ref('');
 const buyPointDraft = ref('');
 const buyPointEditing = ref(false);
-let searchTimer: number | undefined;
 let favoriteNoticeTimer: number | undefined;
 let statementRequestId = 0;
 let peerRequestId = 0;
@@ -456,7 +456,6 @@ async function openCompanyPage(): Promise<void> {
   syncViewUrl('company');
   window.scrollTo({ top: 0, behavior: 'auto' });
   if (!statements.value && selectedCompany.value) {
-    await runSearch();
     await selectCompany(selectedCompany.value, false, 'replace');
   }
 }
@@ -880,13 +879,6 @@ function updatePageTitle(): void {
     : titles[currentView.value];
 }
 
-watch([query, market], () => {
-  window.clearTimeout(searchTimer);
-  searchTimer = window.setTimeout(() => {
-    void runSearch();
-  }, 380);
-});
-
 watch(selectedCompany, () => {
   buyPointDraft.value = activeCompanyInsight.value.buyPointRange;
   buyPointEditing.value = false;
@@ -901,7 +893,6 @@ onMounted(async () => {
   loadRecentCompanies();
   await Promise.all([loadRefreshStatus(), loadCacheEntries(), loadFavorites()]);
   if (currentView.value === 'company') {
-    await runSearch();
     if (selectedCompany.value) {
       await selectCompany(selectedCompany.value, false, 'replace');
     }

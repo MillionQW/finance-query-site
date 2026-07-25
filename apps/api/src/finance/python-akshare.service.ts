@@ -18,8 +18,9 @@ export class PythonAkshareService {
   private readonly logger = new Logger(PythonAkshareService.name);
   private readonly pythonBin = this.resolvePythonBin();
   private readonly bridgePath = this.resolveBridgePath();
+  private readonly defaultTimeoutMs = this.readTimeout(process.env.AKSHARE_TIMEOUT_MS, 120_000);
 
-  async run<T>(args: string[], timeoutMs?: number): Promise<T> {
+  async run<T>(args: string[], timeoutMs = this.defaultTimeoutMs): Promise<T> {
     if (!existsSync(this.bridgePath)) {
       throw new HttpException(
         `AKShare bridge not found: ${this.bridgePath}`,
@@ -95,7 +96,7 @@ export class PythonAkshareService {
         ? setTimeout(() => {
             if (settled) return;
             settled = true;
-            child.kill();
+            child.kill('SIGKILL');
             reject(
               new HttpException(
                 {
@@ -157,5 +158,12 @@ export class PythonAkshareService {
         });
       });
     });
+  }
+
+  private readTimeout(value: string | undefined, fallback: number): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 1_000 && parsed <= 10 * 60_000
+      ? Math.floor(parsed)
+      : fallback;
   }
 }

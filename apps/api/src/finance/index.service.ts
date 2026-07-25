@@ -14,7 +14,7 @@ export class IndexService {
     @Inject(IndexStoreService) private readonly store: IndexStoreService
   ) {}
 
-  async list(q = '', market = 'all', refresh = false): Promise<IndexMarketResponse> {
+  async list(q = '', market: 'all' | IndexMarket = 'all', refresh = false): Promise<IndexMarketResponse> {
     const state = await this.ensureMarket(refresh);
     return { items: this.store.listQuotes(q.trim(), market), refreshedAt: state.refreshedAt, source: 'AKShare index spot', cache: { hit: state.hit, stale: state.stale } };
   }
@@ -43,7 +43,7 @@ export class IndexService {
         historyStale = true;
       }
     }
-    return { quote, history, metrics: calculateMetrics(history), cache: { marketHit:marketState.hit,marketStale:marketState.stale,marketRefreshedAt:marketState.refreshedAt,historyHit,historyStale,historyRefreshedAt:this.store.getRefresh(refreshKey) } };
+    return { quote, history, metrics: calculateIndexMetrics(history), cache: { marketHit:marketState.hit,marketStale:marketState.stale,marketRefreshedAt:marketState.refreshedAt,historyHit,historyStale,historyRefreshedAt:this.store.getRefresh(refreshKey) } };
   }
 
   favorites() { return this.store.getFavorites(); }
@@ -72,7 +72,7 @@ export class IndexService {
 
 function fresh(value:string|null,maxAge:number):boolean { if(!value)return false; const normalized=/(Z|[+-]\d\d:\d\d)$/.test(value)?value:`${value}Z`; return Date.now()-new Date(normalized).getTime()<maxAge; }
 function startDateForYears(years:number):string { const d=new Date(); d.setFullYear(d.getFullYear()-Math.max(1,Math.min(years,20))); return d.toISOString().slice(0,10); }
-function calculateMetrics(points:IndexHistoryPoint[]):IndexMetrics {
+export function calculateIndexMetrics(points:IndexHistoryPoint[]):IndexMetrics {
   const valid=points.filter((p):p is IndexHistoryPoint & {close:number}=>typeof p.close==='number'&&p.close>0);
   if(!valid.length) return {return20d:null,return60d:null,returnYtd:null,annualizedReturn:null,annualizedVolatility:null,maxDrawdown:null,currentDrawdown:null,periodHigh:null,periodLow:null,tradingDays:0};
   const closes=valid.map(p=>p.close), latest=closes.at(-1)!, returns=closes.slice(1).map((v,i)=>v/closes[i]-1), years=Math.max((valid.length-1)/252,1/252);
