@@ -223,6 +223,19 @@ ETF backend ownership:
 - Clicking the selected line item again, or using the chart close button, hides the chart.
 - Switching between balance sheet, income statement, and cash-flow statement clears the previous line-item selection.
 
+## Reporting Period and TTM Analysis
+
+- Financial-statement payload schema version 2 keeps the existing annual tables and adds the latest 20 reporting periods.
+- A-share reporting periods reuse the Eastmoney report-period responses already fetched for annual normalization.
+- Hong Kong statements independently request both `年度` and `报告期` data.
+- The company page shows:
+  - latest reporting-period cumulative values and same-period YoY
+  - revenue, net profit, and operating cash flow on a trailing-twelve-month basis
+  - the latest eight reporting periods for all three statements
+- TTM uses `current YTD + previous annual - previous same period`; it remains unavailable when any required input is missing.
+- Reporting-period table YoY compares the same period in the prior year instead of the adjacent displayed column.
+- Python regression tests cover report-period preservation and TTM calculation.
+
 ## Statement Item Trend Chart
 
 - Implemented in `apps/web/src/components/StatementItemTrend.vue`.

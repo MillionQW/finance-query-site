@@ -1,0 +1,159 @@
+.period-analysis-panel {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid #dce6f2;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #f8fbff 0%, #ffffff 58%);
+  box-shadow: 0 12px 30px rgba(31, 64, 104, 0.07);
+}
+
+.period-analysis-head,
+.period-section-title,
+.period-statement-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.period-analysis-head > div > span,
+.period-section-title span,
+.period-statement-toolbar span {
+  color: #68809b;
+  font-size: 13px;
+}
+
+.period-analysis-head > div > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #2c6aa0;
+  font-weight: 700;
+}
+
+.period-analysis-head h2 {
+  margin: 5px 0 0;
+  color: #17324d;
+  font-size: 22px;
+}
+
+.period-analysis-head small {
+  max-width: 420px;
+  color: #71849a;
+  line-height: 1.6;
+  text-align: right;
+}
+
+.period-analysis-summary {
+  display: grid;
+  gap: 16px;
+}
+
+.period-analysis-summary > section {
+  display: grid;
+  gap: 10px;
+}
+
+.period-section-title strong,
+.period-statement-toolbar strong {
+  color: #203b57;
+}
+
+.period-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.period-metric-grid.ttm {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.period-metric-grid article {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e3ebf4;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.period-metric-grid article > span {
+  overflow: hidden;
+  color: #6a7f95;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.period-metric-grid article strong {
+  color: #183650;
+  font-size: 18px;
+}
+
+.period-metric-grid article em {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #7a8ea3;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.period-metric-grid article em.up {
+  color: #c94b54;
+}
+
+.period-metric-grid article em.down {
+  color: #268561;
+}
+
+.period-analysis-empty {
+  display: grid;
+  gap: 5px;
+  padding: 18px;
+  border: 1px dashed #cbd9e8;
+  border-radius: 13px;
+  color: #6d8196;
+  text-align: center;
+}
+
+.period-analysis-empty strong {
+  color: #294965;
+}
+
+.period-statement-toolbar {
+  padding-top: 3px;
+  border-top: 1px solid #e4ebf3;
+}
+
+.period-statement-toolbar > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+@media (max-width: 1120px) {
+  .period-metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .period-analysis-head,
+  .period-section-title,
+  .period-statement-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .period-analysis-head small {
+    text-align: left;
+  }
+
+  .period-metric-grid,
+  .period-metric-grid.ttm {
+    grid-template-columns: 1fr;
+  }
+}

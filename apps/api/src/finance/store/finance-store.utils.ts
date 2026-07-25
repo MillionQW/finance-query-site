@@ -66,6 +66,35 @@ export function mergePartialStatements(
       rows: [...rows.values()]
     };
   });
+  const reportPeriods = [
+    ...(incoming.reportPeriods ?? []),
+    ...(cached.reportPeriods ?? []).filter(
+      (cachedPeriod) => !(incoming.reportPeriods ?? []).some((period) => period.key === cachedPeriod.key)
+    )
+  ].sort((a, b) => b.key.localeCompare(a.key));
+  const periodTables = (incoming.periodTables ?? []).map((incomingTable) => {
+    const cachedTable = cached.periodTables?.find((table) => table.type === incomingTable.type);
+    if (!cachedTable) return incomingTable;
+    const rows = new Map(
+      cachedTable.rows.map((row) => [row.sourceItem || row.item, { ...row, values: { ...row.values } }])
+    );
+    for (const row of incomingTable.rows) {
+      const key = row.sourceItem || row.item;
+      const previous = rows.get(key);
+      rows.set(key, {
+        ...previous,
+        ...row,
+        values: { ...previous?.values, ...row.values }
+      });
+    }
+    return {
+      ...incomingTable,
+      periods: [...new Set([...cachedTable.periods, ...incomingTable.periods])]
+        .sort((a, b) => b.localeCompare(a))
+        .slice(0, 20),
+      rows: [...rows.values()]
+    };
+  });
 
   return {
     ...incoming,
@@ -75,6 +104,10 @@ export function mergePartialStatements(
     },
     years,
     tables,
+    reportPeriods: reportPeriods.slice(0, 20),
+    periodTables,
+    periodHighlights: incoming.periodHighlights ?? cached.periodHighlights,
+    ttmHighlights: incoming.ttmHighlights ?? cached.ttmHighlights,
     fetchWarnings: [...new Set([...(cached.fetchWarnings ?? []), ...(incoming.fetchWarnings ?? [])])]
   };
 }

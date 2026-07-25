@@ -29,6 +29,7 @@ import type {
 
 const CustomMetricChart = defineAsyncComponent(() => import('./CustomMetricChart.vue'));
 const MiniTrend = defineAsyncComponent(() => import('./MiniTrend.vue'));
+const PeriodAnalysisPanel = defineAsyncComponent(() => import('./PeriodAnalysisPanel.vue'));
 const PeerComparisonPanel = defineAsyncComponent(() => import('./PeerComparisonPanel.vue'));
 const PeerMetricChart = defineAsyncComponent(() => import('./PeerMetricChart.vue'));
 const StatementTable = defineAsyncComponent(() => import('./StatementTable.vue'));
@@ -242,6 +243,8 @@ defineEmits<{
             {{ year }} 年报
           </button>
         </div>
+
+        <PeriodAnalysisPanel :statements="statements" />
 
         <div class="insight-grid">
           <MiniTrend :series="statements?.highlights ?? []" />

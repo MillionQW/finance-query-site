@@ -120,6 +120,35 @@ export interface MetricSeries {
   points: MetricPoint[];
 }
 
+export type ReportPeriodType = 'annual' | 'half-year' | 'quarter' | 'other';
+
+export interface ReportPeriod {
+  key: string;
+  label: string;
+  fiscalYear: number;
+  type: ReportPeriodType;
+  annual: boolean;
+  priorYearKey?: string | null;
+}
+
+export interface PeriodStatementTable {
+  type: StatementTable['type'];
+  title: string;
+  periods: string[];
+  rows: StatementRow[];
+}
+
+export interface PeriodMetricPoint {
+  period: string;
+  value: number | null;
+}
+
+export interface PeriodMetricSeries {
+  key: string;
+  label: string;
+  points: PeriodMetricPoint[];
+}
+
 export interface PeerCompany {
   market: Market;
   symbol: string;
@@ -214,6 +243,7 @@ export interface StatementRefreshRuntimeStatus {
 }
 
 export interface FinancialStatements {
+  schemaVersion?: number;
   company: {
     market: Market;
     symbol: string;
@@ -224,6 +254,10 @@ export interface FinancialStatements {
   unit: string;
   tables: StatementTable[];
   highlights: MetricSeries[];
+  reportPeriods?: ReportPeriod[];
+  periodTables?: PeriodStatementTable[];
+  periodHighlights?: PeriodMetricSeries[];
+  ttmHighlights?: PeriodMetricSeries[];
   fetchedAt: string;
   source: string;
   listingYear?: number | null;

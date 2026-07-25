@@ -12,6 +12,8 @@ type StatementRowLike = StatementTable['rows'][number];
 const props = defineProps<{
   table?: StatementTable;
   activeYears: string[];
+  columnLabels?: Record<string, string>;
+  comparisonKeys?: Record<string, string>;
 }>();
 
 const unitDivisors: Record<ValueDisplayUnit, number> = {
@@ -106,9 +108,17 @@ function normalizeLabel(value: string): string {
 }
 
 function previousYear(year: string): string | undefined {
+  const comparisonKey = props.comparisonKeys?.[year];
+  if (comparisonKey) {
+    return comparisonKey;
+  }
   const years = props.table?.years ?? [];
   const index = years.indexOf(year);
   return index >= 0 ? years[index + 1] : undefined;
+}
+
+function columnLabel(year: string): string {
+  return props.columnLabels?.[year] ?? year;
 }
 
 function formatNumberValue(value: number | string | null | undefined): string {
@@ -236,7 +246,7 @@ function toggleSelectedRow(row: StatementRowLike): void {
       <thead>
         <tr>
           <th class="item-col">项目</th>
-          <th v-for="year in activeYears" :key="year">{{ year }}</th>
+          <th v-for="year in activeYears" :key="year">{{ columnLabel(year) }}</th>
         </tr>
       </thead>
       <tbody>

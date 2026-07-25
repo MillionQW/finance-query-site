@@ -1,5 +1,25 @@
 from .runtime import *  # noqa: F401,F403
-from .common import STATEMENT_TITLES, build_highlights, emit, extract_company_name, extract_year, first_existing_column, merge_years, normalize_a_symbol, normalize_hk_symbol, normalize_report_dataframe
+from .common import (
+    STATEMENT_TITLES,
+    build_highlights,
+    emit,
+    extract_company_name,
+    extract_year,
+    find_date_column,
+    first_existing_column,
+    looks_like_annual_period,
+    merge_years,
+    normalize_a_symbol,
+    normalize_hk_symbol,
+    normalize_report_dataframe,
+)
+from .periods import (
+    build_period_highlights,
+    build_ttm_highlights,
+    extract_report_period,
+    merge_report_periods,
+    normalize_period_report_dataframe,
+)
 
 
 A_REPORT_ENDPOINTS = {
@@ -93,14 +113,19 @@ def call_a_report(
     return result
 
 
-def call_hk_report(statement_type: str, symbol: str) -> "pd.DataFrame":
+def call_hk_report(
+    statement_type: str, symbol: str, indicator: str = "年度"
+) -> "pd.DataFrame":
     function = getattr(ak, "stock_financial_hk_report_em")
     title = STATEMENT_TITLES[statement_type]
-    attempts = [
-        {"stock": symbol, "symbol": title, "indicator": "年度"},
-        {"stock": symbol, "symbol": title, "indicator": "年报"},
-        {"symbol": symbol, "indicator": title},
-    ]
+    attempts = [{"stock": symbol, "symbol": title, "indicator": indicator}]
+    if indicator == "年度":
+        attempts.extend(
+            [
+                {"stock": symbol, "symbol": title, "indicator": "年报"},
+                {"symbol": symbol, "indicator": title},
+            ]
+        )
     last_error: Optional[Exception] = None
     for kwargs in attempts:
         try:
@@ -188,12 +213,32 @@ def filter_tables_from_year(tables: List[Dict[str, Any]], start_year: Optional[i
             row["values"] = {year: row.get("values", {}).get(year) for year in years}
 
 
+def report_period_keys(
+    reports: Iterable["pd.DataFrame"], annual_only: bool = False
+) -> List[str]:
+    periods = set()
+    for report in reports:
+        if report is None or report.empty:
+            continue
+        date_column = find_date_column(report)
+        if not date_column:
+            continue
+        for value in report[date_column].tolist():
+            if annual_only and not looks_like_annual_period(value):
+                continue
+            period = extract_report_period(value)
+            if period:
+                periods.add(period)
+    return sorted(periods, reverse=True)
+
+
 def handle_statements(args: argparse.Namespace) -> None:
     # years=0 is the public "since listing" mode. 200 is only a defensive ceiling,
     # not a business window; the listing year below determines the actual start.
     years_limit = 200 if int(args.years) <= 0 else max(1, min(int(args.years), 200))
     tables: List[Dict[str, Any]] = []
-    raw_reports: List[pd.DataFrame] = []
+    annual_reports: List[pd.DataFrame] = []
+    period_reports: List[pd.DataFrame] = []
     fetch_warnings: List[str] = []
     if args.market == "a":
         api_symbol, display_symbol = normalize_a_symbol(args.symbol)
@@ -209,40 +254,73 @@ def handle_statements(args: argparse.Namespace) -> None:
             fetch_warnings.extend(
                 f"{statement_type}: {warning}" for warning in df.attrs.get("fetch_warnings", [])
             )
-            raw_reports.append(df)
+            annual_reports.append(df)
+            period_reports.append(df)
             tables.append(normalize_report_dataframe(df, statement_type, title, years_limit))
-        if not any(not report.empty for report in raw_reports):
+        if not any(not report.empty for report in annual_reports):
             raise RuntimeError("All A-share financial statement requests failed")
         company = {
             "market": "a",
             "symbol": company_symbol,
             "displaySymbol": display_symbol,
-            "name": extract_company_name(*raw_reports),
+            "name": extract_company_name(*annual_reports),
         }
-        source = "AKShare Eastmoney A-share financial report APIs"
+        source = "AKShare Eastmoney A-share annual and reporting-period APIs"
     else:
         api_symbol, display_symbol = normalize_hk_symbol(args.symbol)
         listing_year = extract_listing_year("hk", api_symbol)
         for statement_type, title in STATEMENT_TITLES.items():
-            df = call_hk_report(statement_type, api_symbol)
-            raw_reports.append(df)
-            tables.append(normalize_report_dataframe(df, statement_type, title, years_limit))
+            annual_df = call_hk_report(statement_type, api_symbol, "年度")
+            annual_reports.append(annual_df)
+            tables.append(
+                normalize_report_dataframe(
+                    annual_df, statement_type, title, years_limit
+                )
+            )
+            try:
+                period_df = call_hk_report(statement_type, api_symbol, "报告期")
+            except Exception as exc:
+                fetch_warnings.append(f"{statement_type} reporting periods: {exc}")
+                period_df = pd.DataFrame()
+            period_reports.append(period_df)
         company = {
             "market": "hk",
             "symbol": api_symbol,
             "displaySymbol": display_symbol,
-            "name": extract_company_name(*raw_reports),
+            "name": extract_company_name(*annual_reports, *period_reports),
         }
-        source = "AKShare Eastmoney HK financial report API"
+        source = "AKShare Eastmoney HK annual and reporting-period API"
 
     filter_tables_from_year(tables, listing_year)
     years = merge_years(tables, years_limit)
+    period_tables = [
+        normalize_period_report_dataframe(
+            report, statement_type, title, periods_limit=20
+        )
+        for report, (statement_type, title) in zip(
+            period_reports, STATEMENT_TITLES.items()
+        )
+    ]
+    annual_periods = (
+        report_period_keys(annual_reports)
+        if args.market == "hk"
+        else report_period_keys(period_reports, annual_only=True)
+    )
+    report_periods = merge_report_periods(period_tables, annual_periods, 20)
+    period_keys = [period["key"] for period in report_periods]
     payload = {
+        "schemaVersion": 2,
         "company": company,
         "years": years,
         "unit": "AKShare 原始单位",
         "tables": tables,
         "highlights": build_highlights(tables, years),
+        "reportPeriods": report_periods,
+        "periodTables": period_tables,
+        "periodHighlights": build_period_highlights(period_tables, period_keys),
+        "ttmHighlights": build_ttm_highlights(
+            period_tables, period_keys, annual_periods
+        ),
         "fetchedAt": datetime.now(timezone.utc).isoformat(),
         "source": source,
         "listingYear": listing_year,
