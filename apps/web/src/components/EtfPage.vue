@@ -7,6 +7,7 @@ import {
   getEtfValuation,
   getEtfs,
   getFavoriteEtfs,
+  isRequestAbort,
   removeFavoriteEtf,
   saveFavoriteEtf
 } from '../services/api';
@@ -39,7 +40,9 @@ const marketError = ref<string | null>(null);
 const detailError = ref<string | null>(null);
 const valuationError = ref<string | null>(null);
 let searchTimer: number | undefined;
-let detailRequestId = 0;
+let marketRequestController: AbortController | null = null;
+let detailRequestController: AbortController | null = null;
+let valuationRequestController: AbortController | null = null;
 
 const visibleItems = computed(() => market.value?.items ?? []);
 const selectedIsFavorite = computed(() => favorites.value.some((item) => item.symbol === selectedSymbol.value));
@@ -72,9 +75,15 @@ onMounted(async () => {
 onUnmounted(() => {
   window.clearTimeout(searchTimer);
   window.removeEventListener('popstate', handlePopState);
+  marketRequestController?.abort();
+  detailRequestController?.abort();
+  valuationRequestController?.abort();
 });
 
 async function loadMarket(refresh = false): Promise<void> {
+  marketRequestController?.abort();
+  const requestController = new AbortController();
+  marketRequestController = requestController;
   marketLoading.value = true;
   marketError.value = null;
   try {
@@ -84,46 +93,61 @@ async function loadMarket(refresh = false): Promise<void> {
       sort: sort.value,
       order: order.value,
       exchange: exchange.value,
-      refresh
+      refresh,
+      signal: requestController.signal
     });
   } catch (error) {
-    marketError.value = error instanceof Error ? error.message : 'ETF 行情读取失败';
+    if (!isRequestAbort(error)) {
+      marketError.value = error instanceof Error ? error.message : 'ETF 行情读取失败';
+    }
   } finally {
-    marketLoading.value = false;
+    if (marketRequestController === requestController) {
+      marketRequestController = null;
+      marketLoading.value = false;
+    }
   }
 }
 
 async function loadDetail(symbol: string, refresh = false): Promise<void> {
-  const requestId = ++detailRequestId;
+  detailRequestController?.abort();
+  const requestController = new AbortController();
+  detailRequestController = requestController;
   detailLoading.value = true;
   detailError.value = null;
   detail.value = null;
   try {
-    const payload = await getEtfDetail(symbol, 10, refresh);
-    if (requestId === detailRequestId) detail.value = payload;
+    detail.value = await getEtfDetail(symbol, 10, refresh, requestController.signal);
   } catch (error) {
-    if (requestId === detailRequestId) {
+    if (detailRequestController === requestController && !isRequestAbort(error)) {
       detail.value = null;
       detailError.value = error instanceof Error ? error.message : 'ETF 详情读取失败';
     }
   } finally {
-    if (requestId === detailRequestId) detailLoading.value = false;
+    if (detailRequestController === requestController) {
+      detailRequestController = null;
+      detailLoading.value = false;
+    }
   }
 }
 
 async function loadValuation(symbol: string, refresh = false): Promise<void> {
+  valuationRequestController?.abort();
+  const requestController = new AbortController();
+  valuationRequestController = requestController;
   valuationLoading.value = true;
   valuationError.value = null;
   valuation.value = null;
   try {
-    const payload = await getEtfValuation(symbol, refresh);
-    if (symbol === selectedSymbol.value) valuation.value = payload;
+    valuation.value = await getEtfValuation(symbol, refresh, requestController.signal);
   } catch (error) {
-    if (symbol === selectedSymbol.value) {
+    if (valuationRequestController === requestController && !isRequestAbort(error)) {
       valuationError.value = error instanceof Error ? error.message : 'ETF 估值读取失败';
     }
   } finally {
-    if (symbol === selectedSymbol.value) valuationLoading.value = false;
+    if (valuationRequestController === requestController) {
+      valuationRequestController = null;
+      valuationLoading.value = false;
+    }
   }
 }
 

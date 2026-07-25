@@ -1,25 +1,237 @@
 <script setup lang="ts">
-import { computed,onMounted,onUnmounted,ref,watch } from 'vue';
-import { Loader2,RefreshCw,Search,Star } from 'lucide-vue-next';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { Loader2, RefreshCw, Search, Star } from 'lucide-vue-next';
 import IndexHistoryChart from './IndexHistoryChart.vue';
-import { getFavoriteIndices,getIndexDetail,getIndices,getIndexValuation,removeFavoriteIndex,saveFavoriteIndex } from '../services/api';
-import type { FavoriteIndex,IndexDetailResponse,IndexMarket,IndexMarketResponse,IndexQuote,IndexValuation } from '../types/index';
-const query=ref(''),marketFilter=ref<'all'|IndexMarket>('all'),market=ref<IndexMarketResponse|null>(null),detail=ref<IndexDetailResponse|null>(null),favorites=ref<FavoriteIndex[]>([]);
-const selectedKey=ref(keyFromUrl()),marketLoading=ref(false),detailLoading=ref(false),favoriteLoading=ref(false),error=ref<string|null>(null);let timer:number|undefined,requestId=0;
-const valuation=ref<IndexValuation|null>(null),valuationLoading=ref(false),valuationError=ref<string|null>(null);
-const items=computed(()=>market.value?.items??[]),selectedQuote=computed(()=>detail.value?.quote??items.value.find(i=>i.key===selectedKey.value)??null),isFavorite=computed(()=>favorites.value.some(i=>i.key===selectedKey.value));
-const groups=computed(()=>{const map=new Map<string,IndexQuote[]>();for(const item of items.value){const list=map.get(item.category)??[];list.push(item);map.set(item.category,list)}return [...map.entries()]});
-watch([query,marketFilter],()=>{clearTimeout(timer);timer=window.setTimeout(()=>void loadMarket(),250)});
-onMounted(async()=>{window.addEventListener('popstate',pop);await Promise.all([loadFavorites(),loadMarket(),loadDetail(selectedKey.value),loadValuation(selectedKey.value)])});onUnmounted(()=>{clearTimeout(timer);window.removeEventListener('popstate',pop)});
-async function loadMarket(refresh=false){marketLoading.value=true;error.value=null;try{market.value=await getIndices({q:query.value,market:marketFilter.value,refresh})}catch(e){error.value=e instanceof Error?e.message:'指数行情读取失败'}finally{marketLoading.value=false}}
-async function loadDetail(key:string,refresh=false){const id=++requestId,[m,s]=key.split(':') as [IndexMarket,string];detailLoading.value=true;error.value=null;try{const data=await getIndexDetail(m,s,10,refresh);if(id===requestId)detail.value=data}catch(e){if(id===requestId){detail.value=null;error.value=e instanceof Error?e.message:'指数详情读取失败'}}finally{if(id===requestId)detailLoading.value=false}}
-async function loadValuation(key:string,refresh=false){const [m,s]=key.split(':') as [IndexMarket,string];valuationLoading.value=true;valuationError.value=null;valuation.value=null;try{const data=await getIndexValuation(m,s,refresh);if(key===selectedKey.value)valuation.value=data}catch(e){if(key===selectedKey.value)valuationError.value=e instanceof Error?e.message:'指数估值读取失败'}finally{if(key===selectedKey.value)valuationLoading.value=false}}
-async function loadFavorites(){try{favorites.value=await getFavoriteIndices()}catch{favorites.value=[]}}
-function select(item:IndexQuote,mode:'push'|'none'='push'){selectedKey.value=item.key;if(mode==='push')sync(item.key);window.scrollTo({top:0,behavior:'auto'});void loadDetail(item.key);void loadValuation(item.key)}
-async function refresh(){await Promise.all([loadMarket(true),loadDetail(selectedKey.value,true),loadValuation(selectedKey.value,true)])}
-async function toggleFavorite(){const q=selectedQuote.value;if(!q||favoriteLoading.value)return;favoriteLoading.value=true;try{favorites.value=isFavorite.value?await removeFavoriteIndex(q.market,q.symbol):await saveFavoriteIndex(q.market,q.symbol)}finally{favoriteLoading.value=false}}
-function sync(key:string){const p=new URLSearchParams(location.search);p.set('view','index');p.set('index',key);p.delete('etf');history.pushState({view:'index',index:key},'',`${location.pathname}?${p}`)} function pop(){const k=keyFromUrl();if(k!==selectedKey.value){selectedKey.value=k;void loadDetail(k);void loadValuation(k)}} function keyFromUrl(){const v=new URLSearchParams(location.search).get('index')??'cn:000300';return /^(cn|bj|hk):[A-Z0-9]+$/i.test(v)?v:'cn:000300'}
-function number(v:number|null,d=2){return v===null?'-':new Intl.NumberFormat('zh-CN',{maximumFractionDigits:d}).format(v)} function compact(v:number|null){if(v===null)return'-';return Math.abs(v)>=1e8?`${(v/1e8).toFixed(2)}亿`:Math.abs(v)>=1e4?`${(v/1e4).toFixed(2)}万`:number(v)} function percent(v:number|null,decimal=false){if(v===null)return'-';const n=decimal?v*100:v;return`${n>=0?'+':''}${n.toFixed(2)}%`} function marketName(v:IndexMarket){return v==='hk'?'港股指数':v==='bj'?'北交所指数':'A股指数'} function date(v:string|null){if(!v)return'-';return new Date(v).toLocaleString('zh-CN',{hour12:false})}
+import {
+  getFavoriteIndices,
+  getIndexDetail,
+  getIndices,
+  getIndexValuation,
+  isRequestAbort,
+  removeFavoriteIndex,
+  saveFavoriteIndex
+} from '../services/api';
+import type {
+  FavoriteIndex,
+  IndexDetailResponse,
+  IndexMarket,
+  IndexMarketResponse,
+  IndexQuote,
+  IndexValuation
+} from '../types/index';
+
+const query = ref('');
+const marketFilter = ref<'all' | IndexMarket>('all');
+const market = ref<IndexMarketResponse | null>(null);
+const detail = ref<IndexDetailResponse | null>(null);
+const favorites = ref<FavoriteIndex[]>([]);
+const selectedKey = ref(keyFromUrl());
+const marketLoading = ref(false);
+const detailLoading = ref(false);
+const favoriteLoading = ref(false);
+const error = ref<string | null>(null);
+const valuation = ref<IndexValuation | null>(null);
+const valuationLoading = ref(false);
+const valuationError = ref<string | null>(null);
+let timer: number | undefined;
+let marketRequestController: AbortController | null = null;
+let detailRequestController: AbortController | null = null;
+let valuationRequestController: AbortController | null = null;
+
+const items = computed(() => market.value?.items ?? []);
+const selectedQuote = computed(
+  () => detail.value?.quote ?? items.value.find((item) => item.key === selectedKey.value) ?? null
+);
+const isFavorite = computed(() => favorites.value.some((item) => item.key === selectedKey.value));
+const groups = computed(() => {
+  const map = new Map<string, IndexQuote[]>();
+  for (const item of items.value) {
+    const list = map.get(item.category) ?? [];
+    list.push(item);
+    map.set(item.category, list);
+  }
+  return [...map.entries()];
+});
+
+watch([query, marketFilter], () => {
+  window.clearTimeout(timer);
+  timer = window.setTimeout(() => void loadMarket(), 250);
+});
+
+onMounted(async () => {
+  window.addEventListener('popstate', pop);
+  await Promise.all([
+    loadFavorites(),
+    loadMarket(),
+    loadDetail(selectedKey.value),
+    loadValuation(selectedKey.value)
+  ]);
+});
+
+onUnmounted(() => {
+  window.clearTimeout(timer);
+  window.removeEventListener('popstate', pop);
+  marketRequestController?.abort();
+  detailRequestController?.abort();
+  valuationRequestController?.abort();
+});
+
+async function loadMarket(refresh = false): Promise<void> {
+  marketRequestController?.abort();
+  const requestController = new AbortController();
+  marketRequestController = requestController;
+  marketLoading.value = true;
+  error.value = null;
+  try {
+    market.value = await getIndices({
+      q: query.value,
+      market: marketFilter.value,
+      refresh,
+      signal: requestController.signal
+    });
+  } catch (caught) {
+    if (!isRequestAbort(caught)) {
+      error.value = caught instanceof Error ? caught.message : '指数行情读取失败';
+    }
+  } finally {
+    if (marketRequestController === requestController) {
+      marketRequestController = null;
+      marketLoading.value = false;
+    }
+  }
+}
+
+async function loadDetail(key: string, refresh = false): Promise<void> {
+  detailRequestController?.abort();
+  const requestController = new AbortController();
+  detailRequestController = requestController;
+  const [marketName, symbol] = key.split(':') as [IndexMarket, string];
+  detailLoading.value = true;
+  error.value = null;
+  detail.value = null;
+  try {
+    detail.value = await getIndexDetail(marketName, symbol, 10, refresh, requestController.signal);
+  } catch (caught) {
+    if (detailRequestController === requestController && !isRequestAbort(caught)) {
+      detail.value = null;
+      error.value = caught instanceof Error ? caught.message : '指数详情读取失败';
+    }
+  } finally {
+    if (detailRequestController === requestController) {
+      detailRequestController = null;
+      detailLoading.value = false;
+    }
+  }
+}
+
+async function loadValuation(key: string, refresh = false): Promise<void> {
+  valuationRequestController?.abort();
+  const requestController = new AbortController();
+  valuationRequestController = requestController;
+  const [marketName, symbol] = key.split(':') as [IndexMarket, string];
+  valuationLoading.value = true;
+  valuationError.value = null;
+  valuation.value = null;
+  try {
+    valuation.value = await getIndexValuation(marketName, symbol, refresh, requestController.signal);
+  } catch (caught) {
+    if (valuationRequestController === requestController && !isRequestAbort(caught)) {
+      valuationError.value = caught instanceof Error ? caught.message : '指数估值读取失败';
+    }
+  } finally {
+    if (valuationRequestController === requestController) {
+      valuationRequestController = null;
+      valuationLoading.value = false;
+    }
+  }
+}
+
+async function loadFavorites(): Promise<void> {
+  try {
+    favorites.value = await getFavoriteIndices();
+  } catch {
+    favorites.value = [];
+  }
+}
+
+function select(item: IndexQuote, mode: 'push' | 'none' = 'push'): void {
+  selectedKey.value = item.key;
+  if (mode === 'push') sync(item.key);
+  window.scrollTo({ top: 0, behavior: 'auto' });
+  void loadDetail(item.key);
+  void loadValuation(item.key);
+}
+
+async function refresh(): Promise<void> {
+  await Promise.all([
+    loadMarket(true),
+    loadDetail(selectedKey.value, true),
+    loadValuation(selectedKey.value, true)
+  ]);
+}
+
+async function toggleFavorite(): Promise<void> {
+  const quote = selectedQuote.value;
+  if (!quote || favoriteLoading.value) return;
+  favoriteLoading.value = true;
+  try {
+    favorites.value = isFavorite.value
+      ? await removeFavoriteIndex(quote.market, quote.symbol)
+      : await saveFavoriteIndex(quote.market, quote.symbol);
+  } finally {
+    favoriteLoading.value = false;
+  }
+}
+
+function sync(key: string): void {
+  const params = new URLSearchParams(location.search);
+  params.set('view', 'index');
+  params.set('index', key);
+  params.delete('etf');
+  history.pushState({ view: 'index', index: key }, '', `${location.pathname}?${params}`);
+}
+
+function pop(): void {
+  const key = keyFromUrl();
+  if (key === selectedKey.value) return;
+  selectedKey.value = key;
+  void loadDetail(key);
+  void loadValuation(key);
+}
+
+function keyFromUrl(): string {
+  const value = new URLSearchParams(location.search).get('index') ?? 'cn:000300';
+  return /^(cn|bj|hk):[A-Z0-9]+$/i.test(value) ? value : 'cn:000300';
+}
+
+function number(value: number | null, digits = 2): string {
+  return value === null
+    ? '-'
+    : new Intl.NumberFormat('zh-CN', { maximumFractionDigits: digits }).format(value);
+}
+
+function compact(value: number | null): string {
+  if (value === null) return '-';
+  if (Math.abs(value) >= 1e8) return `${(value / 1e8).toFixed(2)}亿`;
+  if (Math.abs(value) >= 1e4) return `${(value / 1e4).toFixed(2)}万`;
+  return number(value);
+}
+
+function percent(value: number | null, decimal = false): string {
+  if (value === null) return '-';
+  const normalized = decimal ? value * 100 : value;
+  return `${normalized >= 0 ? '+' : ''}${normalized.toFixed(2)}%`;
+}
+
+function marketName(value: IndexMarket): string {
+  return value === 'hk' ? '港股指数' : value === 'bj' ? '北交所指数' : 'A股指数';
+}
+
+function date(value: string | null): string {
+  return value
+    ? new Date(value).toLocaleString('zh-CN', { hour12: false })
+    : '-';
+}
 </script>
 <template><section class="index-page"><header class="etf-page-toolbar"><div><h1>指数研究</h1><span>{{items.length}} 个常用指数</span></div><div class="etf-search-control"><Search :size="18"/><input v-model="query" type="search" placeholder="搜索指数名称或代码" aria-label="搜索指数"/><Loader2 v-if="marketLoading" class="spin-icon" :size="16"/></div><button class="ghost-button blue" type="button" :disabled="marketLoading||detailLoading" @click="refresh"><Loader2 v-if="marketLoading||detailLoading" class="spin-icon" :size="16"/><RefreshCw v-else :size="16"/>刷新</button></header>
 <div v-if="error" class="status-banner">{{error}}</div>

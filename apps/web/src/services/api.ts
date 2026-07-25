@@ -63,6 +63,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 }
 
+export function isRequestAbort(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
 export function searchCompanies(
   q: string,
   market: MarketFilter,
@@ -227,6 +231,7 @@ export function getEtfs(options: {
   order?: 'asc' | 'desc';
   exchange?: 'all' | 'sh' | 'sz';
   refresh?: boolean;
+  signal?: AbortSignal;
 } = {}): Promise<EtfMarketResponse> {
   const params = new URLSearchParams({
     q: options.q ?? '',
@@ -236,18 +241,27 @@ export function getEtfs(options: {
     exchange: options.exchange ?? 'all'
   });
   if (options.refresh) params.set('refresh', 'true');
-  return request<EtfMarketResponse>(`/etfs?${params.toString()}`);
+  return request<EtfMarketResponse>(`/etfs?${params.toString()}`, { signal: options.signal });
 }
 
-export function getEtfDetail(symbol: string, years = 10, refresh = false): Promise<EtfDetailResponse> {
+export function getEtfDetail(
+  symbol: string,
+  years = 10,
+  refresh = false,
+  signal?: AbortSignal
+): Promise<EtfDetailResponse> {
   const params = new URLSearchParams({ years: String(years) });
   if (refresh) params.set('refresh', 'true');
-  return request<EtfDetailResponse>(`/etfs/${encodeURIComponent(symbol)}?${params.toString()}`);
+  return request<EtfDetailResponse>(`/etfs/${encodeURIComponent(symbol)}?${params.toString()}`, { signal });
 }
 
-export function getEtfValuation(symbol: string, refresh = false): Promise<EtfValuation> {
+export function getEtfValuation(
+  symbol: string,
+  refresh = false,
+  signal?: AbortSignal
+): Promise<EtfValuation> {
   const suffix = refresh ? '?refresh=true' : '';
-  return request<EtfValuation>(`/etfs/${encodeURIComponent(symbol)}/valuation${suffix}`);
+  return request<EtfValuation>(`/etfs/${encodeURIComponent(symbol)}/valuation${suffix}`, { signal });
 }
 
 export function getFavoriteEtfs(): Promise<FavoriteEtf[]> {
@@ -262,15 +276,20 @@ export function removeFavoriteEtf(symbol: string): Promise<FavoriteEtf[]> {
   return request<FavoriteEtf[]>(`/etfs/favorites/${encodeURIComponent(symbol)}`, { method: 'DELETE' });
 }
 
-export function getIndices(options:{q?:string;market?:'all'|IndexMarket;refresh?:boolean}={}):Promise<IndexMarketResponse> {
+export function getIndices(options:{
+  q?:string;
+  market?:'all'|IndexMarket;
+  refresh?:boolean;
+  signal?:AbortSignal;
+}={}):Promise<IndexMarketResponse> {
   const params=new URLSearchParams({q:options.q??'',market:options.market??'all'}); if(options.refresh) params.set('refresh','true');
-  return request<IndexMarketResponse>(`/indices?${params.toString()}`);
+  return request<IndexMarketResponse>(`/indices?${params.toString()}`, { signal: options.signal });
 }
-export function getIndexDetail(market:IndexMarket,symbol:string,years=10,refresh=false):Promise<IndexDetailResponse> {
+export function getIndexDetail(market:IndexMarket,symbol:string,years=10,refresh=false,signal?:AbortSignal):Promise<IndexDetailResponse> {
   const params=new URLSearchParams({years:String(years)}); if(refresh) params.set('refresh','true');
-  return request<IndexDetailResponse>(`/indices/${market}/${encodeURIComponent(symbol)}?${params.toString()}`);
+  return request<IndexDetailResponse>(`/indices/${market}/${encodeURIComponent(symbol)}?${params.toString()}`, { signal });
 }
 export function getFavoriteIndices():Promise<FavoriteIndex[]> { return request<FavoriteIndex[]>('/indices/favorites'); }
 export function saveFavoriteIndex(market:IndexMarket,symbol:string):Promise<FavoriteIndex[]> { return request<FavoriteIndex[]>(`/indices/favorites/${market}/${encodeURIComponent(symbol)}`,{method:'POST'}); }
 export function removeFavoriteIndex(market:IndexMarket,symbol:string):Promise<FavoriteIndex[]> { return request<FavoriteIndex[]>(`/indices/favorites/${market}/${encodeURIComponent(symbol)}`,{method:'DELETE'}); }
-export function getIndexValuation(market:IndexMarket,symbol:string,refresh=false):Promise<IndexValuation> { const suffix=refresh?'?refresh=true':''; return request<IndexValuation>(`/indices/${market}/${encodeURIComponent(symbol)}/valuation${suffix}`); }
+export function getIndexValuation(market:IndexMarket,symbol:string,refresh=false,signal?:AbortSignal):Promise<IndexValuation> { const suffix=refresh?'?refresh=true':''; return request<IndexValuation>(`/indices/${market}/${encodeURIComponent(symbol)}/valuation${suffix}`, { signal }); }
