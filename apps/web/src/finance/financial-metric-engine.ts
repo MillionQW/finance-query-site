@@ -84,6 +84,50 @@ export function calculateRollingRatio(
   return { numeratorTotal, denominatorTotal, value: safeDivide(numeratorTotal, denominatorTotal) };
 }
 
+export function calculateIncrementalReturn(
+  currentProfit: number | null,
+  baseProfit: number | null,
+  currentCapital: number | null,
+  baseCapital: number | null
+): { profitChange: number | null; capitalChange: number | null; value: number | null } {
+  const profitChange = currentProfit !== null && baseProfit !== null
+    ? currentProfit - baseProfit
+    : null;
+  const capitalChange = currentCapital !== null && baseCapital !== null
+    ? currentCapital - baseCapital
+    : null;
+  return {
+    profitChange,
+    capitalChange,
+    value: profitChange !== null && capitalChange !== null && capitalChange > 0
+      ? profitChange / capitalChange
+      : null
+  };
+}
+
+export function calculateRollingStatistics(
+  values: Array<number | null>,
+  startIndex: number,
+  windowSize: number
+): { count: number; mean: number | null; standardDeviation: number | null } {
+  const window = values.slice(startIndex, startIndex + windowSize);
+  if (
+    startIndex < 0 ||
+    window.length < windowSize ||
+    window.some((value) => value === null)
+  ) {
+    return { count: window.filter((value) => value !== null).length, mean: null, standardDeviation: null };
+  }
+  const numericValues = window as number[];
+  const mean = numericValues.reduce((total, value) => total + value, 0) / numericValues.length;
+  const variance = numericValues.reduce((total, value) => total + (value - mean) ** 2, 0) / numericValues.length;
+  return {
+    count: numericValues.length,
+    mean,
+    standardDeviation: Math.sqrt(variance)
+  };
+}
+
 export function calculateCashConversionCycle(
   revenue: number | null,
   operatingCost: number | null,

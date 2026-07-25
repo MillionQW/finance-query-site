@@ -54,7 +54,9 @@ import {
   absoluteValue,
   calculateCashConversionCycle,
   calculateFreeCashFlow,
+  calculateIncrementalReturn,
   calculateRollingRatio,
+  calculateRollingStatistics,
   findRow,
   findRows,
   formatMetricValue,
@@ -158,6 +160,83 @@ const definitions: MetricDefinition[] = [
         nopatValue(context, year),
         averageInvestedCapital(context, year, yearIndex).average
       )
+  },
+  {
+    key: 'incrementalRoic3y',
+    label: '3年增量ROIC',
+    group: 'profitability',
+    formula: '(本期NOPAT - 三年前NOPAT) / (本期投入资本 - 三年前投入资本)',
+    kind: 'percent',
+    description: '观察近三年新增投入资本带来的税后经营利润增量。只有投入资本净增加时计算；高且稳定说明企业仍有较强的再投资能力。',
+    requirements: [
+      { label: '营业利润', table: 'income', aliases: OPERATING_PROFIT_ALIASES },
+      { label: '利润总额', table: 'income', aliases: TOTAL_PROFIT_ALIASES },
+      { label: '所得税费用', table: 'income', aliases: INCOME_TAX_ALIASES },
+      { label: '股东权益', table: 'balance', aliases: EQUITY_ALIASES },
+      { label: '现金及现金等价物', table: 'balance', aliases: CASH_ALIASES }
+    ],
+    calculate: (context, _year, yearIndex) => incrementalRoicDetails(context, yearIndex, 3).value
+  },
+  {
+    key: 'averageRoic5y',
+    label: '5年平均ROIC',
+    group: 'profitability',
+    formula: '近5年ROIC算术平均值',
+    kind: 'percent',
+    description: '用五年平均值过滤单年周期和会计波动，观察企业长期投入资本回报水平。完整计算通常需要至少六年资产负债表数据。',
+    requirements: [
+      { label: '营业利润', table: 'income', aliases: OPERATING_PROFIT_ALIASES },
+      { label: '利润总额', table: 'income', aliases: TOTAL_PROFIT_ALIASES },
+      { label: '所得税费用', table: 'income', aliases: INCOME_TAX_ALIASES },
+      { label: '股东权益', table: 'balance', aliases: EQUITY_ALIASES },
+      { label: '现金及现金等价物', table: 'balance', aliases: CASH_ALIASES }
+    ],
+    calculate: (context, _year, yearIndex) => rollingProfitabilityStatistics(context, yearIndex, 5, 'roic').mean
+  },
+  {
+    key: 'roicVolatility5y',
+    label: '5年ROIC波动',
+    group: 'profitability',
+    formula: '近5年ROIC标准差',
+    kind: 'percent',
+    description: '衡量投入资本回报的稳定程度，数值越低越稳定。应与五年平均ROIC一起看，避免把稳定的低回报误判为优秀。',
+    requirements: [
+      { label: '营业利润', table: 'income', aliases: OPERATING_PROFIT_ALIASES },
+      { label: '利润总额', table: 'income', aliases: TOTAL_PROFIT_ALIASES },
+      { label: '所得税费用', table: 'income', aliases: INCOME_TAX_ALIASES },
+      { label: '股东权益', table: 'balance', aliases: EQUITY_ALIASES },
+      { label: '现金及现金等价物', table: 'balance', aliases: CASH_ALIASES }
+    ],
+    calculate: (context, _year, yearIndex) =>
+      rollingProfitabilityStatistics(context, yearIndex, 5, 'roic').standardDeviation
+  },
+  {
+    key: 'grossMarginVolatility5y',
+    label: '5年毛利率波动',
+    group: 'profitability',
+    formula: '近5年毛利率标准差',
+    kind: 'percent',
+    description: '观察产品定价、成本转嫁和竞争格局是否稳定。波动突然扩大时，应检查产品结构、原材料价格和行业竞争变化。',
+    requirements: [
+      { label: '毛利润或营业成本', table: 'income', aliases: [...GROSS_PROFIT_ALIASES, ...OPERATING_COST_ALIASES] },
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+    ],
+    calculate: (context, _year, yearIndex) =>
+      rollingProfitabilityStatistics(context, yearIndex, 5, 'grossMargin').standardDeviation
+  },
+  {
+    key: 'operatingMarginVolatility5y',
+    label: '5年营业利润率波动',
+    group: 'profitability',
+    formula: '近5年营业利润率标准差',
+    kind: 'percent',
+    description: '观察主营经营利润跨周期的稳定程度。毛利率稳定而营业利润率波动扩大时，通常要进一步检查费用、减值和非主营项目。',
+    requirements: [
+      { label: '营业利润', table: 'income', aliases: OPERATING_PROFIT_ALIASES },
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+    ],
+    calculate: (context, _year, yearIndex) =>
+      rollingProfitabilityStatistics(context, yearIndex, 5, 'operatingMargin').standardDeviation
   },
   {
     key: 'greenblattReturnOnCapital',
@@ -1404,6 +1483,69 @@ function averageInvestedCapital(context: MetricContext, year: string, yearIndex:
   return { current, previous, previousYear, average };
 }
 
+function incrementalRoicDetails(context: MetricContext, yearIndex: number, lookbackYears: number) {
+  const currentYear = context.statements.years[yearIndex];
+  const baseIndex = yearIndex + lookbackYears;
+  const baseYear = context.statements.years[baseIndex];
+  const currentNopat = currentYear ? nopatValue(context, currentYear) : null;
+  const baseNopat = baseYear ? nopatValue(context, baseYear) : null;
+  const currentCapital = currentYear ? investedCapitalDetails(context, currentYear).investedCapital : null;
+  const baseCapital = baseYear ? investedCapitalDetails(context, baseYear).investedCapital : null;
+  const calculated = calculateIncrementalReturn(currentNopat, baseNopat, currentCapital, baseCapital);
+  return {
+    currentYear,
+    baseYear,
+    currentNopat,
+    baseNopat,
+    currentCapital,
+    baseCapital,
+    ...calculated
+  };
+}
+
+function profitabilityValueAtIndex(
+  context: MetricContext,
+  yearIndex: number,
+  metric: 'roic' | 'grossMargin' | 'operatingMargin'
+): number | null {
+  const year = context.statements.years[yearIndex];
+  if (!year) return null;
+  if (metric === 'roic') {
+    return safeDivide(
+      nopatValue(context, year),
+      averageInvestedCapital(context, year, yearIndex).average
+    );
+  }
+  const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+  if (metric === 'operatingMargin') {
+    return safeDivide(rowValue(context.income, year, OPERATING_PROFIT_ALIASES), revenue);
+  }
+  const directGrossProfit = rowValue(context.income, year, GROSS_PROFIT_ALIASES);
+  const operatingCost = rowValue(context.income, year, OPERATING_COST_ALIASES);
+  const grossProfit = directGrossProfit ?? (
+    revenue !== null && operatingCost !== null
+      ? revenue - Math.abs(operatingCost)
+      : null
+  );
+  return safeDivide(grossProfit, revenue);
+}
+
+function rollingProfitabilityStatistics(
+  context: MetricContext,
+  yearIndex: number,
+  windowSize: number,
+  metric: 'roic' | 'grossMargin' | 'operatingMargin'
+) {
+  const values = context.statements.years.map((_, index) => profitabilityValueAtIndex(context, index, metric));
+  const years = context.statements.years.slice(yearIndex, yearIndex + windowSize);
+  const windowValues = values.slice(yearIndex, yearIndex + windowSize);
+  return {
+    years,
+    values: windowValues,
+    ...calculateRollingStatistics(values, yearIndex, windowSize)
+  };
+}
+
 function greenblattCapitalDetails(context: MetricContext, year: string) {
   const currentAssets = rowValue(context.balance, year, CURRENT_ASSET_ALIASES);
   const currentLiabilities = rowValue(context.balance, year, CURRENT_LIABILITY_ALIASES);
@@ -1566,6 +1708,55 @@ function metricDetails(
         { label: '平均投入资本', value: investedCapital.average, note: '(期初 + 期末) / 2' }
       ],
       expression: `${formatRawValue(nopat)} / ${formatRawValue(investedCapital.average)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'incrementalRoic3y') {
+    const incremental = incrementalRoicDetails(context, yearIndex, 3);
+    return {
+      rows: [
+        { label: `${incremental.currentYear ?? year} NOPAT`, value: incremental.currentNopat },
+        { label: `${incremental.baseYear ?? '三年前'} NOPAT`, value: incremental.baseNopat },
+        { label: 'NOPAT增量', value: incremental.profitChange, note: '本期 - 三年前' },
+        { label: `${incremental.currentYear ?? year} 投入资本`, value: incremental.currentCapital },
+        { label: `${incremental.baseYear ?? '三年前'} 投入资本`, value: incremental.baseCapital },
+        { label: '投入资本增量', value: incremental.capitalChange, note: '仅在大于0时计算' }
+      ],
+      expression: `${formatRawValue(incremental.profitChange)} / ${formatRawValue(incremental.capitalChange)} = ${formatMetricValue(incremental.value, definition.kind)}`
+    };
+  }
+
+  if (
+    definition.key === 'averageRoic5y' ||
+    definition.key === 'roicVolatility5y' ||
+    definition.key === 'grossMarginVolatility5y' ||
+    definition.key === 'operatingMarginVolatility5y'
+  ) {
+    const metric = definition.key === 'grossMarginVolatility5y'
+      ? 'grossMargin'
+      : definition.key === 'operatingMarginVolatility5y'
+        ? 'operatingMargin'
+        : 'roic';
+    const metricLabel = metric === 'grossMargin'
+      ? '毛利率'
+      : metric === 'operatingMargin'
+        ? '营业利润率'
+        : 'ROIC';
+    const statistics = rollingProfitabilityStatistics(context, yearIndex, 5, metric);
+    const value = definition.key === 'averageRoic5y'
+      ? statistics.mean
+      : statistics.standardDeviation;
+    return {
+      rows: [
+        ...statistics.years.map((statisticsYear, index) => ({
+          label: `${statisticsYear} ${metricLabel}`,
+          value: statistics.values[index] ?? null,
+          kind: 'percent' as const
+        })),
+        { label: `5年${metricLabel}均值`, value: statistics.mean, kind: 'percent' },
+        { label: `5年${metricLabel}标准差`, value: statistics.standardDeviation, kind: 'percent' }
+      ],
+      expression: `${definition.formula} = ${formatMetricValue(value, definition.kind)}`
     };
   }
 

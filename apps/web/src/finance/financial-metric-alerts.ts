@@ -27,6 +27,8 @@ export function isCriticalMetric(result: MetricResult): boolean {
   if (result.definition.key === 'deductedProfitRatio') return result.latest >= 0 && result.latest < 0.5;
   if (result.definition.key === 'interestCoverage') return result.latest < 1;
   if (result.definition.key === 'netDebtToOperatingCash') return result.latest > 5;
+  if (result.definition.key === 'incrementalRoic3y' || result.definition.key === 'averageRoic5y') return result.latest < 0;
+  if (isProfitabilityVolatilityMetric(result.definition.key)) return result.latest > 0.1;
   if (isGrowthGapMetric(result.definition.key)) return result.latest > 0.2;
   return false;
 }
@@ -42,6 +44,8 @@ export function isPositiveMetric(result: MetricResult): boolean {
   if (result.definition.key === 'deductedProfitRatio') return result.latest >= 0.9;
   if (result.definition.key === 'interestCoverage') return result.latest >= 5;
   if (result.definition.key === 'netDebtToOperatingCash') return result.latest < 2;
+  if (result.definition.key === 'incrementalRoic3y' || result.definition.key === 'averageRoic5y') return result.latest >= 0.15;
+  if (isProfitabilityVolatilityMetric(result.definition.key)) return result.latest <= 0.03;
   if (isGrowthGapMetric(result.definition.key)) return result.latest <= 0;
   return false;
 }
@@ -57,8 +61,18 @@ export function isWarningMetric(result: MetricResult): boolean {
   if (result.definition.key === 'deductedProfitRatio') return result.latest >= 0.5 && result.latest < 0.9;
   if (result.definition.key === 'interestCoverage') return result.latest >= 1 && result.latest < 3;
   if (result.definition.key === 'netDebtToOperatingCash') return result.latest >= 3 && result.latest <= 5;
+  if (result.definition.key === 'incrementalRoic3y' || result.definition.key === 'averageRoic5y') return result.latest >= 0 && result.latest < 0.08;
+  if (isProfitabilityVolatilityMetric(result.definition.key)) return result.latest > 0.05 && result.latest <= 0.1;
   if (isGrowthGapMetric(result.definition.key)) return result.latest > 0.1 && result.latest <= 0.2;
   return false;
+}
+
+function isProfitabilityVolatilityMetric(metricKey: string): boolean {
+  return [
+    'roicVolatility5y',
+    'grossMarginVolatility5y',
+    'operatingMarginVolatility5y'
+  ].includes(metricKey);
 }
 
 export function metricAlerts(
@@ -135,6 +149,25 @@ export function metricAlerts(
         year: latest.year,
         message: `${latest.year} 净债务相当于 ${formatMetricValue(latest.value, 'times')} 年经营现金流。`,
         tone: latest.value > 5 ? 'danger' : 'warning'
+      });
+    }
+    if (
+      (definition.key === 'incrementalRoic3y' || definition.key === 'averageRoic5y') &&
+      latest.value < 0.08
+    ) {
+      alerts.push({
+        year: latest.year,
+        message: definition.key === 'incrementalRoic3y'
+          ? `${latest.year} 三年增量ROIC为 ${formatMetricValue(latest.value, 'percent')}，新增资本回报偏低。`
+          : `${latest.year} 五年平均ROIC为 ${formatMetricValue(latest.value, 'percent')}，长期资本回报偏低。`,
+        tone: latest.value < 0 ? 'danger' : 'warning'
+      });
+    }
+    if (isProfitabilityVolatilityMetric(definition.key) && latest.value > 0.05) {
+      alerts.push({
+        year: latest.year,
+        message: `${latest.year} 五年盈利指标标准差为 ${formatMetricValue(latest.value, 'percent')}，跨周期波动较大。`,
+        tone: latest.value > 0.1 ? 'danger' : 'warning'
       });
     }
     if (

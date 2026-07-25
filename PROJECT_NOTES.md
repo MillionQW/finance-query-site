@@ -251,6 +251,11 @@ Current fixed metrics:
 - ROE = net profit / average shareholders' equity
 - ROA = net profit / average total assets
 - ROIC = NOPAT / average invested capital
+- Three-year incremental ROIC = change in NOPAT over three years / positive change in ending invested capital over three years
+- Five-year average ROIC = arithmetic mean of five annual ROIC observations
+- Five-year ROIC volatility = population standard deviation of five annual ROIC observations
+- Five-year gross-margin volatility = population standard deviation of five annual gross margins
+- Five-year operating-margin volatility = population standard deviation of five annual operating margins
 - Greenblatt ROC = EBIT / (working capital + net fixed assets)
 - Current ratio = current assets / current liabilities
 - Quick ratio = (current assets - inventory) / current liabilities

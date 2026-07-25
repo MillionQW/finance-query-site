@@ -81,6 +81,27 @@ test('metric state classification keeps danger, warning, and positive thresholds
   assert.equal(isPositiveMetric(result('interestCoverage', 6, 'times')), true);
   assert.equal(isWarningMetric(result('assetLiabilityRatio', 0.75)), true);
   assert.equal(isCriticalMetric(result('assetLiabilityRatio', 0.85)), true);
+  assert.equal(isCriticalMetric(result('incrementalRoic3y', -0.02)), true);
+  assert.equal(isWarningMetric(result('incrementalRoic3y', 0.06)), true);
+  assert.equal(isPositiveMetric(result('incrementalRoic3y', 0.18)), true);
+  assert.equal(isPositiveMetric(result('roicVolatility5y', 0.02)), true);
+  assert.equal(isWarningMetric(result('roicVolatility5y', 0.07)), true);
+});
+
+test('profitability stability alerts explain low incremental returns and high volatility', () => {
+  const incrementalAlerts = metricAlerts(
+    definition('incrementalRoic3y'),
+    [point('2025', 0.05)]
+  );
+  assert.equal(incrementalAlerts[0]?.tone, 'warning');
+  assert.match(incrementalAlerts[0]?.message ?? '', /新增资本回报偏低/);
+
+  const volatilityAlerts = metricAlerts(
+    definition('grossMarginVolatility5y'),
+    [point('2025', 0.12)]
+  );
+  assert.equal(volatilityAlerts[0]?.tone, 'danger');
+  assert.match(volatilityAlerts[0]?.message ?? '', /跨周期波动较大/);
 });
 
 test('missing years are surfaced without inventing zero values', () => {

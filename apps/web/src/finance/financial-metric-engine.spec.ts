@@ -3,7 +3,9 @@ import test from 'node:test';
 import {
   calculateCashConversionCycle,
   calculateFreeCashFlow,
+  calculateIncrementalReturn,
   calculateRollingRatio,
+  calculateRollingStatistics,
   findRow,
   formatMetricValue,
   growthGapValue,
@@ -87,6 +89,29 @@ test('cash conversion cycle combines receivable, inventory, and payable days', (
   assert.equal(result.inventoryDays, 73);
   assert.equal(result.payableDays, 54.75);
   assert.equal(result.cycle, 54.75);
+});
+
+test('incremental return uses only positive additions to invested capital', () => {
+  assert.deepEqual(
+    calculateIncrementalReturn(160, 100, 1400, 1000),
+    { profitChange: 60, capitalChange: 400, value: 0.15 }
+  );
+  assert.deepEqual(
+    calculateIncrementalReturn(160, 100, 900, 1000),
+    { profitChange: 60, capitalChange: -100, value: null }
+  );
+  assert.equal(calculateIncrementalReturn(null, 100, 1400, 1000).value, null);
+});
+
+test('five-year statistics calculate mean and population volatility', () => {
+  const result = calculateRollingStatistics([0.10, 0.12, 0.08, 0.11, 0.09], 0, 5);
+  assert.equal(result.count, 5);
+  assert.equal(result.mean, 0.1);
+  assert.ok(Math.abs((result.standardDeviation ?? 0) - Math.sqrt(0.0002)) < 1e-12);
+  assert.deepEqual(
+    calculateRollingStatistics([0.10, 0.12, null, 0.11, 0.09], 0, 5),
+    { count: 4, mean: null, standardDeviation: null }
+  );
 });
 
 test('growth gaps preserve direction and handle negative comparison bases', () => {
