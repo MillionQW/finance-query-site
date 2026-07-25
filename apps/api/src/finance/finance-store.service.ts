@@ -38,6 +38,7 @@ export class FinanceStoreService implements OnModuleDestroy {
   constructor() {
     mkdirSync(dirname(this.dbPath), { recursive: true });
     this.db = new DatabaseSync(this.dbPath);
+    this.configureDatabase();
     this.initializeSchema();
     this.markInterruptedRefreshRuns();
   }
@@ -1302,9 +1303,6 @@ export class FinanceStoreService implements OnModuleDestroy {
 
   private initializeSchema(): void {
     this.db.exec(`
-      PRAGMA journal_mode = WAL;
-      PRAGMA foreign_keys = ON;
-
       CREATE TABLE IF NOT EXISTS companies (
         market TEXT NOT NULL,
         symbol TEXT NOT NULL,
@@ -1782,7 +1780,7 @@ export class FinanceStoreService implements OnModuleDestroy {
       return callback();
     }
 
-    this.db.exec('BEGIN');
+    this.db.exec('BEGIN IMMEDIATE');
     try {
       const result = callback();
       this.db.exec('COMMIT');
@@ -1791,6 +1789,15 @@ export class FinanceStoreService implements OnModuleDestroy {
       this.db.exec('ROLLBACK');
       throw error;
     }
+  }
+
+  private configureDatabase(): void {
+    this.db.exec(`
+      PRAGMA journal_mode = WAL;
+      PRAGMA synchronous = NORMAL;
+      PRAGMA busy_timeout = 5000;
+      PRAGMA foreign_keys = ON;
+    `);
   }
 }
 

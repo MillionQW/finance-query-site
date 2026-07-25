@@ -19,6 +19,11 @@ export class PythonAkshareService {
   private readonly pythonBin = this.resolvePythonBin();
   private readonly bridgePath = this.resolveBridgePath();
   private readonly defaultTimeoutMs = this.readTimeout(process.env.AKSHARE_TIMEOUT_MS, 120_000);
+  private readonly maxOutputBytes = this.readByteLimit(
+    process.env.AKSHARE_MAX_OUTPUT_BYTES,
+    25 * 1024 * 1024
+  );
+  private readonly exposeErrorDetails = process.env.AKSHARE_EXPOSE_ERROR_DETAILS === 'true';
 
   async run<T>(args: string[], timeoutMs = this.defaultTimeoutMs): Promise<T> {
     if (!existsSync(this.bridgePath)) {
@@ -33,7 +38,7 @@ export class PythonAkshareService {
     try {
       parsed = JSON.parse(output) as BridgeResult<T>;
     } catch (error) {
-      this.logger.error(`Invalid bridge JSON: ${output}`);
+      this.logger.error(`Invalid bridge JSON: ${this.truncateForLog(output)}`);
       throw new HttpException(
         'Python AKShare bridge returned invalid JSON.',
         HttpStatus.BAD_GATEWAY
@@ -41,11 +46,16 @@ export class PythonAkshareService {
     }
 
     if (!parsed.ok) {
+      if (parsed.error?.detail) {
+        this.logger.warn(this.truncateForLog(parsed.error.detail));
+      }
       throw new HttpException(
         {
           message: parsed.error?.message ?? 'AKShare request failed.',
           code: parsed.error?.code ?? 'AKSHARE_ERROR',
-          detail: parsed.error?.detail
+          ...(this.exposeErrorDetails && parsed.error?.detail
+            ? { detail: parsed.error.detail }
+            : {})
         },
         HttpStatus.BAD_GATEWAY
       );
@@ -91,6 +101,7 @@ export class PythonAkshareService {
 
       let stdout = '';
       let stderr = '';
+      let outputBytes = 0;
       let settled = false;
       const timeout = timeoutMs && timeoutMs > 0
         ? setTimeout(() => {
@@ -99,11 +110,13 @@ export class PythonAkshareService {
             child.kill('SIGKILL');
             reject(
               new HttpException(
-                {
-                  message: 'Python AKShare bridge timed out.',
-                  code: 'PYTHON_BRIDGE_TIMEOUT',
-                  detail: `Command exceeded ${timeoutMs}ms: ${args.join(' ')}`
-                },
+                  {
+                    message: 'Python AKShare bridge timed out.',
+                    code: 'PYTHON_BRIDGE_TIMEOUT',
+                    ...(this.exposeErrorDetails
+                      ? { detail: `Command exceeded ${timeoutMs}ms: ${args.join(' ')}` }
+                      : {})
+                  },
                 HttpStatus.BAD_GATEWAY
               )
             );
@@ -120,9 +133,41 @@ export class PythonAkshareService {
       child.stdout.setEncoding('utf8');
       child.stderr.setEncoding('utf8');
       child.stdout.on('data', (chunk: string) => {
+        outputBytes += Buffer.byteLength(chunk);
+        if (outputBytes > this.maxOutputBytes) {
+          finish(() => {
+            child.kill('SIGKILL');
+            reject(
+              new HttpException(
+                {
+                  message: 'Python AKShare bridge returned too much data.',
+                  code: 'PYTHON_BRIDGE_OUTPUT_LIMIT'
+                },
+                HttpStatus.BAD_GATEWAY
+              )
+            );
+          });
+          return;
+        }
         stdout += chunk;
       });
       child.stderr.on('data', (chunk: string) => {
+        outputBytes += Buffer.byteLength(chunk);
+        if (outputBytes > this.maxOutputBytes) {
+          finish(() => {
+            child.kill('SIGKILL');
+            reject(
+              new HttpException(
+                {
+                  message: 'Python AKShare bridge returned too much data.',
+                  code: 'PYTHON_BRIDGE_OUTPUT_LIMIT'
+                },
+                HttpStatus.BAD_GATEWAY
+              )
+            );
+          });
+          return;
+        }
         stderr += chunk;
       });
 
@@ -140,13 +185,15 @@ export class PythonAkshareService {
       child.on('close', (code) => {
         finish(() => {
           if (code !== 0) {
-            this.logger.error(stderr || stdout);
+            this.logger.error(this.truncateForLog(stderr || stdout));
             reject(
               new HttpException(
                 {
                   message: 'Python AKShare bridge failed.',
                   code: 'PYTHON_BRIDGE_FAILED',
-                  detail: stderr || stdout
+                  ...(this.exposeErrorDetails
+                    ? { detail: stderr || stdout }
+                    : {})
                 },
                 HttpStatus.BAD_GATEWAY
               )
@@ -165,5 +212,18 @@ export class PythonAkshareService {
     return Number.isFinite(parsed) && parsed >= 1_000 && parsed <= 10 * 60_000
       ? Math.floor(parsed)
       : fallback;
+  }
+
+  private readByteLimit(value: string | undefined, fallback: number): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 1024 * 1024 && parsed <= 100 * 1024 * 1024
+      ? Math.floor(parsed)
+      : fallback;
+  }
+
+  private truncateForLog(value: string, maxLength = 4_000): string {
+    return value.length <= maxLength
+      ? value
+      : `${value.slice(0, maxLength)}… [truncated ${value.length - maxLength} chars]`;
   }
 }

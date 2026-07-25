@@ -116,6 +116,7 @@ let peerRequestId = 0;
 let peerMetricRequestId = 0;
 let announcementRequestId = 0;
 let insightRequestId = 0;
+let companyRequestController: AbortController | null = null;
 
 const marketOptions: { value: MarketFilter; label: string }[] = [
   { value: 'all', label: '全部' },
@@ -227,6 +228,10 @@ function formatDate(value?: string): string {
   return new Date(value).toLocaleString('zh-CN', { hour12: false });
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
 function refreshRunLabel(status?: string): string {
   if (status === 'completed') return '已完成';
   if (status === 'failed') return '失败';
@@ -259,16 +264,16 @@ function cancelBuyPointEditing(): void {
   buyPointEditing.value = false;
 }
 
-async function loadCompanyInsight(company: CompanySearchResult): Promise<void> {
+async function loadCompanyInsight(company: CompanySearchResult, signal?: AbortSignal): Promise<void> {
   const requestId = ++insightRequestId;
   try {
-    const insight = await getCompanyInsight(company.market, company.symbol);
+    const insight = await getCompanyInsight(company.market, company.symbol, signal);
     companyInsights.value = { ...companyInsights.value, [companyKey(company)]: insight };
     if (requestId === insightRequestId && sameCompany(company, selectedCompany.value)) {
       buyPointDraft.value = insight.buyPointRange;
     }
   } catch (error) {
-    if (requestId === insightRequestId) {
+    if (requestId === insightRequestId && !isAbortError(error)) {
       statementError.value = error instanceof Error ? error.message : '公司备注读取失败';
     }
   }
@@ -691,6 +696,10 @@ async function runSearch(): Promise<void> {
 
 async function selectCompany(company: CompanySearchResult, refresh = false, urlMode: UrlMode = 'push'): Promise<void> {
   const requestId = ++statementRequestId;
+  companyRequestController?.abort();
+  const requestController = new AbortController();
+  companyRequestController = requestController;
+  const { signal } = requestController;
   companies.value = mergeCompanyList([company], companies.value);
   selectedCompany.value = company;
   rememberRecentCompany(company);
@@ -704,12 +713,12 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
   peerComparison.value = null;
   peerMetricComparison.value = null;
   activeStatement.value = 'balance';
-  void loadPeerComparison(company);
-  void loadPeerMetricComparison(company);
-  void loadAnnouncements(company);
-  void loadCompanyInsight(company);
+  void loadPeerComparison(company, signal);
+  void loadPeerMetricComparison(company, signal);
+  void loadAnnouncements(company, signal);
+  void loadCompanyInsight(company, signal);
   try {
-    const payload = await getStatements(company.market, company.symbol, 0, refresh);
+    const payload = await getStatements(company.market, company.symbol, 0, refresh, signal);
     if (requestId !== statementRequestId || !sameCompany(company, selectedCompany.value)) {
       return;
     }
@@ -726,7 +735,7 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
     }
     selectedYears.value = [...payload.years];
   } catch (error) {
-    if (requestId === statementRequestId) {
+    if (requestId === statementRequestId && !isAbortError(error)) {
       statements.value = null;
       selectedYears.value = [];
       statementError.value = error instanceof Error ? error.message : '财报查询失败';
@@ -738,18 +747,21 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
   }
 }
 
-async function loadAnnouncements(company: CompanySearchResult): Promise<void> {
+async function loadAnnouncements(company: CompanySearchResult, signal?: AbortSignal): Promise<void> {
   const requestId = ++announcementRequestId;
   announcementLoading.value = true;
   announcementError.value = null;
   announcementFeed.value = null;
   try {
-    const feed = await getAnnouncements(company.market, company.symbol);
-    if (requestId !== announcementRequestId) return;
+    const feed = await getAnnouncements(company.market, company.symbol, signal);
+    if (requestId !== announcementRequestId || signal?.aborted) return;
     announcementFeed.value = feed;
-    favorites.value = await markAnnouncementsViewed(company.market, company.symbol);
+    const nextFavorites = await markAnnouncementsViewed(company.market, company.symbol, signal);
+    if (requestId === announcementRequestId && !signal?.aborted) {
+      favorites.value = nextFavorites;
+    }
   } catch (error) {
-    if (requestId === announcementRequestId) {
+    if (requestId === announcementRequestId && !isAbortError(error)) {
       announcementError.value = error instanceof Error ? error.message : '公告读取失败';
     }
   } finally {
@@ -759,19 +771,19 @@ async function loadAnnouncements(company: CompanySearchResult): Promise<void> {
   }
 }
 
-async function loadPeerComparison(company: CompanySearchResult): Promise<void> {
+async function loadPeerComparison(company: CompanySearchResult, signal?: AbortSignal): Promise<void> {
   const requestId = ++peerRequestId;
   peerLoading.value = true;
   peerError.value = null;
   peerComparison.value = null;
 
   try {
-    const payload = await getPeerComparison(company.market, company.symbol, 20);
-    if (requestId === peerRequestId) {
+    const payload = await getPeerComparison(company.market, company.symbol, 20, signal);
+    if (requestId === peerRequestId && !signal?.aborted) {
       peerComparison.value = payload;
     }
   } catch (error) {
-    if (requestId === peerRequestId) {
+    if (requestId === peerRequestId && !isAbortError(error)) {
       peerError.value = error instanceof Error ? error.message : '同行对比获取失败';
     }
   } finally {
@@ -781,7 +793,7 @@ async function loadPeerComparison(company: CompanySearchResult): Promise<void> {
   }
 }
 
-async function loadPeerMetricComparison(company: CompanySearchResult): Promise<void> {
+async function loadPeerMetricComparison(company: CompanySearchResult, signal?: AbortSignal): Promise<void> {
   const requestId = ++peerMetricRequestId;
   peerMetricLoading.value = true;
   peerMetricError.value = null;
@@ -799,13 +811,13 @@ async function loadPeerMetricComparison(company: CompanySearchResult): Promise<v
     }
 
     const payload = peerMetricMode.value === 'custom'
-      ? await getMetricComparison(activePeerMetricKey.value, selectedMetricCompanies.value)
-      : await getPeerMetricComparison(company.market, company.symbol, activePeerMetricKey.value, 12);
-    if (requestId === peerMetricRequestId) {
+      ? await getMetricComparison(activePeerMetricKey.value, selectedMetricCompanies.value, signal)
+      : await getPeerMetricComparison(company.market, company.symbol, activePeerMetricKey.value, 12, signal);
+    if (requestId === peerMetricRequestId && !signal?.aborted) {
       peerMetricComparison.value = payload;
     }
   } catch (error) {
-    if (requestId === peerMetricRequestId) {
+    if (requestId === peerMetricRequestId && !isAbortError(error)) {
       peerMetricComparison.value = null;
       peerMetricError.value = error instanceof Error ? error.message : '同行财务指标读取失败';
     }
@@ -900,6 +912,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  companyRequestController?.abort();
   window.removeEventListener('popstate', handleUrlNavigation);
   window.removeEventListener('keydown', handleGlobalKeydown);
 });

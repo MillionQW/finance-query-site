@@ -74,6 +74,8 @@ Windows 下也可以直接运行 `start-finance-site.cmd`。脚本会在源码�
 - `HOST`、`PORT`：API 监听地址和端口。
 - `WEB_ORIGIN`：允许的前端来源，多个来源用逗号分隔。
 - `AKSHARE_TIMEOUT_MS`：单个 Python 数据任务的总超时。
+- `AKSHARE_MAX_OUTPUT_BYTES`：Python bridge 单次允许返回的最大数据量。
+- `AKSHARE_EXPOSE_ERROR_DETAILS`：是否向浏览器暴露上游错误细节，默认关闭。
 - `FINANCE_DB_PATH`：SQLite 数据库路径。
 - `FINANCE_REFRESH_*`、`ANNOUNCEMENT_*`：后台刷新频率。
 

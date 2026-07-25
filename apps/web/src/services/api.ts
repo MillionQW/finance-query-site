@@ -17,6 +17,7 @@ import type { EtfDetailResponse, EtfMarketResponse, EtfSortKey, EtfValuation, Fa
 import type { FavoriteIndex, IndexDetailResponse, IndexMarket, IndexMarketResponse, IndexValuation } from '../types/index';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
+const REQUEST_TIMEOUT_MS = 125_000;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -24,21 +25,42 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers
-  });
-  if (!response.ok) {
-    let message = `请求失败：${response.status}`;
-    try {
-      const body = await response.json();
-      message = body.message ?? body.error?.message ?? message;
-    } catch {
-      // Ignore non-JSON errors.
-    }
-    throw new Error(message);
+  const controller = new AbortController();
+  const externalSignal = init?.signal;
+  const relayAbort = () => controller.abort(externalSignal?.reason);
+  if (externalSignal?.aborted) {
+    relayAbort();
+  } else {
+    externalSignal?.addEventListener('abort', relayAbort, { once: true });
   }
-  return response.json() as Promise<T>;
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers,
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      let message = `请求失败：${response.status}`;
+      try {
+        const body = await response.json();
+        message = body.message ?? body.error?.message ?? message;
+      } catch {
+        // Ignore non-JSON errors.
+      }
+      throw new Error(message);
+    }
+    return response.json() as Promise<T>;
+  } catch (error) {
+    if (controller.signal.aborted && !externalSignal?.aborted) {
+      throw new Error('请求超时，请稍后重试');
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+    externalSignal?.removeEventListener('abort', relayAbort);
+  }
 }
 
 export function searchCompanies(q: string, market: MarketFilter): Promise<CompanySearchResult[]> {
@@ -50,54 +72,63 @@ export function getStatements(
   market: Market,
   symbol: string,
   years = 0,
-  refresh = false
+  refresh = false,
+  signal?: AbortSignal
 ): Promise<FinancialStatements> {
   const params = new URLSearchParams({ market, symbol, years: String(years) });
   if (refresh) {
     params.set('refresh', 'true');
   }
-  return request<FinancialStatements>(`/finance/statements?${params.toString()}`);
+  return request<FinancialStatements>(`/finance/statements?${params.toString()}`, { signal });
 }
 
-export function getAnnouncements(market: Market, symbol: string): Promise<AnnouncementFeed> {
+export function getAnnouncements(market: Market, symbol: string, signal?: AbortSignal): Promise<AnnouncementFeed> {
   const params = new URLSearchParams({ market, symbol });
-  return request<AnnouncementFeed>(`/finance/announcements?${params.toString()}`);
+  return request<AnnouncementFeed>(`/finance/announcements?${params.toString()}`, { signal });
 }
 
-export function markAnnouncementsViewed(market: Market, symbol: string): Promise<FavoriteCompany[]> {
+export function markAnnouncementsViewed(
+  market: Market,
+  symbol: string,
+  signal?: AbortSignal
+): Promise<FavoriteCompany[]> {
   return request<FavoriteCompany[]>(`/finance/announcements/${market}/${encodeURIComponent(symbol)}/viewed`, {
-    method: 'POST'
+    method: 'POST',
+    signal
   });
 }
 
 export function getPeerComparison(
   market: Market,
   symbol: string,
-  limit = 20
+  limit = 20,
+  signal?: AbortSignal
 ): Promise<PeerComparison> {
   const params = new URLSearchParams({ market, symbol, limit: String(limit) });
-  return request<PeerComparison>(`/finance/peers?${params.toString()}`);
+  return request<PeerComparison>(`/finance/peers?${params.toString()}`, { signal });
 }
 
 export function getPeerMetricComparison(
   market: Market,
   symbol: string,
   metricKey = 'revenue',
-  limit = 12
+  limit = 12,
+  signal?: AbortSignal
 ): Promise<PeerMetricComparison> {
   const params = new URLSearchParams({ market, symbol, metricKey, limit: String(limit) });
-  return request<PeerMetricComparison>(`/finance/peer-metrics?${params.toString()}`);
+  return request<PeerMetricComparison>(`/finance/peer-metrics?${params.toString()}`, { signal });
 }
 
 export function getMetricComparison(
   metricKey: string,
-  companies: Array<{ market: Market; symbol: string; name?: string | null }>
+  companies: Array<{ market: Market; symbol: string; name?: string | null }>,
+  signal?: AbortSignal
 ): Promise<PeerMetricComparison> {
   const companyKeys = companies
     .map((company) => `${company.market}:${company.symbol}:${encodeURIComponent(company.name ?? '')}`)
     .join(',');
   const params = new URLSearchParams({ metricKey, companies: companyKeys });
-  return request<PeerMetricComparison>(`/finance/metric-comparison?${params.toString()}`);
+  return request<PeerMetricComparison>(`/finance/metric-comparison?${params.toString()}`, { signal });
 }
 
 export function getScreenerResults(options: {
@@ -152,8 +183,12 @@ export function removeFavorite(market: Market, symbol: string): Promise<Favorite
   });
 }
 
-export function getCompanyInsight(market: Market, symbol: string): Promise<CompanyInsight> {
-  return request<CompanyInsight>(`/finance/insights/${market}/${encodeURIComponent(symbol)}`);
+export function getCompanyInsight(
+  market: Market,
+  symbol: string,
+  signal?: AbortSignal
+): Promise<CompanyInsight> {
+  return request<CompanyInsight>(`/finance/insights/${market}/${encodeURIComponent(symbol)}`, { signal });
 }
 
 export function saveCompanyInsight(

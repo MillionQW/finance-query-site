@@ -16,6 +16,12 @@ export class IndexStoreService implements OnModuleDestroy {
     const dbPath = this.resolveDbPath();
     mkdirSync(dirname(dbPath), { recursive: true });
     this.db = new DatabaseSync(dbPath);
+    this.db.exec(`
+      PRAGMA journal_mode = WAL;
+      PRAGMA synchronous = NORMAL;
+      PRAGMA busy_timeout = 5000;
+      PRAGMA foreign_keys = ON;
+    `);
     this.initializeSchema();
   }
 
@@ -31,7 +37,7 @@ export class IndexStoreService implements OnModuleDestroy {
       volume=excluded.volume,amount=excluded.amount,open_price=excluded.open_price,high_price=excluded.high_price,
       low_price=excluded.low_price,previous_close=excluded.previous_close,quote_updated_at=excluded.quote_updated_at,
       source=excluded.source,updated_at=datetime('now')`);
-    this.db.exec('BEGIN');
+    this.db.exec('BEGIN IMMEDIATE');
     try {
       for (const q of quotes) stmt.run(q.market,q.symbol,q.displaySymbol,q.name,q.category,q.latestPrice,q.changeAmount,q.changePercent,q.volume,q.amount,q.open,q.high,q.low,q.previousClose,q.quoteUpdatedAt,q.source);
       this.setRefresh('market');
@@ -54,7 +60,7 @@ export class IndexStoreService implements OnModuleDestroy {
   saveHistory(payload: IndexHistoryPayload): void {
     const stmt = this.db.prepare(`INSERT INTO index_daily_prices (market,symbol,trade_date,open_price,close_price,high_price,low_price,volume,amount,change_percent,change_amount,source,fetched_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(market,symbol,trade_date) DO UPDATE SET open_price=excluded.open_price,close_price=excluded.close_price,high_price=excluded.high_price,low_price=excluded.low_price,volume=excluded.volume,amount=excluded.amount,change_percent=excluded.change_percent,change_amount=excluded.change_amount,source=excluded.source,fetched_at=excluded.fetched_at`);
-    this.db.exec('BEGIN');
+    this.db.exec('BEGIN IMMEDIATE');
     try {
       for (const p of payload.points) stmt.run(payload.market,payload.symbol,p.date,p.open,p.close,p.high,p.low,p.volume,p.amount,p.changePercent,p.changeAmount,payload.source,payload.fetchedAt);
       const latest=payload.points.at(-1),previous=payload.points.at(-2);
