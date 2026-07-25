@@ -1,0 +1,61 @@
+.status-banner,
+.loading-panel,
+.empty-table,
+.rail-placeholder,
+.rail-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+}
+
+.status-banner {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.loading-panel,
+.empty-table {
+  min-height: 180px;
+  justify-content: center;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: #fff;
+}
+
+.company-loading-panel {
+  min-height: 260px;
+  margin-top: 18px;
+}
+
+.company-loading-panel strong {
+  color: #172033;
+  font-size: 16px;
+}
+
+.company-loading-panel span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.rail-placeholder,
+.rail-error {
+  min-height: 70px;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+  color: var(--muted);
+  background: var(--surface-soft);
+}
+
+.rail-error {
+  justify-content: flex-start;
+  margin: 0 0 10px;
+  color: #9a3412;
+  background: #fff7ed;
+}
+

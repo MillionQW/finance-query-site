@@ -1,0 +1,527 @@
+.custom-metric-panel {
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.custom-metric-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.custom-metric-head h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.custom-metric-head > strong {
+  color: var(--blue);
+  font-size: 26px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.custom-metric-head > strong.critical {
+  color: #dc2626;
+}
+
+.custom-metric-head > strong.positive {
+  color: #16a34a;
+}
+
+.custom-metric-head > strong.warning {
+  color: #d97706;
+}
+
+.financial-diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.financial-diagnostic-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.financial-diagnostic-card.positive {
+  border-left-color: #16a34a;
+  background: #f7fef9;
+}
+
+.financial-diagnostic-card.warning {
+  border-left-color: #d97706;
+  background: #fffaf0;
+}
+
+.financial-diagnostic-card.danger {
+  border-left-color: #dc2626;
+  background: #fff8f8;
+}
+
+.financial-diagnostic-card.neutral {
+  border-left-color: #94a3b8;
+}
+
+.financial-diagnostic-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.financial-diagnostic-card header span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.financial-diagnostic-card h4 {
+  margin: 3px 0 0;
+  color: #0f172a;
+  font-size: 17px;
+}
+
+.financial-diagnostic-card header > strong {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #475569;
+  background: #e2e8f0;
+  font-size: 12px;
+}
+
+.financial-diagnostic-card.positive header > strong {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.financial-diagnostic-card.warning header > strong {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.financial-diagnostic-card.danger header > strong {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.financial-diagnostic-card > p {
+  min-height: 42px;
+  margin: 10px 0 12px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.diagnostic-signal-list {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.diagnostic-signal-list button {
+  padding: 7px 9px;
+  border: 0;
+  border-left: 3px solid #f59e0b;
+  border-radius: 4px;
+  color: #78350f;
+  background: #fffbeb;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.diagnostic-signal-list button.danger {
+  border-left-color: #dc2626;
+  color: #991b1b;
+  background: #fef2f2;
+}
+
+.diagnostic-signal-list button:hover,
+.diagnostic-signal-list button:focus-visible {
+  text-decoration: underline;
+}
+
+.diagnostic-metric-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.diagnostic-metric-list button {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  color: #334155;
+  background: #fff;
+  text-align: left;
+}
+
+.diagnostic-metric-list button:hover,
+.diagnostic-metric-list button:focus-visible {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.diagnostic-metric-list button.warning {
+  border-color: #fcd34d;
+}
+
+.diagnostic-metric-list button.danger {
+  border-color: #fca5a5;
+}
+
+.diagnostic-metric-list button.positive {
+  border-color: #86efac;
+}
+
+.diagnostic-metric-list span,
+.diagnostic-metric-list strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagnostic-metric-list span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.diagnostic-metric-list strong {
+  margin-top: 5px;
+  font-size: 14px;
+}
+
+.financial-diagnostic-card > small {
+  display: block;
+  margin-top: 10px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.metric-group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.metric-group-tabs button {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #475569;
+  background: #fff;
+  font-weight: 800;
+}
+
+.metric-group-tabs button.active {
+  border-color: rgba(37, 99, 235, 0.38);
+  color: var(--blue);
+  background: #eff6ff;
+}
+
+.metric-selector {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.metric-selector button {
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #334155;
+  background: var(--surface-soft);
+  text-align: left;
+}
+
+.metric-selector button.active {
+  border-color: rgba(37, 99, 235, 0.42);
+  color: var(--blue);
+  background: #eff6ff;
+}
+
+.metric-selector span,
+.metric-selector strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-selector span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.metric-selector strong {
+  margin-top: 8px;
+  font-size: 17px;
+}
+
+.custom-chart {
+  width: 100%;
+  height: 300px;
+  margin-top: 16px;
+}
+
+.formula-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.formula-row span {
+  color: #334155;
+  font-weight: 800;
+}
+
+.formula-row small {
+  text-align: right;
+}
+
+.metric-threshold-guide {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.metric-threshold-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.metric-threshold-head > strong {
+  color: #334155;
+  font-size: 13px;
+}
+
+.metric-threshold-head > small {
+  color: #94a3b8;
+  text-align: right;
+}
+
+.metric-threshold-bands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.metric-threshold-band {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  color: #64748b;
+  background: #fff;
+  font-size: 12px;
+}
+
+.metric-threshold-band span {
+  font-weight: 800;
+}
+
+.metric-threshold-band strong {
+  color: #334155;
+}
+
+.metric-threshold-band.active {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.06);
+}
+
+.metric-threshold-band.danger.active {
+  border-color: #fca5a5;
+  color: #991b1b;
+  background: #fef2f2;
+}
+
+.metric-threshold-band.warning.active {
+  border-color: #fcd34d;
+  color: #92400e;
+  background: #fffbeb;
+}
+
+.metric-threshold-band.positive.active {
+  border-color: #86efac;
+  color: #166534;
+  background: #f0fdf4;
+}
+
+.metric-warning {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #9a3412;
+  background: #fff7ed;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.favorite-unread-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.18);
+}
+
+.metric-alert-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.metric-alert {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.metric-alert.warning {
+  border: 1px solid #fde68a;
+  color: #854d0e;
+  background: #fefce8;
+}
+
+.metric-alert.danger {
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  background: #fef2f2;
+}
+
+.metric-tooltip-content {
+  min-width: 260px;
+  color: #0f172a;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.metric-tooltip-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 7px;
+}
+
+.metric-tooltip-title strong {
+  font-size: 13px;
+}
+
+.metric-tooltip-title span {
+  color: var(--blue);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.metric-tooltip-formula {
+  color: #475569;
+  font-weight: 800;
+}
+
+.metric-tooltip-expression {
+  margin: 5px 0 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #1e3a8a;
+  background: #eff6ff;
+  font-weight: 800;
+}
+
+.metric-tooltip-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.metric-tooltip-content th,
+.metric-tooltip-content td {
+  padding: 4px 0;
+  border-top: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: top;
+}
+
+.metric-tooltip-content th {
+  padding-right: 14px;
+  color: #475569;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.metric-tooltip-content td:nth-child(2) {
+  color: #111827;
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.metric-tooltip-content td:nth-child(3) {
+  padding-left: 10px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.metric-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.metric-card {
+  min-height: 112px;
+  padding: 17px;
+}
+
+.metric-card span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.metric-card strong {
+  display: block;
+  margin: 10px 0 9px;
+  overflow-wrap: anywhere;
+  font-size: 24px;
+  line-height: 1.1;
+}
+

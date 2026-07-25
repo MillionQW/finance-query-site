@@ -322,6 +322,8 @@ The application shell is also split by responsibility:
 - `apps/web/src/components/CompanyResearchView.vue`: company research page composition.
 - `apps/web/src/components/SettingsPage.vue` and `CompanyNoteDialog.vue`: focused settings and note interfaces.
 
+Global styles keep their original cascade order through `apps/web/src/styles.css`, which imports focused modules from `apps/web/src/styles/` for the shell, company workspace, financial metrics, peers/statements, research pages, shared states, and responsive overrides.
+
 ## Hong Kong Stock Field Handling
 
 For Hong Kong stock inventory turnover, if operating cost is missing, the code looks for:

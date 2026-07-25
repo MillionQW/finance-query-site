@@ -1,0 +1,159 @@
+@media (max-width: 1100px) {
+  .topbar {
+    grid-template-columns: 1fr;
+    height: auto;
+    padding: 16px;
+  }
+
+  .brand,
+  .top-actions {
+    justify-content: space-between;
+  }
+
+  .workspace,
+  .company-card,
+  .insight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .company-rail {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .company-list {
+    max-height: 320px;
+  }
+
+  .quote-grid {
+    border-left: 0;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .index-workspace,.index-analysis-grid { grid-template-columns: 1fr; }
+  .index-directory { position: static; }
+  .index-snapshot-strip { grid-template-columns: repeat(8, 140px); }
+  .screener-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .screener-segments { grid-column: 1 / -1; }
+  .screener-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .content {
+    padding: 16px;
+  }
+
+  .global-search {
+    grid-template-columns: 44px minmax(0, 1fr) 88px;
+  }
+
+  .global-search button {
+    display: inline-flex;
+  }
+
+  .search-dropdown {
+    max-height: min(460px, calc(100vh - 156px));
+  }
+
+  .top-actions {
+    overflow-x: auto;
+  }
+
+  .company-title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .company-title-content {
+    width: 100%;
+  }
+
+  .company-heading-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .company-note-preview {
+    padding: 10px 0 0;
+    border-top: 1px solid #dbeafe;
+    border-left: 0;
+  }
+
+  .quote-grid,
+  .peer-rank-grid,
+  .metric-selector,
+  .metric-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-selector {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .financial-diagnostic-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-selector button {
+    flex: 0 0 148px;
+  }
+
+  .custom-metric-head,
+  .formula-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .formula-row small {
+    text-align: left;
+  }
+
+  .metric-threshold-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .metric-threshold-head > small {
+    text-align: left;
+  }
+
+  .toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 12px;
+  }
+
+  .tabs {
+    width: 100%;
+    gap: 16px;
+    overflow-x: auto;
+  }
+
+  .screener-page {
+    width: calc(100% - 32px);
+    padding-top: 16px;
+  }
+
+  .screener-head,
+  .screener-result-panel > header {
+    flex-direction: column;
+  }
+
+  .screener-result-panel header small {
+    max-width: none;
+    text-align: left;
+  }
+
+  .screener-controls,
+  .screener-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .screener-run {
+    width: 100%;
+  }
+}
