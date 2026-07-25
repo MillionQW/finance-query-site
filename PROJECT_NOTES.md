@@ -250,20 +250,39 @@ Current fixed metrics:
 
 - ROE = net profit / average shareholders' equity
 - ROA = net profit / average total assets
+- ROIC = NOPAT / average invested capital
+- Greenblatt ROC = EBIT / (working capital + net fixed assets)
 - Current ratio = current assets / current liabilities
 - Quick ratio = (current assets - inventory) / current liabilities
 - Cash debt ratio = cash and cash equivalents / interest-bearing debt
+- Interest-bearing debt ratio = interest-bearing debt / total assets
+- Asset-liability ratio = total liabilities / total assets
+- Interest coverage = EBIT / interest expense
+- Net debt to operating cash flow = (interest-bearing debt - cash) / operating cash flow
 - Operating margin = operating profit / revenue
 - Net margin = net profit / revenue
+- Operating cash conversion = operating cash flow / net profit
+- Three-year cumulative cash conversion = rolling three-year operating cash flow / rolling three-year net profit
+- Free cash flow = operating cash flow - cash paid to acquire long-term assets
+- Free cash flow margin = free cash flow / revenue
+- Accrual ratio = (net profit - operating cash flow) / average total assets
+- Deducted-profit ratio = recurring attributable net profit / attributable net profit
+- Cash collection ratio = customer cash receipts / revenue
 - Revenue growth = (current revenue - previous revenue) / previous revenue
 - Operating profit growth = (current operating profit - previous operating profit) / previous operating profit
 - Asset growth = (current assets - previous assets) / previous assets
 - Net asset growth = (current net assets - previous net assets) / previous net assets
+- Growth-divergence metrics compare receivables, inventory, profit, assets, and interest-bearing debt growth with revenue or operating-cash-flow growth.
 - Receivables turnover = revenue / average accounts receivable
 - Inventory turnover = operating cost / average inventory
+- Payables turnover = operating cost / average accounts payable
+- Cash conversion cycle = receivable days + inventory days - payable days
 - Fixed asset turnover = revenue / net fixed assets
 - Gross margin = gross profit / revenue
 - Expense ratio = selling, admin, and finance expenses / revenue
+
+The financial metric panel groups cash conversion and free-cash-flow metrics under `现金质量`.
+Growth-divergence metrics display warning or danger states when the latest gap exceeds 10 or 20 percentage points, and persistent two-year gaps are promoted to danger alerts.
 
 ## Hong Kong Stock Field Handling
 
