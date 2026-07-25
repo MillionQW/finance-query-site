@@ -104,6 +104,31 @@ test('profitability stability alerts explain low incremental returns and high vo
   assert.match(volatilityAlerts[0]?.message ?? '', /跨周期波动较大/);
 });
 
+test('asset quality thresholds distinguish caution from material exposure', () => {
+  assert.equal(isWarningMetric(result('developmentCapitalizationProxy', 0.4)), true);
+  assert.equal(isCriticalMetric(result('developmentCapitalizationProxy', 0.6)), true);
+  assert.equal(isWarningMetric(result('goodwillToEquity', 0.4)), true);
+  assert.equal(isCriticalMetric(result('goodwillToEquity', 0.7)), true);
+  assert.equal(isWarningMetric(result('impairmentToOperatingProfit', 0.3)), true);
+  assert.equal(isCriticalMetric(result('impairmentToOperatingProfit', 0.6)), true);
+});
+
+test('asset quality alerts state the accounting risk being flagged', () => {
+  const goodwillAlerts = metricAlerts(
+    definition('goodwillToEquity'),
+    [point('2025', 0.7)]
+  );
+  assert.equal(goodwillAlerts[0]?.tone, 'danger');
+  assert.match(goodwillAlerts[0]?.message ?? '', /并购标的业绩与减值测试/);
+
+  const impairmentAlerts = metricAlerts(
+    definition('impairmentToOperatingProfit'),
+    [point('2025', 0.3)]
+  );
+  assert.equal(impairmentAlerts[0]?.tone, 'warning');
+  assert.match(impairmentAlerts[0]?.message ?? '', /资产质量影响较大/);
+});
+
 test('missing years are surfaced without inventing zero values', () => {
   const alerts = metricAlerts(
     definition('freeCashFlowMargin'),

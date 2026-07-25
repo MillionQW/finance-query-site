@@ -18,23 +18,28 @@ import {
   CURRENT_LIABILITY_ALIASES,
   CUSTOMER_CASH_RECEIPTS_ALIASES,
   DEDUCTED_NET_PROFIT_ALIASES,
+  DEVELOPMENT_EXPENDITURE_ALIASES,
   END_CASH_EQUIVALENT_ALIASES,
   EQUITY_ALIASES,
   FINANCE_EXPENSE_ALIASES,
   FIXED_ASSET_ALIASES,
   FIXED_ASSET_CAPEX_ALIASES,
   GROSS_PROFIT_ALIASES,
+  GOODWILL_ALIASES,
   HK_ASSOCIATE_JOINT_VENTURE_GROUPS,
   HK_INVESTMENT_CASH_NET_ALIASES,
   INCOME_TAX_ALIASES,
   INTEREST_BEARING_DEBT_ALIASES,
   INTEREST_BEARING_DEBT_GROUPS,
   INTEREST_EXPENSE_ALIASES,
+  INTANGIBLE_ASSET_ALIASES,
+  INTANGIBLE_GOODWILL_ALIASES,
   INTANGIBLE_ASSET_CAPEX_ALIASES,
   INVENTORY_ALIASES,
   INVESTMENT_CASH_INFLOW_ALIASES,
   INVESTMENT_CASH_OUTFLOW_ALIASES,
   LONG_TERM_EQUITY_INVESTMENT_ALIASES,
+  IMPAIRMENT_ALIASES,
   NET_ASSET_ALIASES,
   NET_PROFIT_ALIASES,
   OPERATING_CASHFLOW_ALIASES,
@@ -42,6 +47,7 @@ import {
   OPERATING_PROFIT_ALIASES,
   OPERATING_REVENUE_ALIASES,
   RECEIVABLE_ALIASES,
+  RESEARCH_EXPENSE_ALIASES,
   REVENUE_ALIASES,
   SELLING_EXPENSE_ALIASES,
   TOTAL_ASSET_ALIASES,
@@ -53,6 +59,7 @@ import {
 import {
   absoluteValue,
   calculateCashConversionCycle,
+  calculateDevelopmentCapitalizationProxy,
   calculateFreeCashFlow,
   calculateIncrementalReturn,
   calculateRollingRatio,
@@ -103,6 +110,7 @@ const metricGroups: Array<{ key: MetricGroupKey; label: string }> = [
   { key: 'growth', label: '成长能力' },
   { key: 'solvency', label: '偿债能力' },
   { key: 'efficiency', label: '营运效率' },
+  { key: 'assetQuality', label: '研发与资产' },
   { key: 'judgment', label: '判断指标' }
 ];
 
@@ -801,6 +809,105 @@ const definitions: MetricDefinition[] = [
     }
   },
   {
+    key: 'researchExpenseRatio',
+    label: '研发费用率',
+    group: 'assetQuality',
+    formula: '研发费用 / 营业收入',
+    kind: 'percent',
+    description: '观察企业当期费用化研发投入强度。高投入不直接等于高产出，应结合收入增长、毛利率和后续产品表现判断。',
+    requirements: [
+      { label: '研发费用', table: 'income', aliases: RESEARCH_EXPENSE_ALIASES },
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+    ],
+    calculate: (context, year) =>
+      safeDivide(
+        absoluteValue(rowValue(context.income, year, RESEARCH_EXPENSE_ALIASES)),
+        rowValue(context.income, year, REVENUE_ALIASES)
+      )
+  },
+  {
+    key: 'developmentCapitalizationProxy',
+    label: '研发资本化代理率',
+    group: 'assetQuality',
+    formula: '开发支出正增长额 / (研发费用 + 开发支出正增长额)',
+    kind: 'percent',
+    description: '用开发支出余额的正增长近似当期资本化金额，只作趋势预警；开发项目转入无形资产会令该代理值偏低，不能替代财报附注中的真实资本化率。',
+    requirements: [
+      { label: '研发费用', table: 'income', aliases: RESEARCH_EXPENSE_ALIASES },
+      { label: '开发支出', table: 'balance', aliases: DEVELOPMENT_EXPENDITURE_ALIASES }
+    ],
+    calculate: (context, year, yearIndex) =>
+      developmentCapitalizationDetails(context, year, yearIndex).value
+  },
+  {
+    key: 'developmentToEquity',
+    label: '开发支出/净资产',
+    group: 'assetQuality',
+    formula: '开发支出 / 股东权益',
+    kind: 'percent',
+    description: '观察尚未完成或尚未转入无形资产的开发项目占净资产比例。比例过高时，项目失败或减值可能显著影响股东权益。',
+    requirements: [
+      { label: '开发支出', table: 'balance', aliases: DEVELOPMENT_EXPENDITURE_ALIASES },
+      { label: '股东权益', table: 'balance', aliases: EQUITY_ALIASES }
+    ],
+    calculate: (context, year) =>
+      safeDivide(
+        absoluteValue(rowValue(context.balance, year, DEVELOPMENT_EXPENDITURE_ALIASES)),
+        rowValue(context.balance, year, EQUITY_ALIASES)
+      )
+  },
+  {
+    key: 'goodwillToEquity',
+    label: '商誉/净资产',
+    group: 'assetQuality',
+    formula: '商誉 / 股东权益',
+    kind: 'percent',
+    description: '观察并购形成的商誉相对股东权益的暴露。商誉本身不等于风险，但比例较高时，一次重大减值可能明显侵蚀净资产。',
+    requirements: [
+      { label: '商誉', table: 'balance', aliases: GOODWILL_ALIASES },
+      { label: '股东权益', table: 'balance', aliases: EQUITY_ALIASES }
+    ],
+    calculate: (context, year) =>
+      safeDivide(
+        absoluteValue(rowValue(context.balance, year, GOODWILL_ALIASES)),
+        rowValue(context.balance, year, EQUITY_ALIASES)
+      )
+  },
+  {
+    key: 'intangibleGoodwillToAssets',
+    label: '商誉及无形资产/总资产',
+    group: 'assetQuality',
+    formula: '(商誉 + 无形资产 + 开发支出) / 总资产',
+    kind: 'percent',
+    description: '观察总资产中依赖估值、摊销和未来现金流假设的资产比例。比例高时需进一步查看无形资产构成、使用寿命和减值测试。',
+    requirements: [
+      { label: '商誉、无形资产或开发支出', table: 'balance', aliases: INTANGIBLE_GOODWILL_ALIASES },
+      { label: '总资产', table: 'balance', aliases: TOTAL_ASSET_ALIASES }
+    ],
+    calculate: (context, year) =>
+      safeDivide(
+        sumRows(context.balance, year, [{ label: '商誉及无形资产', aliases: INTANGIBLE_GOODWILL_ALIASES }]).total,
+        rowValue(context.balance, year, TOTAL_ASSET_ALIASES)
+      )
+  },
+  {
+    key: 'impairmentToOperatingProfit',
+    label: '减值侵蚀率',
+    group: 'assetQuality',
+    formula: '资产及信用减值绝对额 / |营业利润|',
+    kind: 'percent',
+    description: '观察资产减值、信用减值或港股减值拨备相对经营利润的侵蚀程度。不同报表可能以损失或收益列示，因此统一使用绝对额。',
+    requirements: [
+      { label: '资产减值、信用减值或减值拨备', table: 'income', aliases: IMPAIRMENT_ALIASES },
+      { label: '营业利润', table: 'income', aliases: OPERATING_PROFIT_ALIASES }
+    ],
+    calculate: (context, year) =>
+      safeDivide(
+        sumRows(context.income, year, [{ label: '减值及拨备', aliases: IMPAIRMENT_ALIASES }]).total,
+        absoluteValue(rowValue(context.income, year, OPERATING_PROFIT_ALIASES))
+      )
+  },
+  {
     key: 'internalAssetReturn',
     label: '内部资产收益率',
     group: 'profitability',
@@ -1410,6 +1517,29 @@ function freeCashFlowDetails(context: MetricContext, year: string) {
     intangibleCapitalExpenditure,
     capitalExpenditure: calculated.capitalExpenditure,
     freeCashFlow: calculated.freeCashFlow
+  };
+}
+
+function developmentCapitalizationDetails(context: MetricContext, year: string, yearIndex: number) {
+  const currentDevelopmentExpenditure = rowValue(context.balance, year, DEVELOPMENT_EXPENDITURE_ALIASES);
+  const previousYear = context.statements.years[yearIndex + 1];
+  const previousDevelopmentExpenditure = previousRowValue(
+    context,
+    context.balance,
+    yearIndex,
+    DEVELOPMENT_EXPENDITURE_ALIASES
+  );
+  const researchExpense = absoluteValue(rowValue(context.income, year, RESEARCH_EXPENSE_ALIASES));
+  return {
+    currentDevelopmentExpenditure,
+    previousDevelopmentExpenditure,
+    previousYear,
+    researchExpense,
+    ...calculateDevelopmentCapitalizationProxy(
+      currentDevelopmentExpenditure,
+      previousDevelopmentExpenditure,
+      researchExpense
+    )
   };
 }
 
@@ -2253,6 +2383,84 @@ function metricDetails(
         { label: operatingCashflowDisplayName(context), value: operatingCashflow }
       ],
       expression: `${formatRawValue(netDebt)} / ${formatRawValue(operatingCashflow)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'researchExpenseRatio') {
+    const researchExpense = absoluteValue(rowValue(context.income, year, RESEARCH_EXPENSE_ALIASES));
+    const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+    const value = safeDivide(researchExpense, revenue);
+    return {
+      rows: [
+        { label: '研发费用', value: researchExpense },
+        { label: context.statements.company.market === 'hk' ? '营业额' : '营业收入', value: revenue }
+      ],
+      expression: `${formatRawValue(researchExpense)} / ${formatRawValue(revenue)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'developmentCapitalizationProxy') {
+    const details = developmentCapitalizationDetails(context, year, yearIndex);
+    return {
+      rows: [
+        { label: `${year} 开发支出`, value: details.currentDevelopmentExpenditure, note: '期末余额' },
+        { label: `${details.previousYear ?? '上年'} 开发支出`, value: details.previousDevelopmentExpenditure, note: '期初余额' },
+        { label: '开发支出正增长额', value: details.developmentIncrease, note: '负增长按0处理' },
+        { label: '研发费用', value: details.researchExpense },
+        { label: '研发投入代理值', value: details.totalResearchInvestmentProxy, note: '研发费用 + 开发支出正增长额' }
+      ],
+      expression: `${formatRawValue(details.developmentIncrease)} / ${formatRawValue(details.totalResearchInvestmentProxy)} = ${formatMetricValue(details.value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'developmentToEquity' || definition.key === 'goodwillToEquity') {
+    const isDevelopment = definition.key === 'developmentToEquity';
+    const assetLabel = isDevelopment ? '开发支出' : '商誉';
+    const assetValue = absoluteValue(rowValue(
+      context.balance,
+      year,
+      isDevelopment ? DEVELOPMENT_EXPENDITURE_ALIASES : GOODWILL_ALIASES
+    ));
+    const equity = rowValue(context.balance, year, EQUITY_ALIASES);
+    const value = safeDivide(assetValue, equity);
+    return {
+      rows: [
+        { label: assetLabel, value: assetValue },
+        { label: '股东权益', value: equity }
+      ],
+      expression: `${formatRawValue(assetValue)} / ${formatRawValue(equity)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'intangibleGoodwillToAssets') {
+    const assets = sumRows(context.balance, year, [
+      { label: '商誉', aliases: GOODWILL_ALIASES },
+      { label: '无形资产', aliases: INTANGIBLE_ASSET_ALIASES },
+      { label: '开发支出', aliases: DEVELOPMENT_EXPENDITURE_ALIASES }
+    ]);
+    const totalAssets = rowValue(context.balance, year, TOTAL_ASSET_ALIASES);
+    const value = safeDivide(assets.total, totalAssets);
+    return {
+      rows: [
+        ...assets.rows,
+        { label: '商誉及无形资产合计', value: assets.total },
+        { label: '总资产', value: totalAssets }
+      ],
+      expression: `${formatRawValue(assets.total)} / ${formatRawValue(totalAssets)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'impairmentToOperatingProfit') {
+    const impairment = sumRows(context.income, year, [{ label: '减值及拨备', aliases: IMPAIRMENT_ALIASES }]);
+    const operatingProfit = absoluteValue(rowValue(context.income, year, OPERATING_PROFIT_ALIASES));
+    const value = safeDivide(impairment.total, operatingProfit);
+    return {
+      rows: [
+        ...impairment.rows,
+        { label: '减值及拨备绝对额合计', value: impairment.total },
+        { label: '|营业利润|', value: operatingProfit }
+      ],
+      expression: `${formatRawValue(impairment.total)} / ${formatRawValue(operatingProfit)} = ${formatMetricValue(value, definition.kind)}`
     };
   }
 

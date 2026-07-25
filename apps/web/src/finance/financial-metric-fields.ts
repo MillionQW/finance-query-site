@@ -25,6 +25,16 @@ export const FINANCE_EXPENSE_ALIASES = ['财务费用', '融资成本', 'FINANCE
 export const NET_ASSET_ALIASES = ['净资产', '所有者权益合计', '股东权益', '总权益', '归属于母公司股东权益', 'PARENT EQUITY BALANCE', 'EQUITY BALANCE'];
 export const FIXED_ASSET_ALIASES = ['固定资产', '固定资产净值', '物业厂房及设备', '物业厂房设备', 'FIXED ASSET', 'PROPERTY PLANT EQUIPMENT', 'PROPERTY PLANT AND EQUIPMENT'];
 export const LONG_TERM_EQUITY_INVESTMENT_ALIASES = ['长期股权投资', 'LONG EQUITY INVEST', 'LONG TERM EQUITY INVESTMENT'];
+export const RESEARCH_EXPENSE_ALIASES = ['研发费用', '研究及开发开支', '研发开支', 'RESEARCH EXPENSE'];
+export const DEVELOPMENT_EXPENDITURE_ALIASES = ['开发支出', 'DEVELOP EXPENSE'];
+export const GOODWILL_ALIASES = ['商誉', 'GOODWILL'];
+export const INTANGIBLE_ASSET_ALIASES = ['无形资产', 'INTANGIBLE ASSET'];
+export const IMPAIRMENT_ALIASES = ['资产减值损失', '资产减值收益', '信用减值损失', '信用减值收益', '减值及拨备', 'ASSET IMPAIRMENT LOSS', 'ASSET IMPAIRMENT INCOME', 'CREDIT IMPAIRMENT INCOME'];
+export const INTANGIBLE_GOODWILL_ALIASES = [
+  ...GOODWILL_ALIASES,
+  ...INTANGIBLE_ASSET_ALIASES,
+  ...DEVELOPMENT_EXPENDITURE_ALIASES
+];
 
 export const HK_ASSOCIATE_JOINT_VENTURE_GROUPS = [
   { label: '联营公司权益', aliases: ['联营公司权益'] },

@@ -256,6 +256,12 @@ Current fixed metrics:
 - Five-year ROIC volatility = population standard deviation of five annual ROIC observations
 - Five-year gross-margin volatility = population standard deviation of five annual gross margins
 - Five-year operating-margin volatility = population standard deviation of five annual operating margins
+- R&D expense ratio = expensed research and development / revenue
+- R&D capitalization proxy = positive increase in development-expenditure balance / (R&D expense + positive development-expenditure increase)
+- Development expenditure to equity = ending development-expenditure balance / shareholders' equity
+- Goodwill to equity = goodwill / shareholders' equity
+- Intangible and goodwill asset ratio = (goodwill + intangible assets + development expenditure) / total assets
+- Impairment burden = absolute asset/credit impairment and Hong Kong impairment provisions / absolute operating profit
 - Greenblatt ROC = EBIT / (working capital + net fixed assets)
 - Current ratio = current assets / current liabilities
 - Quick ratio = (current assets - inventory) / current liabilities

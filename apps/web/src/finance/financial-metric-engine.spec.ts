@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   calculateCashConversionCycle,
+  calculateDevelopmentCapitalizationProxy,
   calculateFreeCashFlow,
   calculateIncrementalReturn,
   calculateRollingRatio,
   calculateRollingStatistics,
   findRow,
+  findRows,
   formatMetricValue,
   growthGapValue,
   growthRate,
@@ -18,8 +20,10 @@ import {
   ACCOUNTS_PAYABLE_ALIASES,
   COMBINED_CAPITAL_EXPENDITURE_ALIASES,
   FIXED_ASSET_CAPEX_ALIASES,
+  IMPAIRMENT_ALIASES,
   INTANGIBLE_ASSET_CAPEX_ALIASES,
-  NET_PROFIT_ALIASES
+  NET_PROFIT_ALIASES,
+  RESEARCH_EXPENSE_ALIASES
 } from './financial-metric-fields';
 import type { StatementTable } from '../types/finance';
 
@@ -49,6 +53,20 @@ test('field matching supports A-share aliases and traditional account characters
   assert.equal(rowValue(statement, '2025', NET_PROFIT_ALIASES), 88);
   assert.equal(rowValue(statement, '2025', ACCOUNTS_PAYABLE_ALIASES), 1200);
   assert.equal(findRow(statement, ['应付账款'])?.item, '应付帐款');
+});
+
+test('field matching covers A-share and Hong Kong research and impairment names', () => {
+  const statement = table([
+    { item: '研发费用', values: { '2025': 240 } },
+    { item: '资产减值损失', values: { '2025': -30 } },
+    { item: '信用减值收益', values: { '2025': -20 } },
+    { item: '减值及拨备', values: { '2025': -40 } }
+  ]);
+  assert.equal(rowValue(statement, '2025', RESEARCH_EXPENSE_ALIASES), 240);
+  assert.deepEqual(
+    findRows(statement, IMPAIRMENT_ALIASES).map((row) => row.item),
+    ['资产减值损失', '信用减值收益', '减值及拨备']
+  );
 });
 
 test('free cash flow prefers the combined A-share capex line', () => {
@@ -101,6 +119,18 @@ test('incremental return uses only positive additions to invested capital', () =
     { profitChange: 60, capitalChange: -100, value: null }
   );
   assert.equal(calculateIncrementalReturn(null, 100, 1400, 1000).value, null);
+});
+
+test('development capitalization proxy uses only positive balance increases', () => {
+  assert.deepEqual(
+    calculateDevelopmentCapitalizationProxy(160, 100, 240),
+    { developmentIncrease: 60, totalResearchInvestmentProxy: 300, value: 0.2 }
+  );
+  assert.deepEqual(
+    calculateDevelopmentCapitalizationProxy(80, 100, 240),
+    { developmentIncrease: 0, totalResearchInvestmentProxy: 240, value: 0 }
+  );
+  assert.equal(calculateDevelopmentCapitalizationProxy(null, 100, 240).value, null);
 });
 
 test('five-year statistics calculate mean and population volatility', () => {

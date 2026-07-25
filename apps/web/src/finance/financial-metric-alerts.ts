@@ -29,6 +29,11 @@ export function isCriticalMetric(result: MetricResult): boolean {
   if (result.definition.key === 'netDebtToOperatingCash') return result.latest > 5;
   if (result.definition.key === 'incrementalRoic3y' || result.definition.key === 'averageRoic5y') return result.latest < 0;
   if (isProfitabilityVolatilityMetric(result.definition.key)) return result.latest > 0.1;
+  if (result.definition.key === 'developmentCapitalizationProxy') return result.latest > 0.5;
+  if (result.definition.key === 'developmentToEquity') return result.latest > 0.2;
+  if (result.definition.key === 'goodwillToEquity') return result.latest > 0.6;
+  if (result.definition.key === 'intangibleGoodwillToAssets') return result.latest > 0.5;
+  if (result.definition.key === 'impairmentToOperatingProfit') return result.latest > 0.5;
   if (isGrowthGapMetric(result.definition.key)) return result.latest > 0.2;
   return false;
 }
@@ -63,6 +68,11 @@ export function isWarningMetric(result: MetricResult): boolean {
   if (result.definition.key === 'netDebtToOperatingCash') return result.latest >= 3 && result.latest <= 5;
   if (result.definition.key === 'incrementalRoic3y' || result.definition.key === 'averageRoic5y') return result.latest >= 0 && result.latest < 0.08;
   if (isProfitabilityVolatilityMetric(result.definition.key)) return result.latest > 0.05 && result.latest <= 0.1;
+  if (result.definition.key === 'developmentCapitalizationProxy') return result.latest > 0.3 && result.latest <= 0.5;
+  if (result.definition.key === 'developmentToEquity') return result.latest > 0.1 && result.latest <= 0.2;
+  if (result.definition.key === 'goodwillToEquity') return result.latest > 0.3 && result.latest <= 0.6;
+  if (result.definition.key === 'intangibleGoodwillToAssets') return result.latest > 0.3 && result.latest <= 0.5;
+  if (result.definition.key === 'impairmentToOperatingProfit') return result.latest > 0.2 && result.latest <= 0.5;
   if (isGrowthGapMetric(result.definition.key)) return result.latest > 0.1 && result.latest <= 0.2;
   return false;
 }
@@ -170,6 +180,8 @@ export function metricAlerts(
         tone: latest.value > 0.1 ? 'danger' : 'warning'
       });
     }
+    const assetQualityAlert = assetQualityAlertFor(definition.key, latest.value, latest.year);
+    if (assetQualityAlert) alerts.push(assetQualityAlert);
     if (
       definition.key === 'cashConversionCycle' &&
       previous?.value !== null &&
@@ -203,4 +215,43 @@ export function metricAlerts(
   }
 
   return alerts.slice(0, 3);
+}
+
+function assetQualityAlertFor(metricKey: string, value: number, year: string): MetricAlert | null {
+  if (metricKey === 'developmentCapitalizationProxy' && value > 0.3) {
+    return {
+      year,
+      message: `${year} 研发资本化代理率为 ${formatMetricValue(value, 'percent')}，需结合无形资产转入和研发附注核查。`,
+      tone: value > 0.5 ? 'danger' : 'warning'
+    };
+  }
+  if (metricKey === 'developmentToEquity' && value > 0.1) {
+    return {
+      year,
+      message: `${year} 开发支出占净资产 ${formatMetricValue(value, 'percent')}，项目失败或减值的权益影响较大。`,
+      tone: value > 0.2 ? 'danger' : 'warning'
+    };
+  }
+  if (metricKey === 'goodwillToEquity' && value > 0.3) {
+    return {
+      year,
+      message: `${year} 商誉相当于净资产的 ${formatMetricValue(value, 'percent')}，需检查并购标的业绩与减值测试。`,
+      tone: value > 0.6 ? 'danger' : 'warning'
+    };
+  }
+  if (metricKey === 'intangibleGoodwillToAssets' && value > 0.3) {
+    return {
+      year,
+      message: `${year} 商誉及无形资产占总资产 ${formatMetricValue(value, 'percent')}，资产估值依赖度较高。`,
+      tone: value > 0.5 ? 'danger' : 'warning'
+    };
+  }
+  if (metricKey === 'impairmentToOperatingProfit' && value > 0.2) {
+    return {
+      year,
+      message: `${year} 减值及拨备相当于营业利润的 ${formatMetricValue(value, 'percent')}，利润受资产质量影响较大。`,
+      tone: value > 0.5 ? 'danger' : 'warning'
+    };
+  }
+  return null;
 }

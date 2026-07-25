@@ -105,6 +105,31 @@ export function calculateIncrementalReturn(
   };
 }
 
+export function calculateDevelopmentCapitalizationProxy(
+  currentDevelopmentExpenditure: number | null,
+  previousDevelopmentExpenditure: number | null,
+  researchExpense: number | null
+): {
+  developmentIncrease: number | null;
+  totalResearchInvestmentProxy: number | null;
+  value: number | null;
+} {
+  if (
+    currentDevelopmentExpenditure === null ||
+    previousDevelopmentExpenditure === null ||
+    researchExpense === null
+  ) {
+    return { developmentIncrease: null, totalResearchInvestmentProxy: null, value: null };
+  }
+  const developmentIncrease = Math.max(currentDevelopmentExpenditure - previousDevelopmentExpenditure, 0);
+  const totalResearchInvestmentProxy = Math.abs(researchExpense) + developmentIncrease;
+  return {
+    developmentIncrease,
+    totalResearchInvestmentProxy,
+    value: safeDivide(developmentIncrease, totalResearchInvestmentProxy)
+  };
+}
+
 export function calculateRollingStatistics(
   values: Array<number | null>,
   startIndex: number,
