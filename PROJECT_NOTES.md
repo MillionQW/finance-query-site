@@ -308,8 +308,8 @@ Financial metric code is split by responsibility:
 - `apps/web/src/finance/financial-metric-alerts.ts`: metric state classification and explainable warning rules.
 - `apps/web/src/finance/financial-diagnostics.ts`: transparent aggregation for the four diagnostic summaries.
 - `apps/web/src/finance/financial-metric-thresholds.ts`: visible threshold descriptions kept in step with metric-state rules.
-- `apps/web/src/finance/financial-metric-definitions.ts`: metric catalog and market-specific labels/formulas.
-- `apps/web/src/finance/financial-metric-calculations.ts`: reusable calculations and explainable formula details.
+- `apps/web/src/finance/financial-metric-definitions.ts` and `financial-metric-definitions/`: metric catalog, grouped definitions, and market-specific labels/formulas.
+- `apps/web/src/finance/financial-metric-calculations.ts`, `financial-metric-calculation-helpers.ts`, and `financial-metric-details/`: group dispatch, reusable calculations, and explainable formula details.
 - `apps/web/src/finance/financial-metric-evaluator.ts`: statement-to-metric result orchestration, including missing fields and alerts.
 - `apps/web/src/finance/*.spec.ts`: formula, field-matching, cross-market, missing-data, and alert regression tests.
 - `apps/web/src/components/CustomMetricChart.vue`: Vue state, ECharts configuration, and presentation details only.
