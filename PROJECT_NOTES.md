@@ -314,6 +314,14 @@ Financial metric code is split by responsibility:
 - `apps/web/src/finance/*.spec.ts`: formula, field-matching, cross-market, missing-data, and alert regression tests.
 - `apps/web/src/components/CustomMetricChart.vue`: Vue state, ECharts configuration, and presentation details only.
 
+The application shell is also split by responsibility:
+
+- `apps/web/src/App.vue`: cross-view state and request orchestration.
+- `apps/web/src/app/`: URL navigation, formatting, recent-company persistence, and statement export helpers.
+- `apps/web/src/components/AppTopbar.vue`: navigation and global company search presentation.
+- `apps/web/src/components/CompanyResearchView.vue`: company research page composition.
+- `apps/web/src/components/SettingsPage.vue` and `CompanyNoteDialog.vue`: focused settings and note interfaces.
+
 ## Hong Kong Stock Field Handling
 
 For Hong Kong stock inventory turnover, if operating cost is missing, the code looks for:

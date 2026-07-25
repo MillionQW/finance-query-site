@@ -1,22 +1,9 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import {
-  AlertTriangle,
-  ArrowLeft,
-  Clock3,
-  Database,
-  Download,
-  Loader2,
-  RefreshCw,
-  Search,
-  Settings,
-  SlidersHorizontal,
-  Star,
-  StickyNote,
-  TrendingUp,
-  X
-} from 'lucide-vue-next';
-import AnnouncementPanel from './components/AnnouncementPanel.vue';
+import AppTopbar from './components/AppTopbar.vue';
+import CompanyNoteDialog from './components/CompanyNoteDialog.vue';
+import CompanyResearchView from './components/CompanyResearchView.vue';
+import SettingsPage from './components/SettingsPage.vue';
 import {
   getCacheEntries,
   getAnnouncements,
@@ -41,34 +28,35 @@ import type {
   CacheEntry,
   FavoriteCompany,
   FinancialStatements,
-  Market,
   MarketFilter,
   PeerComparison,
   PeerMetricComparison,
   StatementRefreshRuntimeStatus,
   StatementType
 } from './types/finance';
+import {
+  companyFromUrl,
+  companyKey,
+  mergeCompanyList,
+  sameCompany,
+  searchOptionId,
+  seedCompanies,
+  syncCompanyUrl,
+  viewFromUrl,
+  writeViewUrl
+} from './app/app-navigation';
+import type { AppView, UrlMode } from './app/app-navigation';
+import { isAbortError } from './app/app-formatters';
+import {
+  loadRecentCompanies as readRecentCompanies,
+  rememberRecentCompany as persistRecentCompany
+} from './app/recent-companies';
+import { exportStatementCsv } from './app/export-statements';
 
-const CacheManagerPanel = defineAsyncComponent(() => import('./components/CacheManagerPanel.vue'));
-const CustomMetricChart = defineAsyncComponent(() => import('./components/CustomMetricChart.vue'));
 const EtfPage = defineAsyncComponent(() => import('./components/EtfPage.vue'));
 const IndexPage = defineAsyncComponent(() => import('./components/IndexPage.vue'));
-const MiniTrend = defineAsyncComponent(() => import('./components/MiniTrend.vue'));
-const PeerComparisonPanel = defineAsyncComponent(() => import('./components/PeerComparisonPanel.vue'));
-const PeerMetricChart = defineAsyncComponent(() => import('./components/PeerMetricChart.vue'));
 const ScreenerPage = defineAsyncComponent(() => import('./components/ScreenerPage.vue'));
-const StatementTable = defineAsyncComponent(() => import('./components/StatementTable.vue'));
 
-const seedCompanies: CompanySearchResult[] = [
-  { market: 'hk', symbol: '00700', displaySymbol: '00700.HK', name: '腾讯控股', source: 'seed' },
-  { market: 'a', symbol: '600519', displaySymbol: '600519.SH', name: '贵州茅台', source: 'seed' },
-  { market: 'hk', symbol: '09988', displaySymbol: '09988.HK', name: '阿里巴巴-W', source: 'seed' },
-  { market: 'a', symbol: '601398', displaySymbol: '601398.SH', name: '工商银行', source: 'seed' },
-  { market: 'hk', symbol: '03690', displaySymbol: '03690.HK', name: '美团-W', source: 'seed' }
-];
-
-type UrlMode = 'push' | 'replace' | 'none';
-type AppView = 'company' | 'settings' | 'etf' | 'index' | 'screener';
 const initialCompany = companyFromUrl() ?? seedCompanies[0];
 const currentView = ref<AppView>(viewFromUrl());
 const query = ref(initialCompany.name);
@@ -108,8 +96,6 @@ const refreshTaskLoading = ref(false);
 const refreshTaskNotice = ref<string | null>(null);
 const companyInsights = ref<Record<string, CompanyInsight>>({});
 const noteDialogOpen = ref(false);
-const noteDialog = ref<HTMLElement | null>(null);
-const noteTextarea = ref<HTMLTextAreaElement | null>(null);
 const noteDraft = ref('');
 const buyPointDraft = ref('');
 const buyPointEditing = ref(false);
@@ -212,48 +198,6 @@ const selectedMetricCompanies = computed(() => {
     }));
 });
 
-function marketLabel(value?: MarketFilter): string {
-  if (value === 'hk') return '港股';
-  if (value === 'a') return 'A股';
-  return '全部市场';
-}
-
-function formatNumber(value: number | null): string {
-  if (value === null) return '-';
-  const abs = Math.abs(value);
-  if (abs >= 1_000_000_000_000) {
-    return `${(value / 1_000_000_000_000).toFixed(2)}万亿`;
-  }
-  if (abs >= 100_000_000) {
-    return `${(value / 100_000_000).toFixed(2)}亿`;
-  }
-  if (abs >= 10_000) {
-    return `${(value / 10_000).toFixed(2)}万`;
-  }
-  return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value);
-}
-
-function formatDate(value?: string): string {
-  if (!value) return '-';
-  return new Date(value).toLocaleString('zh-CN', { hour12: false });
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === 'AbortError';
-}
-
-function refreshRunLabel(status?: string): string {
-  if (status === 'completed') return '已完成';
-  if (status === 'failed') return '失败';
-  if (status === 'skipped') return '已跳过';
-  if (status === 'running') return '运行中';
-  return '-';
-}
-
-function companyKey(company: Pick<CompanySearchResult, 'market' | 'symbol'>): string {
-  return `${company.market}:${company.symbol}`;
-}
-
 function openNoteDialog(): void {
   if (!selectedCompany.value) return;
   noteDialogReturnFocus = document.activeElement instanceof HTMLElement
@@ -261,7 +205,6 @@ function openNoteDialog(): void {
     : null;
   noteDraft.value = activeCompanyInsight.value.note;
   noteDialogOpen.value = true;
-  void nextTick(() => noteTextarea.value?.focus());
 }
 
 function closeNoteDialog(): void {
@@ -269,22 +212,6 @@ function closeNoteDialog(): void {
   const returnFocus = noteDialogReturnFocus;
   noteDialogReturnFocus = null;
   void nextTick(() => returnFocus?.focus());
-}
-
-function trapNoteDialogFocus(event: KeyboardEvent): void {
-  const focusable = noteDialog.value?.querySelectorAll<HTMLElement>(
-    'button:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'
-  );
-  if (!focusable?.length) return;
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault();
-    first.focus();
-  }
 }
 
 function startBuyPointEditing(): void {
@@ -352,134 +279,8 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape' && noteDialogOpen.value) closeNoteDialog();
 }
 
-function sameCompany(
-  left: Pick<CompanySearchResult, 'market' | 'symbol'> | null,
-  right: Pick<CompanySearchResult, 'market' | 'symbol'> | null
-): boolean {
-  return Boolean(left && right && left.market === right.market && left.symbol === right.symbol);
-}
-
-function normalizeUrlSymbol(value: string, selectedMarket: Market): string {
-  const digits = value.replace(/\D/g, '');
-  if (selectedMarket === 'hk') {
-    return digits.padStart(5, '0');
-  }
-  return digits;
-}
-
-function displaySymbolFor(selectedMarket: Market, symbol: string): string {
-  if (selectedMarket === 'hk') {
-    return `${symbol}.HK`;
-  }
-  if (symbol.startsWith('6')) {
-    return `${symbol}.SH`;
-  }
-  if (symbol.startsWith('4') || symbol.startsWith('8') || symbol.startsWith('9')) {
-    return `${symbol}.BJ`;
-  }
-  return `${symbol}.SZ`;
-}
-
-function companyFromUrl(): CompanySearchResult | null {
-  const params = new URLSearchParams(window.location.search);
-  const urlMarket = params.get('market');
-  const rawSymbol = params.get('symbol') ?? params.get('code') ?? '';
-  if (urlMarket !== 'a' && urlMarket !== 'hk') {
-    return null;
-  }
-
-  const symbol = normalizeUrlSymbol(rawSymbol, urlMarket);
-  if (!symbol) {
-    return null;
-  }
-
-  const seeded = seedCompanies.find(
-    (company) => company.market === urlMarket && company.symbol === symbol
-  );
-  if (seeded) {
-    return seeded;
-  }
-
-  const displaySymbol = displaySymbolFor(urlMarket, symbol);
-  return {
-    market: urlMarket,
-    symbol,
-    displaySymbol,
-    name: displaySymbol,
-    source: 'url'
-  };
-}
-
-function viewFromUrl(): AppView {
-  const view = new URLSearchParams(window.location.search).get('view');
-  if (view === 'settings') return 'settings';
-  if (view === 'etf') return 'etf';
-  if (view === 'index') return 'index';
-  if (view === 'screener') return 'screener';
-  return 'company';
-}
-
-function mergeCompanyList(
-  additions: CompanySearchResult[],
-  base: CompanySearchResult[]
-): CompanySearchResult[] {
-  const seen = new Set<string>();
-  const merged: CompanySearchResult[] = [];
-  for (const company of [...additions, ...base]) {
-    const key = companyKey(company);
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    merged.push(company);
-  }
-  return merged;
-}
-
-function syncCompanyUrl(company: CompanySearchResult, mode: Exclude<UrlMode, 'none'>): void {
-  const params = new URLSearchParams(window.location.search);
-  const currentMarket = params.get('market');
-  const currentSymbol = params.get('symbol') ?? '';
-  const alreadySynced =
-    currentMarket === company.market &&
-    normalizeUrlSymbol(currentSymbol, company.market) === company.symbol;
-  if (alreadySynced && mode === 'push') {
-    return;
-  }
-
-  params.set('market', company.market);
-  params.set('symbol', company.symbol);
-  const nextUrl = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
-  window.history[mode === 'replace' ? 'replaceState' : 'pushState'](
-    { market: company.market, symbol: company.symbol },
-    '',
-    nextUrl
-  );
-}
-
 function syncViewUrl(view: AppView, mode: 'push' | 'replace' = 'push'): void {
-  const params = new URLSearchParams(window.location.search);
-  if (view === 'settings') {
-    params.set('view', 'settings');
-  } else if (view === 'etf') {
-    params.set('view', 'etf');
-    if (!params.get('etf')) params.set('etf', '510300');
-  } else if (view === 'index') {
-    params.set('view', 'index');
-    params.delete('etf');
-    if (!params.get('index')) params.set('index', 'cn:000300');
-  } else if (view === 'screener') {
-    params.set('view', 'screener');
-    params.delete('etf');
-    params.delete('index');
-  } else {
-    params.delete('view');
-    params.delete('etf');
-    params.delete('index');
-  }
-  const queryString = params.toString();
-  const nextUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}${window.location.hash}`;
-  window.history[mode === 'replace' ? 'replaceState' : 'pushState']({ view }, '', nextUrl);
+  writeViewUrl(view, mode);
   currentView.value = view;
 }
 
@@ -514,6 +315,20 @@ function openScreenerPage(): void {
   searchDropdownOpen.value = false;
   syncViewUrl('screener');
   window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
+function navigateToView(view: AppView): void {
+  if (view === 'company') {
+    void openCompanyPage();
+  } else if (view === 'settings') {
+    void openSettingsPage();
+  } else if (view === 'etf') {
+    openEtfPage();
+  } else if (view === 'index') {
+    openIndexPage();
+  } else {
+    openScreenerPage();
+  }
 }
 
 async function openCompanyFromScreener(company: CompanySearchResult): Promise<void> {
@@ -562,35 +377,12 @@ function normalizeFavorite(company: CompanySearchResult): CompanySearchResult {
   };
 }
 
-function storageSafeCompany(company: CompanySearchResult): CompanySearchResult {
-  return {
-    market: company.market,
-    symbol: company.symbol,
-    displaySymbol: company.displaySymbol,
-    name: company.name,
-    source: company.source || 'recent',
-    latestPrice: company.latestPrice ?? null,
-    changePercent: company.changePercent ?? null
-  };
-}
-
 function loadRecentCompanies(): void {
-  try {
-    const raw = window.localStorage.getItem('finance-query:recent-companies');
-    const parsed = raw ? (JSON.parse(raw) as CompanySearchResult[]) : [];
-    recentCompanies.value = mergeCompanyList(parsed.filter(Boolean), []).slice(0, 8);
-  } catch {
-    recentCompanies.value = [];
-  }
+  recentCompanies.value = readRecentCompanies();
 }
 
 function rememberRecentCompany(company: CompanySearchResult): void {
-  const normalized = storageSafeCompany(company);
-  recentCompanies.value = mergeCompanyList([normalized], recentCompanies.value).slice(0, 8);
-  window.localStorage.setItem(
-    'finance-query:recent-companies',
-    JSON.stringify(recentCompanies.value)
-  );
+  recentCompanies.value = persistRecentCompany(company, recentCompanies.value);
 }
 
 async function loadFavorites(): Promise<void> {
@@ -711,10 +503,6 @@ function selectSearchMarket(value: MarketFilter): void {
   if (market.value === value) return;
   market.value = value;
   submitSearch();
-}
-
-function searchOptionId(company: CompanySearchResult): string {
-  return `company-search-option-${company.market}-${company.symbol.replace(/[^a-zA-Z0-9_-]/g, '')}`;
 }
 
 function selectSearchCompany(company: CompanySearchResult): void {
@@ -949,20 +737,11 @@ function toggleYear(year: string): void {
 
 function exportCsv(): void {
   if (!activeTable.value) return;
-  const header = ['项目', ...activeYears.value];
-  const lines = activeTable.value.rows.map((row) =>
-    [row.item, ...activeYears.value.map((year) => row.values[year] ?? '')]
-      .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
-      .join(',')
+  exportStatementCsv(
+    activeTable.value,
+    activeYears.value,
+    `${selectedCompany.value?.displaySymbol ?? 'statements'}-${activeTable.value.type}.csv`
   );
-  const csv = [header.join(','), ...lines].join('\n');
-  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${selectedCompany.value?.displaySymbol ?? 'statements'}-${activeTable.value.type}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 function updatePageTitle(): void {
@@ -1011,520 +790,106 @@ onUnmounted(() => {
 
 <template>
   <div class="app-shell">
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark"><Database :size="18" /></span>
-        <strong>财报查询台</strong>
-      </div>
-
-      <div v-if="currentView === 'company'" class="search-shell" @focusin="openSearchDropdown" @focusout="handleSearchFocusOut">
-        <div class="global-search">
-          <Search :size="20" />
-          <input
-            v-model="query"
-            type="search"
-            placeholder="公司/代码，例如：腾讯、00700、600519"
-            aria-label="搜索公司或股票代码"
-            role="combobox"
-            aria-autocomplete="list"
-            :aria-expanded="showSearchDropdown"
-            aria-controls="company-search-results"
-            :aria-activedescendant="activeSearchDescendant"
-            @input="handleSearchInput"
-            @keydown.enter.prevent="handleSearchEnter"
-            @keydown.down.prevent="moveSearchSelection(1)"
-            @keydown.up.prevent="moveSearchSelection(-1)"
-            @keydown.esc.prevent="closeSearchDropdown"
-          />
-          <button type="button" :disabled="searchLoading" @click="submitSearch">
-            <Loader2 v-if="searchLoading" class="spin-icon" :size="15" />
-            <span>{{ searchLoading ? '搜索中' : '搜索' }}</span>
-          </button>
-        </div>
-
-        <div v-if="showSearchDropdown" class="search-dropdown">
-          <div class="search-market-tabs" aria-label="市场筛选">
-            <button
-              v-for="item in marketOptions"
-              :key="item.value"
-              :class="{ active: market === item.value }"
-              type="button"
-              :aria-pressed="market === item.value"
-              @click="selectSearchMarket(item.value)"
-            >
-              {{ item.label }}
-            </button>
-          </div>
-
-          <div v-if="searchLoading" class="search-dropdown-state searching">
-            <Loader2 class="spin-icon" :size="16" />
-            <span>正在从 AKShare 搜索公司...</span>
-          </div>
-          <div v-else-if="searchError" class="search-dropdown-state error">
-            {{ searchError }}
-          </div>
-          <div
-            v-else-if="companies.length"
-            id="company-search-results"
-            class="search-results"
-            role="listbox"
-            aria-label="搜索结果"
-          >
-            <button
-              v-for="(company, index) in companies"
-              :id="searchOptionId(company)"
-              :key="`${company.market}-${company.symbol}`"
-              class="search-result-row"
-              :class="{
-                active:
-                  activeSearchIndex === index ||
-                  (selectedCompany?.market === company.market && selectedCompany?.symbol === company.symbol)
-              }"
-              type="button"
-              role="option"
-              :aria-selected="activeSearchIndex === index"
-              @mouseenter="activeSearchIndex = index"
-              @click="selectSearchCompany(company)"
-            >
-              <span class="company-logo" :data-market="company.market">{{ company.name.slice(0, 1) }}</span>
-              <span class="company-main">
-                <strong>{{ company.name }}</strong>
-                <span>
-                  {{ company.displaySymbol }}
-                  <small>{{ company.market === 'hk' ? 'HK' : 'A' }}</small>
-                </span>
-              </span>
-              <span class="company-quote">
-                <span v-if="company.latestPrice !== null && company.latestPrice !== undefined">
-                  {{ company.latestPrice }}
-                </span>
-                <em
-                  v-if="company.changePercent !== null && company.changePercent !== undefined"
-                  :class="{ up: Number(company.changePercent) > 0, down: Number(company.changePercent) < 0 }"
-                >
-                  {{ Number(company.changePercent).toFixed(2) }}%
-                </em>
-              </span>
-            </button>
-          </div>
-          <div v-else class="search-dropdown-state">
-            暂无搜索结果
-          </div>
-        </div>
-      </div>
-
-      <div v-else-if="currentView === 'settings'" class="settings-topbar-title">
-        <Settings :size="18" />
-        <strong>系统设置</strong>
-      </div>
-      <div v-else-if="currentView === 'etf'" class="settings-topbar-title">
-        <TrendingUp :size="18" />
-        <strong>ETF 研究</strong>
-      </div>
-      <div v-else-if="currentView === 'index'" class="settings-topbar-title">
-        <TrendingUp :size="18" />
-        <strong>指数研究</strong>
-      </div>
-      <div v-else class="settings-topbar-title">
-        <SlidersHorizontal :size="18" />
-        <strong>ROA/PE 筛选</strong>
-      </div>
-
-      <nav class="top-actions" aria-label="工具">
-        <button v-if="currentView === 'company'" class="ghost-button" type="button" @click="openScreenerPage">
-          <SlidersHorizontal :size="17" />筛选
-        </button>
-        <button v-if="currentView === 'company'" class="ghost-button" type="button" @click="openEtfPage">
-          <TrendingUp :size="17" />ETF
-        </button>
-        <button v-if="currentView === 'company'" class="ghost-button" type="button" @click="openIndexPage">
-          <TrendingUp :size="17" />指数
-        </button>
-        <button v-if="currentView === 'company'" class="ghost-button" type="button" title="刷新财报" @click="selectedCompany && selectCompany(selectedCompany, true)">
-          <RefreshCw :size="17" />刷新
-        </button>
-        <button
-          v-if="currentView === 'company'"
-          class="ghost-button"
-          :class="{ 'favorite-active': selectedIsFavorite }"
-          type="button"
-          :title="favoriteLoading ? '保存中' : selectedIsFavorite ? '取消收藏' : '收藏'"
-          :disabled="!selectedCompany || favoriteLoading"
-          @click="toggleFavorite"
-        >
-          <Star :size="17" />{{ favoriteLoading ? '保存中' : selectedIsFavorite ? '已收藏' : '收藏' }}
-        </button>
-        <button
-          v-if="currentView === 'company'"
-          class="icon-button dark"
-          type="button"
-          title="设置"
-          aria-label="打开设置"
-          @click="openSettingsPage"
-        >
-          <Settings :size="17" />
-        </button>
-        <button v-if="currentView === 'etf'" class="ghost-button" type="button" @click="openIndexPage">
-          <TrendingUp :size="17" />指数
-        </button>
-        <button v-if="currentView === 'etf'" class="ghost-button" type="button" @click="openScreenerPage">
-          <SlidersHorizontal :size="17" />筛选
-        </button>
-        <button v-if="currentView === 'etf'" class="ghost-button" type="button" @click="openCompanyPage">
-          <ArrowLeft :size="17" />个股
-        </button>
-        <button v-if="currentView === 'index'" class="ghost-button" type="button" @click="openEtfPage">
-          <TrendingUp :size="17" />ETF
-        </button>
-        <button v-if="currentView === 'index'" class="ghost-button" type="button" @click="openScreenerPage">
-          <SlidersHorizontal :size="17" />筛选
-        </button>
-        <button v-if="currentView === 'index'" class="ghost-button" type="button" @click="openCompanyPage">
-          <ArrowLeft :size="17" />个股
-        </button>
-        <button v-if="currentView === 'screener'" class="ghost-button" type="button" @click="openEtfPage">
-          <TrendingUp :size="17" />ETF
-        </button>
-        <button v-if="currentView === 'screener'" class="ghost-button" type="button" @click="openIndexPage">
-          <TrendingUp :size="17" />指数
-        </button>
-        <button v-if="currentView === 'screener'" class="ghost-button" type="button" @click="openCompanyPage">
-          <ArrowLeft :size="17" />个股
-        </button>
-        <button v-else-if="currentView === 'settings'" class="ghost-button" type="button" @click="openCompanyPage">
-          <ArrowLeft :size="17" />返回财报
-        </button>
-      </nav>
-    </header>
+    <AppTopbar
+      v-model:query="query"
+      v-model:market="market"
+      v-model:active-search-index="activeSearchIndex"
+      :current-view="currentView"
+      :companies="companies"
+      :selected-company="selectedCompany"
+      :search-loading="searchLoading"
+      :search-error="searchError"
+      :show-search-dropdown="showSearchDropdown"
+      :active-search-descendant="activeSearchDescendant"
+      :market-options="marketOptions"
+      :selected-is-favorite="selectedIsFavorite"
+      :favorite-loading="favoriteLoading"
+      @open-search="openSearchDropdown"
+      @search-focus-out="handleSearchFocusOut"
+      @search-input="handleSearchInput"
+      @search-enter="handleSearchEnter"
+      @move-search="moveSearchSelection"
+      @close-search="closeSearchDropdown"
+      @submit-search="submitSearch"
+      @select-market="selectSearchMarket"
+      @select-company="selectSearchCompany"
+      @navigate="navigateToView"
+      @refresh-company="selectedCompany && selectCompany(selectedCompany, true)"
+      @toggle-favorite="toggleFavorite"
+    />
 
     <div v-if="favoriteNotice" class="favorite-toast" role="status">
       {{ favoriteNotice }}
     </div>
 
     <main class="workspace">
-      <section v-if="currentView === 'settings'" class="settings-page">
-        <header class="settings-page-head">
-          <span>系统设置</span>
-          <h1>数据与缓存</h1>
-          <p>查看自动更新任务运行情况和本地 SQLite 缓存占用。</p>
-        </header>
-
-        <section class="refresh-task-panel">
-          <div>
-            <span>数据更新任务</span>
-            <strong>
-              {{ refreshStatus?.enabled ? `每 ${refreshStatus.intervalDays} 天自动检查` : '未启用' }}
-            </strong>
-          </div>
-          <div>
-            <span>待更新</span>
-            <strong>{{ refreshStatus?.pendingTargets ?? 0 }}</strong>
-          </div>
-          <div>
-            <span>上次运行</span>
-            <strong>{{ refreshRunLabel(refreshStatus?.latestRun?.status) }}</strong>
-            <small v-if="refreshStatus?.latestRun">
-              {{ refreshStatus.latestRun.succeeded }}/{{ refreshStatus.latestRun.totalTargets }}
-            </small>
-          </div>
-          <div>
-            <span>下次检查</span>
-            <strong>{{ formatDate(refreshStatus?.nextRunAt ?? undefined) }}</strong>
-          </div>
-          <button
-            class="ghost-button blue"
-            type="button"
-            :disabled="refreshTaskLoading || refreshStatus?.running"
-            @click="runRefreshTask"
-          >
-            <Loader2 v-if="refreshTaskLoading || refreshStatus?.running" class="spin-icon" :size="16" />
-            <RefreshCw v-else :size="16" />
-            {{ refreshTaskLoading || refreshStatus?.running ? '更新中' : '立即更新' }}
-          </button>
-        </section>
-
-        <div v-if="refreshTaskNotice" class="refresh-task-notice">
-          {{ refreshTaskNotice }}
-        </div>
-
-        <CacheManagerPanel
-          :entries="cacheEntries"
-          :loading="cacheEntriesLoading"
-          :error="cacheEntriesError"
-        />
-      </section>
+      <SettingsPage
+        v-if="currentView === 'settings'"
+        :refresh-status="refreshStatus"
+        :refresh-task-loading="refreshTaskLoading"
+        :refresh-task-notice="refreshTaskNotice"
+        :cache-entries="cacheEntries"
+        :cache-entries-loading="cacheEntriesLoading"
+        :cache-entries-error="cacheEntriesError"
+        @refresh="runRefreshTask"
+      />
 
       <EtfPage v-else-if="currentView === 'etf'" />
       <IndexPage v-else-if="currentView === 'index'" />
       <ScreenerPage v-else-if="currentView === 'screener'" />
 
-      <section v-else class="content">
-        <div v-if="favorites.length" class="favorite-strip" aria-label="收藏公司">
-          <span>收藏</span>
-          <button
-            v-for="company in favorites"
-            :key="companyKey(company)"
-            :class="{ active: selectedCompany?.market === company.market && selectedCompany?.symbol === company.symbol }"
-            type="button"
-            @click="selectCompany(company)"
-          >
-            <i
-              v-if="company.hasUnreadAnnouncements"
-              class="favorite-unread-dot"
-              :aria-label="`${company.unreadAnnouncementCount} 条新公告`"
-            ></i>
-            <Star :size="14" />
-            <strong>{{ company.name }}</strong>
-            <small>{{ company.displaySymbol }}</small>
-          </button>
-        </div>
-
-        <div v-if="visibleRecentCompanies.length" class="favorite-strip recent-strip" aria-label="最近访问公司">
-          <span>最近</span>
-          <button
-            v-for="company in visibleRecentCompanies"
-            :key="companyKey(company)"
-            type="button"
-            @click="selectCompany(company)"
-          >
-            <Clock3 :size="14" />
-            <strong>{{ company.name }}</strong>
-            <small>{{ company.displaySymbol }}</small>
-          </button>
-        </div>
-
-        <div class="company-card">
-          <div class="company-title">
-            <span class="market-badge">{{ marketLabel(selectedCompany?.market) }}</span>
-            <div class="company-title-content">
-              <div class="company-heading-row">
-                <div class="company-name-block">
-                  <div class="company-name-line">
-                    <h1>{{ selectedCompany?.name ?? '选择公司' }}</h1>
-                    <button
-                      class="company-note-button"
-                      :class="{ 'has-note': Boolean(activeCompanyInsight.note) }"
-                      type="button"
-                      :disabled="!selectedCompany"
-                      aria-haspopup="dialog"
-                      :aria-expanded="noteDialogOpen"
-                      @click="openNoteDialog"
-                    >
-                      <StickyNote :size="16" />
-                      {{ activeCompanyInsight.note ? '修改备注' : '添加备注' }}
-                    </button>
-                  </div>
-                  <p>{{ selectedCompany?.displaySymbol ?? '输入公司名或股票代码开始' }}</p>
-                </div>
-                <div class="company-note-preview" :class="{ empty: !activeCompanyInsight.note }">
-                  <span>备注</span>
-                  <p>{{ activeCompanyInsight.note || '暂无备注，点击“添加备注”记录你的看法。' }}</p>
-                </div>
-              </div>
-              <div class="buy-point-field">
-                <label :for="selectedCompany ? `buy-point-${selectedCompany.market}-${selectedCompany.symbol}` : 'buy-point'">
-                  预估买点
-                </label>
-                <template v-if="buyPointEditing">
-                  <input
-                    :id="selectedCompany ? `buy-point-${selectedCompany.market}-${selectedCompany.symbol}` : 'buy-point'"
-                    v-model="buyPointDraft"
-                    type="text"
-                    inputmode="decimal"
-                    placeholder="例如：85–95 元"
-                    :disabled="!selectedCompany"
-                    aria-label="预估买点区间"
-                    autofocus
-                    @keydown.enter.prevent="saveBuyPoint"
-                    @keydown.esc.prevent="cancelBuyPointEditing"
-                  />
-                  <button class="buy-point-save" type="button" @click="saveBuyPoint">保存</button>
-                  <button class="buy-point-cancel" type="button" @click="cancelBuyPointEditing">取消</button>
-                </template>
-                <template v-else>
-                  <strong class="buy-point-value" :class="{ empty: !activeCompanyInsight.buyPointRange }">
-                    {{ activeCompanyInsight.buyPointRange || '暂未设置' }}
-                  </strong>
-                  <button
-                    class="buy-point-edit"
-                    type="button"
-                    :disabled="!selectedCompany"
-                    @click="startBuyPointEditing"
-                  >
-                    {{ activeCompanyInsight.buyPointRange ? '修改' : '设置' }}
-                  </button>
-                </template>
-                <span v-if="showBuyPointReminder" class="buy-point-reminder">
-                  <AlertTriangle :size="14" />
-                  请更新最新预估买点
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div class="quote-grid">
-            <div>
-              <span>数据源</span>
-              <strong>AKShare</strong>
-            </div>
-            <div>
-              <span>报表范围</span>
-              <strong>自上市年起</strong>
-            </div>
-            <div>
-              <span>更新时间</span>
-              <strong>{{ formatDate(statements?.fetchedAt) }}</strong>
-            </div>
-            <div>
-              <span>单位</span>
-              <strong>{{ statements?.unit ?? '-' }}</strong>
-            </div>
-          </div>
-        </div>
-
-        <div class="statement-cache-strip">
-          <span>财报数据</span>
-          <strong>{{ statementCacheLabel }}</strong>
-          <small>缓存刷新：{{ formatDate(statements?.cache?.refreshedAt) }}</small>
-        </div>
-
-        <AnnouncementPanel
-          :feed="announcementFeed"
-          :loading="announcementLoading"
-          :error="announcementError"
-        />
-
-        <div v-if="statementLoading" class="loading-panel company-loading-panel" role="status" aria-live="polite">
-          <Loader2 class="spin-icon" :size="22" />
-          <strong>正在读取 {{ selectedCompany?.name ?? '个股' }} 财报数据</strong>
-          <span>本地没有缓存时会通过 AKShare 拉取，请稍候...</span>
-        </div>
-
-        <template v-else>
-        <div v-if="statementError" class="status-banner">
-          <AlertTriangle :size="18" />
-          <span>{{ statementError }}</span>
-        </div>
-
-        <div class="year-strip" v-if="availableYears.length">
-          <button
-            v-for="year in availableYears"
-            :key="year"
-            :class="{ active: activeYears.includes(year) }"
-            type="button"
-            @click="toggleYear(year)"
-          >
-            {{ year }} 年报
-          </button>
-        </div>
-
-        <div class="insight-grid">
-          <MiniTrend :series="statements?.highlights ?? []" />
-          <div class="metric-cards">
-            <article v-for="card in summaryCards" :key="card.key" class="metric-card">
-              <span>{{ card.label }}</span>
-              <strong>{{ formatNumber(card.latest) }}</strong>
-              <em :class="{ up: (card.delta ?? 0) >= 0, down: (card.delta ?? 0) < 0 }">
-                <TrendingUp :size="15" />
-                {{ card.delta === null ? '-' : `${card.delta.toFixed(2)}%` }}
-              </em>
-            </article>
-          </div>
-        </div>
-
-        <PeerComparisonPanel
-          :company="selectedCompany"
-          :comparison="peerComparison"
-          :loading="peerLoading"
-          :error="peerError"
-        />
-
-        <PeerMetricChart
-          :comparison="peerMetricComparison"
-          :loading="peerMetricLoading"
-          :error="peerMetricError"
-          :metric-key="activePeerMetricKey"
-          :mode="peerMetricMode"
-          :cache-entries="cacheEntries"
-          :selected-company-keys="selectedMetricCompanyKeys"
-          @metric-change="changePeerMetric"
-          @mode-change="changePeerMetricMode"
-          @selection-change="changeMetricCompanies"
-        />
-
-        <CustomMetricChart :statements="statements" :active-years="activeYears" />
-
-        <div class="toolbar">
-          <div class="tabs">
-            <button
-              v-for="tab in [
-                { type: 'balance', label: '资产负债表' },
-                { type: 'income', label: '利润表' },
-                { type: 'cashflow', label: '现金流量表' }
-              ]"
-              :key="tab.type"
-              :class="{ active: activeStatement === tab.type }"
-              type="button"
-              @click="activeStatement = tab.type as StatementType"
-            >
-              {{ tab.label }}
-            </button>
-          </div>
-
-          <div class="toolbar-actions">
-            <button class="ghost-button blue" type="button" @click="selectedCompany && selectCompany(selectedCompany, true)">
-              <RefreshCw :size="16" />刷新
-            </button>
-            <button class="ghost-button blue" type="button" @click="exportCsv">
-              <Download :size="16" />导出
-            </button>
-          </div>
-        </div>
-
-        <StatementTable :table="activeTable" :active-years="activeYears" />
-        </template>
-      </section>
+      <CompanyResearchView
+        v-else
+        v-model:buy-point-draft="buyPointDraft"
+        v-model:active-statement="activeStatement"
+        :favorites="favorites"
+        :visible-recent-companies="visibleRecentCompanies"
+        :selected-company="selectedCompany"
+        :active-company-insight="activeCompanyInsight"
+        :note-dialog-open="noteDialogOpen"
+        :buy-point-editing="buyPointEditing"
+        :show-buy-point-reminder="showBuyPointReminder"
+        :statements="statements"
+        :statement-cache-label="statementCacheLabel"
+        :announcement-feed="announcementFeed"
+        :announcement-loading="announcementLoading"
+        :announcement-error="announcementError"
+        :statement-loading="statementLoading"
+        :statement-error="statementError"
+        :available-years="availableYears"
+        :active-years="activeYears"
+        :summary-cards="summaryCards"
+        :peer-comparison="peerComparison"
+        :peer-loading="peerLoading"
+        :peer-error="peerError"
+        :peer-metric-comparison="peerMetricComparison"
+        :peer-metric-loading="peerMetricLoading"
+        :peer-metric-error="peerMetricError"
+        :active-peer-metric-key="activePeerMetricKey"
+        :peer-metric-mode="peerMetricMode"
+        :cache-entries="cacheEntries"
+        :selected-metric-company-keys="selectedMetricCompanyKeys"
+        :active-table="activeTable"
+        @select-company="selectCompany"
+        @open-note="openNoteDialog"
+        @start-buy-point-editing="startBuyPointEditing"
+        @save-buy-point="saveBuyPoint"
+        @cancel-buy-point-editing="cancelBuyPointEditing"
+        @toggle-year="toggleYear"
+        @change-peer-metric="changePeerMetric"
+        @change-peer-metric-mode="changePeerMetricMode"
+        @change-metric-companies="changeMetricCompanies"
+        @refresh-company="selectedCompany && selectCompany(selectedCompany, true)"
+        @export-table="exportCsv"
+      />
     </main>
 
-    <div
-      v-if="noteDialogOpen"
-      class="note-dialog-backdrop"
-      role="presentation"
-      @mousedown.self="closeNoteDialog"
-    >
-      <section
-        ref="noteDialog"
-        class="note-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="company-note-title"
-        @keydown.tab="trapNoteDialogFocus"
-      >
-        <header>
-          <div>
-            <span>公司备注</span>
-            <h2 id="company-note-title">{{ selectedCompany?.name }}</h2>
-          </div>
-          <button type="button" aria-label="关闭备注弹窗" @click="closeNoteDialog">
-            <X :size="20" />
-          </button>
-        </header>
-        <label for="company-note-content">记录你的判断、风险点或后续关注事项</label>
-        <textarea
-          id="company-note-content"
-          ref="noteTextarea"
-          v-model="noteDraft"
-          rows="8"
-          placeholder="例如：核心业务增长稳定，但需要继续观察毛利率和现金流……"
-        ></textarea>
-        <footer>
-          <small>备注保存在本机 SQLite 数据库中</small>
-          <div>
-            <button class="note-dialog-cancel" type="button" @click="closeNoteDialog">取消</button>
-            <button class="note-dialog-save" type="button" @click="saveNote">保存备注</button>
-          </div>
-        </footer>
-      </section>
-    </div>
+    <CompanyNoteDialog
+      v-model:note="noteDraft"
+      :open="noteDialogOpen"
+      :company-name="selectedCompany?.name"
+      @close="closeNoteDialog"
+      @save="saveNote"
+    />
   </div>
 </template>
