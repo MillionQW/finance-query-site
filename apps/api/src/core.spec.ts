@@ -5,6 +5,7 @@ import { normalizeEtfSymbol } from './finance/etf.service';
 import { normalizeSymbol } from './finance/finance-store.service';
 import { calculateIndexMetrics } from './finance/index.service';
 import { IndexHistoryPoint } from './finance/index.types';
+import { applyHttpPolicy, applyStaticCachePolicy } from './http-policy';
 
 test('API defaults stay local and only allow the local development UI', () => {
   assert.equal(apiHost({}), '127.0.0.1');
@@ -49,4 +50,26 @@ test('index metrics calculate period return and drawdown', () => {
   assert.ok(Math.abs(metrics.return20d - 0.1) < 1e-12);
   assert.equal(metrics.maxDrawdown, 0);
   assert.equal(metrics.currentDrawdown, 0);
+});
+
+test('HTTP policy protects private API responses and browser documents', () => {
+  const apiHeaders = new Map<string, string>();
+  applyHttpPolicy('/api/finance/insights/a/600519', {
+    setHeader: (name, value) => apiHeaders.set(name, value)
+  });
+  assert.equal(apiHeaders.get('Cache-Control'), 'no-store');
+  assert.equal(apiHeaders.get('X-Frame-Options'), 'DENY');
+  assert.match(apiHeaders.get('Content-Security-Policy') ?? '', /frame-ancestors 'none'/);
+
+  const assetHeaders = new Map<string, string>();
+  applyStaticCachePolicy('D:\\site\\assets\\index-ABC123.js', {
+    setHeader: (name, value) => assetHeaders.set(name, value)
+  });
+  assert.equal(assetHeaders.get('Cache-Control'), 'public, max-age=31536000, immutable');
+
+  const htmlHeaders = new Map<string, string>();
+  applyStaticCachePolicy('D:\\site\\index.html', {
+    setHeader: (name, value) => htmlHeaders.set(name, value)
+  });
+  assert.equal(htmlHeaders.get('Cache-Control'), 'no-cache');
 });
