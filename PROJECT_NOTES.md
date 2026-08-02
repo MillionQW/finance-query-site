@@ -15,6 +15,7 @@
 - Type check: `npm run typecheck`
 - Build: `npm run build`
 - Start production server: `npm run start`
+- After completing any change, automatically run `npm run build` to rebuild and update the website, and confirm that the build succeeds before handing off the work.
 
 ## Local AKShare Reference Repository
 

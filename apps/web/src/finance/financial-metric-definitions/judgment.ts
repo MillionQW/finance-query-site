@@ -10,7 +10,7 @@ export const judgmentDefinitions: MetricDefinition[] = [
     group: 'judgment',
     formula: '经营活动产生的现金流量净额 > 净利润 > 0',
     kind: 'judgment',
-    description: '经营现金流净额高于正净利润时通过。更完整的判断请查看“现金质量”中的经营现金含金量及三年累计值。',
+    description: '经营现金流净额高于正净利润时通过。更完整的判断请查看“现金质量”中的经营现金含金量及三年累计值。经营活动现金流如果持续大于净利润，很可能意味着公司商品或服务供不应求，买家不断打预付款来订货。',
     requirements: [
       { label: '经营活动产生的现金流量净额', table: 'cashflow', aliases: OPERATING_CASHFLOW_ALIASES },
       { label: '净利润', table: 'income', aliases: NET_PROFIT_ALIASES }
