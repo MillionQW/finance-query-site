@@ -15,14 +15,12 @@ import { companyKey } from '../app/app-navigation';
 import { formatDate, formatNumber, marketLabel } from '../app/app-formatters';
 import type {
   AnnouncementFeed,
-  CacheEntry,
   CompanyInsight,
   CompanySearchResult,
   FavoriteCompany,
   FinancialStatements,
   MetricSeries,
   PeerComparison,
-  PeerMetricComparison,
   StatementTable,
   StatementType
 } from '../types/finance';
@@ -32,11 +30,11 @@ const FinancialDriverPanel = defineAsyncComponent(() => import('./FinancialDrive
 const MiniTrend = defineAsyncComponent(() => import('./MiniTrend.vue'));
 const PeriodAnalysisPanel = defineAsyncComponent(() => import('./PeriodAnalysisPanel.vue'));
 const PeerComparisonPanel = defineAsyncComponent(() => import('./PeerComparisonPanel.vue'));
-const PeerMetricChart = defineAsyncComponent(() => import('./PeerMetricChart.vue'));
 const ResearchSummaryPanel = defineAsyncComponent(() => import('./ResearchSummaryPanel.vue'));
 const ResearchDossierPanel = defineAsyncComponent(() => import('./ResearchDossierPanel.vue'));
 const StatementTrustPanel = defineAsyncComponent(() => import('./StatementTrustPanel.vue'));
 const StatementTable = defineAsyncComponent(() => import('./StatementTable.vue'));
+const StatementComparisonChart = defineAsyncComponent(() => import('./StatementComparisonChart.vue'));
 
 defineProps<{
   favorites: FavoriteCompany[];
@@ -59,13 +57,6 @@ defineProps<{
   peerComparison: PeerComparison | null;
   peerLoading: boolean;
   peerError: string | null;
-  peerMetricComparison: PeerMetricComparison | null;
-  peerMetricLoading: boolean;
-  peerMetricError: string | null;
-  activePeerMetricKey: string;
-  peerMetricMode: 'peers' | 'custom';
-  cacheEntries: CacheEntry[];
-  selectedMetricCompanyKeys: string[];
   activeTable: StatementTable | undefined;
 }>();
 
@@ -79,9 +70,6 @@ defineEmits<{
   saveBuyPoint: [];
   cancelBuyPointEditing: [];
   toggleYear: [year: string];
-  changePeerMetric: [metric: string];
-  changePeerMetricMode: [mode: 'peers' | 'custom'];
-  changeMetricCompanies: [companies: string[]];
   refreshCompany: [];
   exportTable: [];
 }>();
@@ -285,19 +273,6 @@ defineEmits<{
           :error="peerError"
         />
 
-        <PeerMetricChart
-          :comparison="peerMetricComparison"
-          :loading="peerMetricLoading"
-          :error="peerMetricError"
-          :metric-key="activePeerMetricKey"
-          :mode="peerMetricMode"
-          :cache-entries="cacheEntries"
-          :selected-company-keys="selectedMetricCompanyKeys"
-          @metric-change="$emit('changePeerMetric', $event)"
-          @mode-change="$emit('changePeerMetricMode', $event)"
-          @selection-change="$emit('changeMetricCompanies', $event)"
-        />
-
         <CustomMetricChart :statements="statements" :active-years="activeYears" />
 
         <div class="toolbar">
@@ -326,6 +301,12 @@ defineEmits<{
             </button>
           </div>
         </div>
+
+        <StatementComparisonChart
+          v-if="statements"
+          :statements="statements"
+          :active-years="activeYears"
+        />
 
         <StatementTable :table="activeTable" :active-years="activeYears" />
         </template>

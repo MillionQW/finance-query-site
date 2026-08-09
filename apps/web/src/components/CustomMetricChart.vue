@@ -6,6 +6,7 @@ import { LineChart } from 'echarts/charts';
 import { CanvasRenderer } from 'echarts/renderers';
 import type { ECharts, EChartsCoreOption } from 'echarts/core';
 import type { FinancialStatements } from '../types/finance';
+import { CASH_FLOW_CLASSIFICATIONS } from '../finance/cash-flow-classification';
 import { REVENUE_ALIASES } from '../finance/financial-metric-fields';
 import { formatMetricValue, formatRawValue, growthRate, rowValue } from '../finance/financial-metric-engine';
 import {
@@ -144,7 +145,11 @@ const chartOption = computed<EChartsCoreOption>(() => {
     },
     yAxis: {
       type: 'value',
-      ...(result.definition.kind === 'judgment' ? { min: 0, max: 1, interval: 1 } : {}),
+      ...(result.definition.kind === 'judgment'
+        ? { min: 0, max: 1, interval: 1 }
+        : result.definition.kind === 'classification'
+          ? { min: 1, max: 8, interval: 1 }
+          : {}),
       axisLabel: {
         color: '#64748b',
         fontSize: 11,
@@ -266,6 +271,7 @@ function getTooltipDataIndex(params: unknown): number {
 }
 
 function formatDetailValue(detail: FormulaDetail): string {
+  if (detail.displayValue) return detail.displayValue;
   if (detail.kind && detail.kind !== 'number') {
     return formatMetricValue(detail.value, detail.kind);
   }
@@ -282,6 +288,7 @@ function escapeHtml(value: string): string {
 }
 
 function formatAxisValue(value: number, kind: MetricKind): string {
+  if (kind === 'classification') return formatMetricValue(value, kind);
   if (kind === 'judgment') return value === 1 ? '通过' : '不通过';
   if (kind === 'percent') return `${(value * 100).toFixed(0)}%`;
   if (kind === 'amount') return formatRawValue(value);
@@ -383,6 +390,47 @@ function formatAxisValue(value: number, kind: MetricKind): string {
     <div class="formula-row">
       <span>{{ selectedResult.definition.formula }}</span>
       <small>{{ selectedResult.definition.description }}</small>
+    </div>
+
+    <div
+      v-if="selectedResult.definition.key === 'cashFlowCompanyType'"
+      class="cash-flow-classification-guide"
+    >
+      <div class="cash-flow-classification-head">
+        <strong>八类现金流组合参考</strong>
+        <small>当前年度分类已高亮</small>
+      </div>
+      <div class="cash-flow-classification-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>类型</th>
+              <th>经营</th>
+              <th>投资</th>
+              <th>筹资</th>
+              <th>企业类型</th>
+              <th>关注要点</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="item in CASH_FLOW_CLASSIFICATIONS"
+              :key="item.code"
+              :class="{ active: selectedResult.latest === item.code }"
+            >
+              <td>{{ item.code }}</td>
+              <td>{{ item.operatingSign }}</td>
+              <td>{{ item.investingSign }}</td>
+              <td>{{ item.financingSign }}</td>
+              <td>
+                <strong>{{ item.companyType }}</strong>
+                <small v-if="item.note">{{ item.note }}</small>
+              </td>
+              <td>{{ item.focus }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div v-if="selectedThresholdGuide" class="metric-threshold-guide">

@@ -1,9 +1,28 @@
-import { CASH_EQUIVALENT_INCREASE_ALIASES, END_CASH_EQUIVALENT_ALIASES, HK_INVESTMENT_CASH_NET_ALIASES, INTEREST_BEARING_DEBT_ALIASES, INTEREST_BEARING_DEBT_GROUPS, INVESTMENT_CASH_INFLOW_ALIASES, INVESTMENT_CASH_OUTFLOW_ALIASES, NET_PROFIT_ALIASES, OPERATING_CASHFLOW_ALIASES } from '../financial-metric-fields';
+import { CASH_EQUIVALENT_INCREASE_ALIASES, END_CASH_EQUIVALENT_ALIASES, FINANCING_CASHFLOW_ALIASES, HK_INVESTMENT_CASH_NET_ALIASES, INTEREST_BEARING_DEBT_ALIASES, INTEREST_BEARING_DEBT_GROUPS, INVESTING_CASHFLOW_ALIASES, INVESTMENT_CASH_INFLOW_ALIASES, INVESTMENT_CASH_OUTFLOW_ALIASES, NET_PROFIT_ALIASES, OPERATING_CASHFLOW_ALIASES } from '../financial-metric-fields';
 import { absoluteValue, rowValue } from '../financial-metric-engine';
 import type { MetricDefinition } from '../financial-metric-types';
 import { cashEquivalentIncrease, judgmentValue, sumRows } from '../financial-metric-calculation-helpers';
+import { classifyCashFlows } from '../cash-flow-classification';
 
 export const judgmentDefinitions: MetricDefinition[] = [
+  {
+    key: 'cashFlowCompanyType',
+    label: '三类现金流企业类型',
+    group: 'judgment',
+    formula: '经营、投资、筹资活动现金流量净额的正负组合',
+    kind: 'classification',
+    description: '按当年三类现金流净额的正负组合归入八种企业类型。该分类只用于提示进一步核查方向，不能代替对多年数据、行业特征和具体项目的分析；任一净额为 0 时不强行归类。',
+    requirements: [
+      { label: '经营活动产生的现金流量净额', table: 'cashflow', aliases: OPERATING_CASHFLOW_ALIASES },
+      { label: '投资活动产生的现金流量净额', table: 'cashflow', aliases: INVESTING_CASHFLOW_ALIASES },
+      { label: '筹资活动产生的现金流量净额', table: 'cashflow', aliases: FINANCING_CASHFLOW_ALIASES }
+    ],
+    calculate: (context, year) => classifyCashFlows(
+      rowValue(context.cashflow, year, OPERATING_CASHFLOW_ALIASES),
+      rowValue(context.cashflow, year, INVESTING_CASHFLOW_ALIASES),
+      rowValue(context.cashflow, year, FINANCING_CASHFLOW_ALIASES)
+    )?.code ?? null
+  },
   {
     key: 'operatingCashflowAboveProfit',
     label: '经营现金流净额 > 净利润 > 0',

@@ -1,4 +1,5 @@
 import type { StatementTable } from '../types/finance';
+import { cashFlowClassificationByCode } from './cash-flow-classification';
 import type { MetricKind } from './financial-metric-types';
 
 export function toNumber(value: number | string | null | undefined): number | null {
@@ -213,6 +214,7 @@ export function formatRawValue(value: number | null): string {
 
 export function formatMetricValue(value: number | null, kind: MetricKind): string {
   if (value === null) return '-';
+  if (kind === 'classification') return cashFlowClassificationByCode(value)?.companyType ?? `第${value}类`;
   if (kind === 'judgment') return value === 1 ? '通过' : '不通过';
   if (kind === 'percent') return `${(value * 100).toFixed(2)}%`;
   if (kind === 'amount') return formatRawValue(value);

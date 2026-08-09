@@ -307,6 +307,80 @@
   text-align: right;
 }
 
+.cash-flow-classification-guide {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.cash-flow-classification-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cash-flow-classification-head > strong {
+  color: #1e3a8a;
+  font-size: 13px;
+}
+
+.cash-flow-classification-head > small {
+  color: #64748b;
+}
+
+.cash-flow-classification-table-wrap {
+  margin-top: 9px;
+  overflow-x: auto;
+}
+
+.cash-flow-classification-guide table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  color: #334155;
+  background: #fff;
+  font-size: 12px;
+}
+
+.cash-flow-classification-guide th,
+.cash-flow-classification-guide td {
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.cash-flow-classification-guide th {
+  color: #475569;
+  background: #f1f5f9;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.cash-flow-classification-guide td:nth-child(-n + 4) {
+  text-align: center;
+  font-weight: 900;
+}
+
+.cash-flow-classification-guide tbody tr.active {
+  color: #1e40af;
+  background: #eff6ff;
+  box-shadow: inset 3px 0 #2563eb;
+}
+
+.cash-flow-classification-guide td strong,
+.cash-flow-classification-guide td small {
+  display: block;
+}
+
+.cash-flow-classification-guide td small {
+  margin-top: 2px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
 .metric-threshold-guide {
   margin-top: 12px;
   padding: 12px;

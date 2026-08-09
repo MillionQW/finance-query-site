@@ -14,7 +14,7 @@ const sections = computed(() => [
 ]);
 
 const completion = computed(() => (
-  sections.value.filter((section) => Boolean(section.value.trim())).length
+  sections.value.filter((section) => Boolean(section.value?.trim())).length
 ));
 </script>
 

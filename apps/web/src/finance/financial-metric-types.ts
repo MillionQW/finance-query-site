@@ -1,6 +1,6 @@
 import type { FinancialStatements, StatementTable } from '../types/finance';
 
-export type MetricKind = 'percent' | 'times' | 'amount' | 'days' | 'judgment';
+export type MetricKind = 'percent' | 'times' | 'amount' | 'days' | 'judgment' | 'classification';
 export type MetricGroupKey = 'profitability' | 'cashQuality' | 'growth' | 'solvency' | 'efficiency' | 'assetQuality' | 'judgment';
 
 export interface FormulaDetail {
@@ -8,6 +8,7 @@ export interface FormulaDetail {
   value: number | null;
   kind?: MetricKind | 'number';
   note?: string;
+  displayValue?: string;
 }
 
 export interface FormulaDetails {

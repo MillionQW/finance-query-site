@@ -30,7 +30,11 @@ function statements(): FinancialStatements {
       statementTable('income', [
         { item: '归属于母公司股东的净利润', values: { '2025': 120, '2024': 80 } }
       ]),
-      statementTable('cashflow', [])
+      statementTable('cashflow', [
+        { item: '经营活动现金流量净额', values: { '2025': 100, '2024': 90 } },
+        { item: '投资活动现金流量净额', values: { '2025': -80, '2024': -70 } },
+        { item: '筹资活动现金流量净额', values: { '2025': 30, '2024': -20 } }
+      ])
     ],
     highlights: [],
     fetchedAt: '2026-07-25T00:00:00.000Z',
@@ -80,4 +84,17 @@ test('evaluator returns stable empty results before statements load', () => {
   assert.deepEqual(result.points, []);
   assert.equal(result.latest, null);
   assert.deepEqual(result.alerts, []);
+});
+
+test('evaluator classifies enterprise type from three cash-flow net amounts', () => {
+  const definition = definitions.find((item) => item.key === 'cashFlowCompanyType');
+  assert.ok(definition);
+
+  const [result] = evaluateFinancialMetrics(statements(), ['2025', '2024'], [definition]);
+
+  assert.equal(result.points[0].value, 3);
+  assert.equal(result.points[0].expression, '经营+ / 投资- / 筹资+ → 第3类 蛮牛型；关注：项目前景、资金支持');
+  assert.equal(result.points[0].details.at(-1)?.displayValue, '项目前景、资金支持');
+  assert.equal(result.points[1].value, 4);
+  assert.deepEqual(result.missing, []);
 });

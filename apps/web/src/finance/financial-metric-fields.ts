@@ -51,6 +51,8 @@ export const INTEREST_BEARING_DEBT_GROUPS = [
 
 export const INTEREST_BEARING_DEBT_ALIASES = INTEREST_BEARING_DEBT_GROUPS.flatMap((group) => group.aliases);
 export const OPERATING_CASHFLOW_ALIASES = ['经营活动产生的现金流量净额', '经营活动现金流量净额', '经营业务现金净额', 'NETCASH OPERATE'];
+export const INVESTING_CASHFLOW_ALIASES = ['投资活动产生的现金流量净额', '投资活动现金流量净额', '投资业务现金净额', 'NETCASH INVEST'];
+export const FINANCING_CASHFLOW_ALIASES = ['筹资活动产生的现金流量净额', '筹资活动现金流量净额', '融资业务现金净额', 'NETCASH FINANCE'];
 export const CUSTOMER_CASH_RECEIPTS_ALIASES = ['销售商品、提供劳务收到的现金', '销售商品提供劳务收到的现金', '客户合约现金流入', 'SALES SERVICES'];
 export const COMBINED_CAPITAL_EXPENDITURE_ALIASES = ['购建固定资产、无形资产和其他长期资产支付的现金', '购建固定资产无形资产和其他长期资产支付的现金', '购买物业厂房及设备支付的现金', '购买固定资产支付的现金', 'CONSTRUCT LONG ASSET'];
 export const FIXED_ASSET_CAPEX_ALIASES = ['购建固定资产'];

@@ -13,6 +13,7 @@ export function isGrowthGapMetric(metricKey: string): boolean {
 
 export function isCriticalMetric(result: MetricResult): boolean {
   if (result.latest === null) return false;
+  if (result.definition.key === 'cashFlowCompanyType') return [5, 7, 8].includes(result.latest);
   if (result.definition.kind === 'judgment') return result.latest === 0;
   if (result.definition.key === 'roic' || result.definition.key === 'netMargin') return result.latest < 0;
   if (result.definition.key === 'revenueGrowth') return result.latest < -0.2;
@@ -65,6 +66,7 @@ export function isPositiveMetric(result: MetricResult): boolean {
 
 export function isWarningMetric(result: MetricResult): boolean {
   if (result.latest === null) return false;
+  if (result.definition.key === 'cashFlowCompanyType') return [1, 3, 6].includes(result.latest);
   if (result.definition.key === 'roic') return result.latest >= 0 && result.latest < 0.05;
   if (result.definition.key === 'netMargin') return result.latest >= 0 && result.latest < 0.03;
   if (result.definition.key === 'revenueGrowth') return result.latest >= -0.2 && result.latest < 0;
@@ -116,6 +118,18 @@ export function metricAlerts(
   const latest = validPoints[0];
   const previous = validPoints[1];
   if (latest?.value !== null && latest?.value !== undefined) {
+    if (definition.key === 'cashFlowCompanyType') {
+      const typeMessages: Record<number, { message: string; tone: 'warning' | 'danger' }> = {
+        1: { message: `${latest.year} 为妖精型，需核查企业计划投资项目情况。`, tone: 'warning' },
+        3: { message: `${latest.year} 为蛮牛型，需核查项目前景与资金支持。`, tone: 'warning' },
+        5: { message: `${latest.year} 为大出血型，分类规则建议拒绝参与。`, tone: 'danger' },
+        6: { message: `${latest.year} 为赌徒型，需重点核查项目前景与管理层品性。`, tone: 'warning' },
+        7: { message: `${latest.year} 为混吃等死型，分类规则不建议投资；亦可能是老母鸡型。`, tone: 'danger' },
+        8: { message: `${latest.year} 为骗吃骗喝型，分类规则不建议投资；亦可能是妖精型。`, tone: 'danger' }
+      };
+      const classificationAlert = typeMessages[latest.value];
+      if (classificationAlert) alerts.push({ year: latest.year, ...classificationAlert });
+    }
     if (isGrowthGapMetric(definition.key) && latest.value > 0.1) {
       const persistent = previous?.value !== null && previous?.value !== undefined && previous.value > 0.1;
       alerts.push({

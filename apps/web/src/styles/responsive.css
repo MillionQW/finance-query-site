@@ -134,6 +134,25 @@
     overflow-x: auto;
   }
 
+  .statement-comparison-head,
+  .statement-comparison-note {
+    flex-direction: column;
+  }
+
+  .statement-comparison-options {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .statement-comparison-options button {
+    flex: 0 0 250px;
+  }
+
+  .statement-comparison-note strong {
+    flex-basis: auto;
+  }
+
   .screener-page {
     width: calc(100% - 32px);
     padding-top: 16px;

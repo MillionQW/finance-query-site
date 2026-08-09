@@ -9,9 +9,7 @@ import {
   getAnnouncements,
   getCompanyInsight,
   getFavorites,
-  getMetricComparison,
   getPeerComparison,
-  getPeerMetricComparison,
   getRefreshStatus,
   getStatements,
   markAnnouncementsViewed,
@@ -31,7 +29,6 @@ import type {
   FinancialStatements,
   MarketFilter,
   PeerComparison,
-  PeerMetricComparison,
   StatementRefreshRuntimeStatus,
   StatementType
 } from './types/finance';
@@ -66,23 +63,17 @@ const companies = ref<CompanySearchResult[]>(mergeCompanyList([initialCompany], 
 const selectedCompany = ref<CompanySearchResult | null>(initialCompany);
 const statements = ref<FinancialStatements | null>(null);
 const peerComparison = ref<PeerComparison | null>(null);
-const peerMetricComparison = ref<PeerMetricComparison | null>(null);
 const announcementFeed = ref<AnnouncementFeed | null>(null);
 const activeStatement = ref<StatementType>('balance');
-const activePeerMetricKey = ref('revenue');
-const peerMetricMode = ref<'peers' | 'custom'>('peers');
-const selectedMetricCompanyKeys = ref<string[]>([]);
 const selectedYears = ref<string[]>([]);
 const searchLoading = ref(false);
 const statementLoading = ref(false);
 const peerLoading = ref(false);
-const peerMetricLoading = ref(false);
 const cacheEntriesLoading = ref(false);
 const announcementLoading = ref(false);
 const searchError = ref<string | null>(null);
 const statementError = ref<string | null>(null);
 const peerError = ref<string | null>(null);
-const peerMetricError = ref<string | null>(null);
 const cacheEntriesError = ref<string | null>(null);
 const announcementError = ref<string | null>(null);
 const searchDropdownOpen = ref(false);
@@ -109,7 +100,6 @@ const buyPointEditing = ref(false);
 let favoriteNoticeTimer: number | undefined;
 let statementRequestId = 0;
 let peerRequestId = 0;
-let peerMetricRequestId = 0;
 let announcementRequestId = 0;
 let insightRequestId = 0;
 let companyRequestController: AbortController | null = null;
@@ -209,28 +199,17 @@ const statementCacheLabel = computed(() => {
   return statements.value.cache.hit ? '本地缓存' : '刚刚更新';
 });
 
-const selectedMetricCompanies = computed(() => {
-  const selected = new Set(selectedMetricCompanyKeys.value);
-  return cacheEntries.value
-    .filter((entry) => entry.kind === 'statements' && selected.has(companyKey(entry)))
-    .map((entry) => ({
-      market: entry.market,
-      symbol: entry.symbol,
-      name: entry.name ?? entry.displaySymbol
-    }));
-});
-
 function openNoteDialog(): void {
   if (!selectedCompany.value) return;
   noteDialogReturnFocus = document.activeElement instanceof HTMLElement
     ? document.activeElement
     : null;
   insightDraft.value = {
-    note: activeCompanyInsight.value.note,
-    thesis: activeCompanyInsight.value.thesis,
-    risks: activeCompanyInsight.value.risks,
-    catalysts: activeCompanyInsight.value.catalysts,
-    questions: activeCompanyInsight.value.questions
+    note: activeCompanyInsight.value.note ?? '',
+    thesis: activeCompanyInsight.value.thesis ?? '',
+    risks: activeCompanyInsight.value.risks ?? '',
+    catalysts: activeCompanyInsight.value.catalysts ?? '',
+    questions: activeCompanyInsight.value.questions ?? ''
   };
   noteDialogOpen.value = true;
 }
@@ -284,11 +263,11 @@ async function persistActiveCompanyInsight(
 
 async function saveNote(): Promise<void> {
   const saved = await persistActiveCompanyInsight({
-    note: insightDraft.value.note.trim(),
-    thesis: insightDraft.value.thesis.trim(),
-    risks: insightDraft.value.risks.trim(),
-    catalysts: insightDraft.value.catalysts.trim(),
-    questions: insightDraft.value.questions.trim(),
+    note: (insightDraft.value.note ?? '').trim(),
+    thesis: (insightDraft.value.thesis ?? '').trim(),
+    risks: (insightDraft.value.risks ?? '').trim(),
+    catalysts: (insightDraft.value.catalysts ?? '').trim(),
+    questions: (insightDraft.value.questions ?? '').trim(),
     buyPointRange: activeCompanyInsight.value.buyPointRange
   });
   if (saved) closeNoteDialog();
@@ -448,12 +427,6 @@ async function loadCacheEntries(): Promise<void> {
   cacheEntriesError.value = null;
   try {
     cacheEntries.value = await getCacheEntries();
-    if (!selectedMetricCompanyKeys.value.length && selectedCompany.value) {
-      selectedMetricCompanyKeys.value = cacheEntries.value
-        .filter((entry) => entry.kind === 'statements')
-        .slice(0, 4)
-        .map((entry) => companyKey(entry));
-    }
   } catch (error) {
     cacheEntriesError.value = error instanceof Error ? error.message : '缓存列表读取失败';
   } finally {
@@ -630,10 +603,8 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
   statements.value = null;
   selectedYears.value = [];
   peerComparison.value = null;
-  peerMetricComparison.value = null;
   activeStatement.value = 'balance';
   void loadPeerComparison(company, signal);
-  void loadPeerMetricComparison(company, signal);
   void loadAnnouncements(company, signal);
   void loadCompanyInsight(company, signal);
   try {
@@ -709,62 +680,6 @@ async function loadPeerComparison(company: CompanySearchResult, signal?: AbortSi
     if (requestId === peerRequestId) {
       peerLoading.value = false;
     }
-  }
-}
-
-async function loadPeerMetricComparison(company: CompanySearchResult, signal?: AbortSignal): Promise<void> {
-  const requestId = ++peerMetricRequestId;
-  peerMetricLoading.value = true;
-  peerMetricError.value = null;
-
-  try {
-    if (peerMetricMode.value === 'custom' && !selectedMetricCompanies.value.length) {
-      peerMetricComparison.value = {
-        metricKey: activePeerMetricKey.value,
-        metricLabel: '自选指标',
-        years: [],
-        companies: [],
-        missingCompanies: []
-      };
-      return;
-    }
-
-    const payload = peerMetricMode.value === 'custom'
-      ? await getMetricComparison(activePeerMetricKey.value, selectedMetricCompanies.value, signal)
-      : await getPeerMetricComparison(company.market, company.symbol, activePeerMetricKey.value, 12, signal);
-    if (requestId === peerMetricRequestId && !signal?.aborted) {
-      peerMetricComparison.value = payload;
-    }
-  } catch (error) {
-    if (requestId === peerMetricRequestId && !isAbortError(error)) {
-      peerMetricComparison.value = null;
-      peerMetricError.value = error instanceof Error ? error.message : '同行财务指标读取失败';
-    }
-  } finally {
-    if (requestId === peerMetricRequestId) {
-      peerMetricLoading.value = false;
-    }
-  }
-}
-
-function changePeerMetric(value: string): void {
-  activePeerMetricKey.value = value;
-  if (selectedCompany.value) {
-    void loadPeerMetricComparison(selectedCompany.value);
-  }
-}
-
-function changePeerMetricMode(value: 'peers' | 'custom'): void {
-  peerMetricMode.value = value;
-  if (selectedCompany.value) {
-    void loadPeerMetricComparison(selectedCompany.value);
-  }
-}
-
-function changeMetricCompanies(value: string[]): void {
-  selectedMetricCompanyKeys.value = value;
-  if (selectedCompany.value && peerMetricMode.value === 'custom') {
-    void loadPeerMetricComparison(selectedCompany.value);
   }
 }
 
@@ -903,13 +818,6 @@ onUnmounted(() => {
         :peer-comparison="peerComparison"
         :peer-loading="peerLoading"
         :peer-error="peerError"
-        :peer-metric-comparison="peerMetricComparison"
-        :peer-metric-loading="peerMetricLoading"
-        :peer-metric-error="peerMetricError"
-        :active-peer-metric-key="activePeerMetricKey"
-        :peer-metric-mode="peerMetricMode"
-        :cache-entries="cacheEntries"
-        :selected-metric-company-keys="selectedMetricCompanyKeys"
         :active-table="activeTable"
         @select-company="selectCompany"
         @open-note="openNoteDialog"
@@ -917,9 +825,6 @@ onUnmounted(() => {
         @save-buy-point="saveBuyPoint"
         @cancel-buy-point-editing="cancelBuyPointEditing"
         @toggle-year="toggleYear"
-        @change-peer-metric="changePeerMetric"
-        @change-peer-metric-mode="changePeerMetricMode"
-        @change-metric-companies="changeMetricCompanies"
         @refresh-company="selectedCompany && selectCompany(selectedCompany, true)"
         @export-table="exportCsv"
       />

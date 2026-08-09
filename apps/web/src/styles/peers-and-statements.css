@@ -213,7 +213,6 @@
   white-space: nowrap;
 }
 
-.peer-metric-panel,
 .cache-manager-panel {
   margin-bottom: 18px;
   padding: 18px;
@@ -223,7 +222,6 @@
   box-shadow: var(--shadow);
 }
 
-.peer-metric-head,
 .cache-manager-head {
   display: flex;
   align-items: flex-start;
@@ -231,50 +229,15 @@
   gap: 18px;
 }
 
-.peer-metric-head span,
 .cache-manager-head span {
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
 }
 
-.peer-metric-head h3,
 .cache-manager-head h3 {
   margin: 5px 0 0;
   font-size: 20px;
-}
-
-.peer-metric-head select {
-  min-width: 150px;
-  height: 38px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: #0f172a;
-  background: #fff;
-  font: inherit;
-}
-
-.peer-metric-mode-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.peer-metric-mode-tabs button {
-  min-height: 34px;
-  padding: 0 13px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: #475569;
-  background: #fff;
-  font-weight: 800;
-}
-
-.peer-metric-mode-tabs button.active {
-  border-color: rgba(37, 99, 235, 0.38);
-  color: var(--blue);
-  background: #eff6ff;
 }
 
 .metric-selector button.critical {
@@ -308,134 +271,9 @@
   color: #b45309;
 }
 
-.peer-metric-company-select {
-  margin-top: 12px;
-}
-
-.peer-metric-company-search {
-  display: grid;
-  grid-template-columns: minmax(240px, 420px) auto;
-  align-items: end;
-  gap: 6px 12px;
-}
-
-.peer-metric-company-search label {
-  grid-column: 1 / -1;
-  color: #475569;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.peer-metric-company-search-control {
-  position: relative;
-}
-
-.peer-metric-company-search-control input {
-  width: 100%;
-  height: 40px;
-  padding: 0 62px 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: #0f172a;
-  background: #fff;
-  font: inherit;
-  outline: none;
-}
-
-.peer-metric-company-search-control input:focus {
-  border-color: rgba(37, 99, 235, 0.55);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.peer-metric-company-search-control button {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  padding: 4px 6px;
-  border: 0;
-  color: var(--blue);
-  background: transparent;
-  font-size: 12px;
-  font-weight: 800;
-  transform: translateY(-50%);
-}
-
-.peer-metric-company-search > small {
-  padding-bottom: 10px;
-  color: var(--muted);
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.peer-metric-company-picker {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.peer-metric-company-picker button {
-  min-width: 0;
-  min-height: 52px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: #334155;
-  background: var(--surface-soft);
-  text-align: left;
-}
-
-.peer-metric-company-picker button.active {
-  border-color: rgba(37, 99, 235, 0.42);
-  color: var(--blue);
-  background: #eff6ff;
-}
-
-.peer-metric-company-picker span,
-.peer-metric-company-picker small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.peer-metric-company-picker span {
-  font-weight: 900;
-}
-
-.peer-metric-company-picker small {
-  margin-top: 3px;
-  color: var(--muted);
-  font-weight: 800;
-}
-
-.peer-metric-company-empty {
-  margin-top: 10px;
-  padding: 18px;
-  border: 1px dashed var(--line);
-  border-radius: 8px;
-  color: var(--muted);
-  background: var(--surface-soft);
-  text-align: center;
-  font-size: 13px;
-}
-
 .cache-manager-head > strong {
   color: var(--blue);
   font-size: 20px;
-}
-
-.peer-metric-chart {
-  width: 100%;
-  height: 300px;
-  margin-top: 16px;
-}
-
-.peer-metric-note {
-  margin-top: 10px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 800;
 }
 
 .cache-stat-grid {
@@ -508,6 +346,115 @@
 
 .statement-table-tools .unit-switch {
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+}
+
+.statement-comparison-panel {
+  margin: 0 0 12px;
+  padding: 16px 18px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.statement-comparison-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.statement-comparison-head > div:first-child > span,
+.statement-comparison-head small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.statement-comparison-head h3 {
+  margin: 4px 0 2px;
+  color: #172033;
+  font-size: 18px;
+}
+
+.statement-comparison-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.statement-comparison-options button {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #334155;
+  background: var(--surface-soft);
+  text-align: left;
+}
+
+.statement-comparison-options button:hover,
+.statement-comparison-options button:focus-visible {
+  border-color: rgba(37, 99, 235, 0.38);
+}
+
+.statement-comparison-options button.active {
+  border-color: rgba(37, 99, 235, 0.42);
+  color: var(--blue);
+  background: #eff6ff;
+  box-shadow: inset 3px 0 var(--blue);
+}
+
+.statement-comparison-options strong,
+.statement-comparison-options span {
+  display: block;
+}
+
+.statement-comparison-options strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statement-comparison-options span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.statement-comparison-chart {
+  width: 100%;
+  height: 320px;
+  margin-top: 10px;
+}
+
+.statement-comparison-empty {
+  display: grid;
+  min-height: 180px;
+  margin-top: 10px;
+  place-items: center;
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: 13px;
+}
+
+.statement-comparison-note {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.statement-comparison-note strong {
+  flex: 0 0 auto;
+  color: #b45309;
 }
 
 .statement-item-trend {

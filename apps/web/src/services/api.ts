@@ -16,6 +16,7 @@ import type {
 } from '../types/finance';
 import type { EtfDetailResponse, EtfMarketResponse, EtfSortKey, EtfValuation, FavoriteEtf } from '../types/etf';
 import type { FavoriteIndex, IndexDetailResponse, IndexMarket, IndexMarketResponse, IndexValuation } from '../types/index';
+import { normalizeCompanyInsight } from './company-insight';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
 const REQUEST_TIMEOUT_MS = 125_000;
@@ -197,7 +198,8 @@ export function getCompanyInsight(
   symbol: string,
   signal?: AbortSignal
 ): Promise<CompanyInsight> {
-  return request<CompanyInsight>(`/finance/insights/${market}/${encodeURIComponent(symbol)}`, { signal });
+  return request<CompanyInsight>(`/finance/insights/${market}/${encodeURIComponent(symbol)}`, { signal })
+    .then(normalizeCompanyInsight);
 }
 
 export function saveCompanyInsight(
@@ -208,7 +210,7 @@ export function saveCompanyInsight(
   return request<CompanyInsight>(`/finance/insights/${market}/${encodeURIComponent(symbol)}`, {
     method: 'PUT',
     body: JSON.stringify(insight)
-  });
+  }).then(normalizeCompanyInsight);
 }
 
 export function getRefreshStatus(): Promise<StatementRefreshRuntimeStatus> {
