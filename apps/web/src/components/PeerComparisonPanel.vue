@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, ArrowUpDown, BellRing, ChevronDown, ChevronUp, X } from 'lucide-vue-next';
 import type { CompanySearchResult, PeerComparison, PeerCompany } from '../types/finance';
 import { buildIndustryPositions } from '../finance/industry-position';
+import {
+  buildPeerSnapshot,
+  comparePeerSnapshots,
+  loadPeerSnapshot,
+  peerPreferenceStorage,
+  savePeerSnapshot,
+  type PeerChangeSummary
+} from '../finance/peer-preferences';
 import PeerFinancialComparison from './PeerFinancialComparison.vue';
 
 type PeerQuoteMetricKey = 'changePercent' | 'turnoverRate' | 'pe' | 'pb';
@@ -27,13 +35,28 @@ const activeQuoteMetric = ref<PeerQuoteMetricKey>('pe');
 const sortKey = ref<PeerTableSortKey>('pe');
 const sortDirection = ref<'asc' | 'desc'>('asc');
 const nearbyOnly = ref(false);
+const peerChange = ref<PeerChangeSummary | null>(null);
 const industryPositions = computed(() => buildIndustryPositions(props.comparison));
 
 watch(
   () => props.company ? `${props.company.market}:${props.company.symbol}` : '',
   () => {
     expanded.value = false;
+    peerChange.value = null;
   }
+);
+
+watch(
+  () => props.comparison?.fetchedAt ?? '',
+  () => {
+    if (!props.comparison || !props.company) return;
+    const storage = peerPreferenceStorage();
+    const nextSnapshot = buildPeerSnapshot(props.comparison);
+    const previousSnapshot = loadPeerSnapshot(storage, props.company);
+    peerChange.value = comparePeerSnapshots(previousSnapshot, nextSnapshot);
+    savePeerSnapshot(storage, props.company, nextSnapshot);
+  },
+  { immediate: true }
 );
 
 function formatNumber(value: number | null | undefined, digits = 2): string {
@@ -204,6 +227,15 @@ function distributionPosition(value: number | null | undefined): string {
         · {{ formatDate(comparison.cache?.refreshedAt ?? comparison.fetchedAt) }}
         · {{ comparison.industry?.source ?? comparison.source }}
       </small>
+    </div>
+
+    <div v-if="peerChange" :class="['peer-change-notice', peerChange.tone]" role="status">
+      <BellRing :size="17" />
+      <div>
+        <strong>{{ peerChange.title }}</strong>
+        <small>{{ peerChange.detail }}</small>
+      </div>
+      <button type="button" aria-label="关闭同行变化提醒" @click="peerChange = null"><X :size="15" /></button>
     </div>
 
     <div v-if="industryPositions.length" class="industry-position-grid" aria-label="行业相对位置">

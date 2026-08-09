@@ -1,0 +1,285 @@
+.peer-change-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  margin-top: 12px;
+  padding: 11px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.peer-change-notice.warning {
+  border-color: #fed7aa;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.peer-change-notice div {
+  min-width: 0;
+}
+
+.peer-change-notice strong,
+.peer-change-notice small {
+  display: block;
+}
+
+.peer-change-notice small {
+  margin-top: 2px;
+  color: #475569;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.peer-change-notice > button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  place-items: center;
+  color: inherit;
+  background: transparent;
+}
+
+.peer-change-notice > button:hover,
+.peer-change-notice > button:focus-visible {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.peer-comparison-mode-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.peer-comparison-mode-tabs > button,
+.peer-financial-time-tools button {
+  min-height: 31px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: #475569;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.peer-comparison-mode-tabs > button.active,
+.peer-financial-time-tools button.active {
+  border-color: rgba(37, 99, 235, 0.34);
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.peer-comparison-mode-tabs button span {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 3px;
+  padding: 0 4px;
+  border-radius: 999px;
+  place-items: center;
+  color: #1d4ed8;
+  background: #dbeafe;
+  font-size: 10px;
+}
+
+.peer-comparison-mode-tabs > small {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.peer-basket-panel {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 9px;
+  background: #f8fbff;
+}
+
+.peer-basket-search {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: #64748b;
+  background: #fff;
+}
+
+.peer-basket-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 0;
+  border: 0;
+  outline: 0;
+  color: #172033;
+  background: transparent;
+  font: inherit;
+}
+
+.peer-basket-search strong {
+  color: #1d4ed8;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.peer-basket-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  max-height: 236px;
+  margin-top: 9px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.peer-basket-list > button {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: #475569;
+  background: #fff;
+  text-align: left;
+}
+
+.peer-basket-list > button:hover,
+.peer-basket-list > button:focus-visible {
+  border-color: rgba(37, 99, 235, 0.36);
+}
+
+.peer-basket-list > button.selected {
+  border-color: rgba(37, 99, 235, 0.34);
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.peer-basket-list > button.locked {
+  cursor: default;
+  opacity: 1;
+}
+
+.peer-basket-list button span,
+.peer-basket-list button strong,
+.peer-basket-list button small {
+  display: block;
+  min-width: 0;
+}
+
+.peer-basket-list button strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peer-basket-list button small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.peer-basket-list button em {
+  color: #1d4ed8;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.peer-basket-state {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.peer-basket-state.error,
+.peer-basket-notice {
+  color: #9a3412;
+}
+
+.peer-basket-state button {
+  padding: 5px 8px;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  color: #9a3412;
+  background: #fff;
+}
+
+.peer-basket-notice {
+  margin: 8px 0 0;
+  font-size: 11px;
+}
+
+.peer-financial-time-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 9px;
+}
+
+.peer-financial-time-tools label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.peer-financial-time-tools select {
+  min-height: 31px;
+  padding: 0 27px 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: #334155;
+  background: #fff;
+  font: inherit;
+}
+
+.peer-financial-time-tools > div {
+  display: flex;
+  gap: 6px;
+}
+
+@media (max-width: 760px) {
+  .peer-basket-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .peer-comparison-mode-tabs,
+  .peer-financial-time-tools {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .peer-comparison-mode-tabs > small {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .peer-basket-list {
+    grid-template-columns: 1fr;
+  }
+}
