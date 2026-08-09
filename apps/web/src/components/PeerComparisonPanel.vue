@@ -1,8 +1,19 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { ChevronDown, ChevronUp } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-vue-next';
 import type { CompanySearchResult, PeerComparison, PeerCompany } from '../types/finance';
 import { buildIndustryPositions } from '../finance/industry-position';
+import PeerFinancialComparison from './PeerFinancialComparison.vue';
+
+type PeerQuoteMetricKey = 'changePercent' | 'turnoverRate' | 'pe' | 'pb';
+type PeerTableSortKey = 'latestPrice' | PeerQuoteMetricKey;
+
+const quoteMetricOptions: Array<{ key: PeerQuoteMetricKey; label: string }> = [
+  { key: 'pe', label: '动态 PE' },
+  { key: 'pb', label: 'PB' },
+  { key: 'changePercent', label: '涨跌幅' },
+  { key: 'turnoverRate', label: '换手率' }
+];
 
 const props = defineProps<{
   company: CompanySearchResult | null;
@@ -12,6 +23,10 @@ const props = defineProps<{
 }>();
 
 const expanded = ref(false);
+const activeQuoteMetric = ref<PeerQuoteMetricKey>('pe');
+const sortKey = ref<PeerTableSortKey>('pe');
+const sortDirection = ref<'asc' | 'desc'>('asc');
+const nearbyOnly = ref(false);
 const industryPositions = computed(() => buildIndustryPositions(props.comparison));
 
 watch(
@@ -55,6 +70,34 @@ const rankingUniverse = computed(() => Math.max(
   ...(props.comparison?.rankings.map((ranking) => ranking.total) ?? [])
 ));
 
+const activeBenchmark = computed(() => props.comparison?.benchmarks?.find(
+  (benchmark) => benchmark.key === activeQuoteMetric.value
+) ?? null);
+
+const activeQuotePosition = computed(() => industryPositions.value.find(
+  (position) => position.key === activeQuoteMetric.value
+) ?? null);
+
+const visiblePeers = computed(() => {
+  const peers = [...(props.comparison?.peers ?? [])];
+  const selected = peers.find((peer) => peer.isSelected);
+  let others = peers.filter((peer) => !peer.isSelected);
+  if (nearbyOnly.value && selected) {
+    const selectedValue = numericPeerValue(selected, activeQuoteMetric.value);
+    if (selectedValue !== null) {
+      others = others
+        .filter((peer) => numericPeerValue(peer, activeQuoteMetric.value) !== null)
+        .sort((left, right) => (
+          Math.abs((numericPeerValue(left, activeQuoteMetric.value) as number) - selectedValue) -
+          Math.abs((numericPeerValue(right, activeQuoteMetric.value) as number) - selectedValue)
+        ))
+        .slice(0, 6);
+    }
+  }
+  others.sort((left, right) => comparePeers(left, right, sortKey.value, sortDirection.value));
+  return selected ? [selected, ...others] : others;
+});
+
 function changeClass(value: number | null | undefined) {
   return {
     up: Number(value ?? 0) > 0,
@@ -64,6 +107,60 @@ function changeClass(value: number | null | undefined) {
 
 function companyKey(company: PeerCompany): string {
   return `${company.market}:${company.symbol}`;
+}
+
+function companyHref(company: PeerCompany): string {
+  return `?market=${encodeURIComponent(company.market)}&symbol=${encodeURIComponent(company.symbol)}`;
+}
+
+function numericPeerValue(company: PeerCompany, key: PeerTableSortKey): number | null {
+  const value = company[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function comparePeers(
+  left: PeerCompany,
+  right: PeerCompany,
+  key: PeerTableSortKey,
+  direction: 'asc' | 'desc'
+): number {
+  const leftValue = numericPeerValue(left, key);
+  const rightValue = numericPeerValue(right, key);
+  if (leftValue === null) return rightValue === null ? 0 : 1;
+  if (rightValue === null) return -1;
+  return (leftValue - rightValue) * (direction === 'asc' ? 1 : -1);
+}
+
+function sortPeersBy(key: PeerTableSortKey): void {
+  if (sortKey.value === key) {
+    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortKey.value = key;
+    sortDirection.value = key === 'pe' || key === 'pb' ? 'asc' : 'desc';
+  }
+  if (key !== 'latestPrice') activeQuoteMetric.value = key;
+}
+
+function selectQuoteMetric(key: PeerQuoteMetricKey): void {
+  activeQuoteMetric.value = key;
+  if (sortKey.value === key) return;
+  sortKey.value = key;
+  sortDirection.value = key === 'pe' || key === 'pb' ? 'asc' : 'desc';
+}
+
+function sortAria(key: PeerTableSortKey): 'ascending' | 'descending' | 'none' {
+  if (sortKey.value !== key) return 'none';
+  return sortDirection.value === 'asc' ? 'ascending' : 'descending';
+}
+
+function distributionPosition(value: number | null | undefined): string {
+  const benchmark = activeBenchmark.value;
+  if (value === null || value === undefined || !benchmark || benchmark.min === null || benchmark.max === null) {
+    return '50%';
+  }
+  if (benchmark.max === benchmark.min) return '50%';
+  const share = Math.max(0, Math.min(1, (value - benchmark.min) / (benchmark.max - benchmark.min)));
+  return `${(share * 100).toFixed(2)}%`;
 }
 </script>
 
@@ -135,27 +232,102 @@ function companyKey(company: PeerCompany): string {
       <div v-else-if="comparison?.note" class="peer-state">{{ comparison.note }}</div>
 
       <template v-if="comparison && comparison.peers.length">
+        <section class="peer-market-detail" aria-labelledby="peer-market-detail-title">
+          <div class="peer-market-detail-head">
+            <div>
+              <span>市场横截面</span>
+              <h4 id="peer-market-detail-title">{{ activeQuotePosition?.label ?? '行情指标' }}分布</h4>
+            </div>
+            <div class="peer-quote-tabs" aria-label="市场对比指标">
+              <button
+                v-for="option in quoteMetricOptions"
+                :key="option.key"
+                :class="{ active: activeQuoteMetric === option.key }"
+                type="button"
+                @click="selectQuoteMetric(option.key)"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="activeBenchmark?.count" class="peer-distribution">
+            <div class="peer-distribution-labels">
+              <span>低 {{ positionValue(activeBenchmark.min, activeBenchmark.unit) }}</span>
+              <strong>中位数 {{ positionValue(activeBenchmark.median, activeBenchmark.unit) }}</strong>
+              <span>高 {{ positionValue(activeBenchmark.max, activeBenchmark.unit) }}</span>
+            </div>
+            <div class="peer-distribution-track" aria-hidden="true">
+              <span class="range"></span>
+              <i class="quartile q1" :style="{ left: distributionPosition(activeBenchmark.q1) }"></i>
+              <i class="quartile median" :style="{ left: distributionPosition(activeBenchmark.median) }"></i>
+              <i class="quartile q3" :style="{ left: distributionPosition(activeBenchmark.q3) }"></i>
+              <b :style="{ left: distributionPosition(activeQuotePosition?.value) }">当前</b>
+            </div>
+            <p>{{ activeQuotePosition?.context }}</p>
+          </div>
+        </section>
+
+        <div class="peer-table-tools">
+          <span>目标公司固定在首行，点击表头可排序</span>
+          <button
+            :class="{ active: nearbyOnly }"
+            type="button"
+            :aria-pressed="nearbyOnly"
+            @click="nearbyOnly = !nearbyOnly"
+          >
+            {{ nearbyOnly ? '显示全部公司' : '仅看数值相近公司' }}
+          </button>
+        </div>
+
         <div class="peer-table-wrap">
           <table class="peer-table">
-            <caption>目标公司固定在首行；排名口径以标题区有效样本为准</caption>
+            <caption>当前显示 {{ visiblePeers.length }} 家；排名口径以标题区有效样本为准</caption>
             <thead>
               <tr>
                 <th>公司</th>
-                <th>最新价</th>
-                <th>涨跌幅</th>
-                <th>换手率</th>
-                <th>动态 PE</th>
-                <th>PB</th>
+                <th :aria-sort="sortAria('latestPrice')">
+                  <button type="button" @click="sortPeersBy('latestPrice')">
+                    最新价
+                    <ArrowUp v-if="sortKey === 'latestPrice' && sortDirection === 'asc'" :size="13" />
+                    <ArrowDown v-else-if="sortKey === 'latestPrice'" :size="13" />
+                    <ArrowUpDown v-else :size="13" />
+                  </button>
+                </th>
+                <th
+                  v-for="option in quoteMetricOptions.filter((item) => item.key !== 'pe' && item.key !== 'pb')"
+                  :key="option.key"
+                  :aria-sort="sortAria(option.key)"
+                >
+                  <button type="button" @click="sortPeersBy(option.key)">
+                    {{ option.label }}
+                    <ArrowUp v-if="sortKey === option.key && sortDirection === 'asc'" :size="13" />
+                    <ArrowDown v-else-if="sortKey === option.key" :size="13" />
+                    <ArrowUpDown v-else :size="13" />
+                  </button>
+                </th>
+                <th v-for="option in quoteMetricOptions.filter((item) => item.key === 'pe' || item.key === 'pb')" :key="option.key" :aria-sort="sortAria(option.key)">
+                  <button type="button" @click="sortPeersBy(option.key)">
+                    {{ option.label }}
+                    <ArrowUp v-if="sortKey === option.key && sortDirection === 'asc'" :size="13" />
+                    <ArrowDown v-else-if="sortKey === option.key" :size="13" />
+                    <ArrowUpDown v-else :size="13" />
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="peer in comparison.peers"
+                v-for="peer in visiblePeers"
                 :key="companyKey(peer)"
                 :class="{ selected: peer.isSelected }"
               >
                 <th>
-                  <strong>{{ peer.name }} <b v-if="peer.isSelected">当前</b></strong>
+                  <strong>
+                    <span v-if="peer.isSelected">{{ peer.name }}</span>
+                    <a v-else :href="companyHref(peer)">{{ peer.name }}</a>
+                    <b v-if="peer.isSelected">当前</b>
+                  </strong>
                   <span>{{ peer.displaySymbol }}</span>
                 </th>
                 <td>{{ formatNumber(peer.latestPrice) }}</td>
@@ -167,6 +339,8 @@ function companyKey(company: PeerCompany): string {
             </tbody>
           </table>
         </div>
+
+        <PeerFinancialComparison :company="company" :peers="comparison" />
       </template>
     </div>
   </section>

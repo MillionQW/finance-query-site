@@ -14,6 +14,11 @@ import {
   withoutPeerCache
 } from './finance-store.utils';
 import { SqliteRepository } from './sqlite.repository';
+import {
+  calculatePeerMetricRows,
+  peerMetricDependencies,
+  type StoredPeerMetricRow
+} from './peer-metric-calculations';
 
 export class PeerStoreRepository extends SqliteRepository {
   constructor(db: any, private readonly companies: CompanyStoreRepository) {
@@ -132,7 +137,9 @@ export class PeerStoreRepository extends SqliteRepository {
       ...company,
       symbol: normalizeSymbol(company.market, company.symbol)
     }));
-    const metricRows = this.db
+    const metricKeys = peerMetricDependencies(metricKey);
+    const placeholders = metricKeys.map(() => '?').join(', ');
+    const storedRows = this.db
       .prepare(
         `
         SELECT
@@ -140,6 +147,7 @@ export class PeerStoreRepository extends SqliteRepository {
           symbol,
           display_symbol,
           name,
+          metric_key,
           metric_label,
           year,
           value_num
@@ -149,6 +157,7 @@ export class PeerStoreRepository extends SqliteRepository {
             m.symbol,
             COALESCE(c.display_symbol, m.symbol) AS display_symbol,
             COALESCE(c.name, m.symbol) AS name,
+            m.metric_key,
             m.metric_label,
             m.year,
             m.value_num
@@ -156,12 +165,13 @@ export class PeerStoreRepository extends SqliteRepository {
           LEFT JOIN companies c
             ON c.market = m.market
            AND c.symbol = m.symbol
-          WHERE m.metric_key = ?
+          WHERE m.metric_key IN (${placeholders})
         )
         ORDER BY year ASC
       `
       )
-      .all(metricKey);
+      .all(...metricKeys) as StoredPeerMetricRow[];
+    const metricRows = calculatePeerMetricRows(storedRows, metricKey);
 
     const allowed = new Set(normalizedCompanies.map((company) => `${company.market}:${company.symbol}`));
     const byCompany = new Map<string, PeerMetricSeries>();

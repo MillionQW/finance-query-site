@@ -116,6 +116,292 @@
   vertical-align: 1px;
 }
 
+.peer-market-detail,
+.peer-financial-panel {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfcff;
+}
+
+.peer-market-detail-head,
+.peer-financial-head,
+.peer-table-tools,
+.peer-financial-coverage {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.peer-market-detail-head span,
+.peer-financial-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.peer-market-detail-head h4,
+.peer-financial-head h4 {
+  margin: 3px 0 0;
+  color: #172033;
+  font-size: 16px;
+}
+
+.peer-quote-tabs,
+.peer-financial-groups,
+.peer-financial-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.peer-quote-tabs button,
+.peer-financial-groups button,
+.peer-financial-options button,
+.peer-table-tools button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: #475569;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.peer-quote-tabs button:hover,
+.peer-quote-tabs button:focus-visible,
+.peer-financial-groups button:hover,
+.peer-financial-groups button:focus-visible,
+.peer-financial-options button:hover,
+.peer-financial-options button:focus-visible,
+.peer-table-tools button:hover,
+.peer-table-tools button:focus-visible {
+  border-color: rgba(37, 99, 235, 0.36);
+  color: #1d4ed8;
+}
+
+.peer-quote-tabs button.active,
+.peer-financial-groups button.active,
+.peer-financial-options button.active,
+.peer-table-tools button.active {
+  border-color: rgba(37, 99, 235, 0.34);
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.peer-distribution {
+  margin-top: 16px;
+}
+
+.peer-distribution-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.peer-distribution-labels strong {
+  color: #334155;
+}
+
+.peer-distribution-track {
+  position: relative;
+  height: 36px;
+  margin: 4px 12px 0;
+}
+
+.peer-distribution-track .range {
+  position: absolute;
+  top: 17px;
+  right: 0;
+  left: 0;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #dbeafe, #93c5fd 50%, #dbeafe);
+}
+
+.peer-distribution-track .quartile {
+  position: absolute;
+  top: 12px;
+  width: 1px;
+  height: 16px;
+  background: #64748b;
+  transform: translateX(-50%);
+}
+
+.peer-distribution-track .quartile.median {
+  width: 2px;
+  background: #334155;
+}
+
+.peer-distribution-track b {
+  position: absolute;
+  top: 0;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #fff;
+  background: #2563eb;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.22);
+  font-size: 10px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.peer-distribution-track b::after {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 2px;
+  height: 12px;
+  background: #2563eb;
+  content: '';
+  transform: translateX(-50%);
+}
+
+.peer-distribution p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.peer-table-tools {
+  align-items: center;
+  margin: 12px 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.peer-table-tools + .peer-table-wrap {
+  margin-top: 0;
+}
+
+.peer-table thead th button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.peer-table thead th button:hover,
+.peer-table thead th button:focus-visible,
+.peer-table tbody th a:hover,
+.peer-table tbody th a:focus-visible {
+  color: #1d4ed8;
+}
+
+.peer-table tbody th a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.peer-financial-panel {
+  margin-top: 16px;
+  background: #fff;
+}
+
+.peer-financial-head small {
+  display: block;
+  max-width: 620px;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.peer-financial-snapshot {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.peer-financial-snapshot strong {
+  display: block;
+  margin-top: 3px;
+  color: #172033;
+  font-size: 18px;
+}
+
+.peer-financial-groups {
+  margin-top: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.peer-financial-options {
+  margin-top: 8px;
+}
+
+.peer-financial-options button {
+  background: var(--surface-soft);
+}
+
+.peer-financial-chart {
+  width: 100%;
+  height: 330px;
+  margin-top: 8px;
+}
+
+.peer-financial-state {
+  display: flex;
+  min-height: 150px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: 12px;
+  text-align: center;
+}
+
+.peer-financial-state.error {
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.peer-financial-state button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 9px;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  color: #9a3412;
+  background: #fff;
+  font-weight: 800;
+}
+
+.peer-financial-coverage {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.peer-financial-tooltip-row {
+  display: flex;
+  min-width: 190px;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 6px;
+}
+
+.peer-financial-tooltip-row strong {
+  color: #1d4ed8;
+}
+
 @keyframes peer-status-pulse {
   50% {
     opacity: 0.45;
@@ -142,5 +428,34 @@
 
   .industry-position-grid strong {
     min-height: auto;
+  }
+
+  .peer-market-detail-head,
+  .peer-financial-head,
+  .peer-table-tools,
+  .peer-financial-coverage {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .peer-quote-tabs,
+  .peer-financial-groups,
+  .peer-financial-options {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .peer-quote-tabs button,
+  .peer-financial-groups button,
+  .peer-financial-options button {
+    flex: 0 0 auto;
+  }
+
+  .peer-financial-snapshot {
+    text-align: left;
+  }
+
+  .peer-financial-chart {
+    height: 290px;
   }
 }
