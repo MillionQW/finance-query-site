@@ -1,0 +1,146 @@
+.peer-experience-status,
+.peer-universe-strip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.peer-experience-status {
+  padding: 11px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.peer-experience-status strong,
+.peer-universe-strip strong {
+  color: #1d4ed8;
+}
+
+.peer-experience-status.error {
+  border-color: #fed7aa;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.peer-experience-status.error strong {
+  color: #9a3412;
+}
+
+.peer-status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.peer-status-dot.loading {
+  background: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+  animation: peer-status-pulse 1.4s ease-in-out infinite;
+}
+
+.peer-universe-strip {
+  flex-wrap: wrap;
+}
+
+.peer-universe-strip small {
+  margin-left: auto;
+  text-align: right;
+}
+
+.industry-position-grid article {
+  align-content: start;
+}
+
+.industry-position-grid strong {
+  min-height: 44px;
+  line-height: 1.22;
+}
+
+.industry-position-grid .peer-position-value {
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.industry-position-grid p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.peer-table caption {
+  padding: 9px 12px;
+  color: var(--muted);
+  background: #fbfcff;
+  font-size: 11px;
+  text-align: left;
+  caption-side: top;
+}
+
+.peer-table thead th:first-child,
+.peer-table tbody th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  box-shadow: 1px 0 var(--line);
+}
+
+.peer-table thead th:first-child {
+  z-index: 3;
+}
+
+.peer-table tbody th:first-child {
+  background: #fff;
+}
+
+.peer-table tbody tr.selected th:first-child {
+  background: #eff6ff;
+}
+
+.peer-table tbody th b {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  color: #1d4ed8;
+  background: #dbeafe;
+  font-size: 10px;
+  line-height: 1.4;
+  vertical-align: 1px;
+}
+
+@keyframes peer-status-pulse {
+  50% {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
+}
+
+@media (max-width: 640px) {
+  .peer-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .peer-head-actions,
+  .peer-head-actions button {
+    width: 100%;
+  }
+
+  .peer-universe-strip small {
+    width: 100%;
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .industry-position-grid strong {
+    min-height: auto;
+  }
+}

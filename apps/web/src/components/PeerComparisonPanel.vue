@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { ChevronDown, ChevronUp } from 'lucide-vue-next';
-import type { CompanySearchResult, PeerComparison, PeerCompany, PeerRanking } from '../types/finance';
+import type { CompanySearchResult, PeerComparison, PeerCompany } from '../types/finance';
 import { buildIndustryPositions } from '../finance/industry-position';
 
 const props = defineProps<{
@@ -45,19 +45,15 @@ function formatDate(value: string | null | undefined): string {
   });
 }
 
-function formatRank(ranking: PeerRanking): string {
-  if (!ranking.rank || !ranking.total) {
-    return '-';
-  }
-  return `${ranking.rank} / ${ranking.total}`;
+function positionValue(value: number | null, unit?: string): string {
+  if (unit === '%') return formatPercent(value);
+  return formatNumber(value);
 }
 
-function metricValue(ranking: PeerRanking): string {
-  if (ranking.unit === '%') {
-    return formatPercent(ranking.value);
-  }
-  return formatNumber(ranking.value);
-}
+const rankingUniverse = computed(() => Math.max(
+  0,
+  ...(props.comparison?.rankings.map((ranking) => ranking.total) ?? [])
+));
 
 function changeClass(value: number | null | undefined) {
   return {
@@ -79,7 +75,6 @@ function companyKey(company: PeerCompany): string {
         <h3>{{ comparison?.industry?.name ?? company?.name ?? '同行公司' }}</h3>
       </div>
       <div class="peer-head-actions">
-        <small>{{ comparison?.industry?.source ?? comparison?.source ?? 'AKShare' }}</small>
         <button
           type="button"
           :aria-expanded="expanded"
@@ -93,10 +88,25 @@ function companyKey(company: PeerCompany): string {
       </div>
     </div>
 
-    <div v-if="comparison?.cache" class="peer-cache-strip">
-      <span>同行数据</span>
-      <strong>{{ comparison.cache.hit ? '本地缓存' : '刚刚更新' }}</strong>
-      <small>缓存刷新：{{ formatDate(comparison.cache.refreshedAt) }}</small>
+    <div v-if="loading && !comparison" class="peer-experience-status" role="status" aria-live="polite">
+      <span class="peer-status-dot loading"></span>
+      <strong>正在更新同行数据</strong>
+      <small>摘要准备好后会直接显示，无需展开等待</small>
+    </div>
+    <div v-else-if="error && !comparison" class="peer-experience-status error" role="alert">
+      <span class="peer-status-dot"></span>
+      <strong>同行数据暂时不可用</strong>
+      <small>{{ error }}；可使用页面刷新按钮重试</small>
+    </div>
+
+    <div v-if="comparison" class="peer-universe-strip">
+      <span>{{ comparison.peers.length }} 家展示</span>
+      <strong>{{ rankingUniverse }} 家排名样本</strong>
+      <small>
+        {{ comparison.cache?.hit ? '来自本地缓存' : '刚刚更新' }}
+        · {{ formatDate(comparison.cache?.refreshedAt ?? comparison.fetchedAt) }}
+        · {{ comparison.industry?.source ?? comparison.source }}
+      </small>
     </div>
 
     <div v-if="industryPositions.length" class="industry-position-grid" aria-label="行业相对位置">
@@ -108,8 +118,14 @@ function companyKey(company: PeerCompany): string {
       >
         <span>{{ position.label }}</span>
         <strong>{{ position.percentileLabel }}</strong>
-        <em>{{ position.rankLabel }}</em>
-        <small>{{ position.context }}</small>
+        <em class="peer-position-value">
+          当前 {{ positionValue(position.value, position.unit) }}
+          <template v-if="position.benchmark?.median !== null && position.benchmark?.median !== undefined">
+            · 行业中位数 {{ positionValue(position.benchmark.median, position.unit) }}
+          </template>
+        </em>
+        <small>{{ position.rankLabel }} · {{ position.sampleLabel }}</small>
+        <p>{{ position.context }}</p>
       </article>
     </div>
 
@@ -119,16 +135,9 @@ function companyKey(company: PeerCompany): string {
       <div v-else-if="comparison?.note" class="peer-state">{{ comparison.note }}</div>
 
       <template v-if="comparison && comparison.peers.length">
-        <div class="peer-rank-grid">
-          <article v-for="ranking in comparison.rankings" :key="ranking.key">
-            <span>{{ ranking.label }}</span>
-            <strong>{{ formatRank(ranking) }}</strong>
-            <em>{{ metricValue(ranking) }}</em>
-          </article>
-        </div>
-
         <div class="peer-table-wrap">
           <table class="peer-table">
+            <caption>目标公司固定在首行；排名口径以标题区有效样本为准</caption>
             <thead>
               <tr>
                 <th>公司</th>
@@ -146,7 +155,7 @@ function companyKey(company: PeerCompany): string {
                 :class="{ selected: peer.isSelected }"
               >
                 <th>
-                  <strong>{{ peer.name }}</strong>
+                  <strong>{{ peer.name }} <b v-if="peer.isSelected">当前</b></strong>
                   <span>{{ peer.displaySymbol }}</span>
                 </th>
                 <td>{{ formatNumber(peer.latestPrice) }}</td>

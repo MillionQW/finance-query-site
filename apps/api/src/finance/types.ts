@@ -242,6 +242,19 @@ export interface PeerRanking {
   direction: 'asc' | 'desc';
 }
 
+export interface PeerBenchmark {
+  key: string;
+  label: string;
+  count: number;
+  min: number | null;
+  q1: number | null;
+  median: number | null;
+  q3: number | null;
+  max: number | null;
+  unit?: string;
+  direction: 'asc' | 'desc';
+}
+
 export interface PeerComparison {
   company: {
     market: Market;
@@ -256,6 +269,7 @@ export interface PeerComparison {
   } | null;
   peers: PeerCompany[];
   rankings: PeerRanking[];
+  benchmarks?: PeerBenchmark[];
   fetchedAt: string;
   source: string;
   note?: string | null;

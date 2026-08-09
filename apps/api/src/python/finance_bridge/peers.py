@@ -61,6 +61,51 @@ def build_peer_ranking(
     }
 
 
+def percentile(values: List[float], ratio: float) -> Optional[float]:
+    if not values:
+        return None
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * ratio
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return ordered[lower]
+    weight = position - lower
+    return ordered[lower] * (1 - weight) + ordered[upper] * weight
+
+
+def build_peer_benchmark(
+    peers: List[Dict[str, Any]],
+    key: str,
+    label: str,
+    direction: str,
+    unit: str = "",
+    positive_only: bool = False,
+) -> Dict[str, Any]:
+    values = []
+    for peer in peers:
+        value = peer.get(key)
+        if not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+            continue
+        numeric_value = float(value)
+        if positive_only and numeric_value <= 0:
+            continue
+        values.append(numeric_value)
+
+    return {
+        "key": key,
+        "label": label,
+        "count": len(values),
+        "min": min(values) if values else None,
+        "q1": percentile(values, 0.25),
+        "median": percentile(values, 0.5),
+        "q3": percentile(values, 0.75),
+        "max": max(values) if values else None,
+        "unit": unit,
+        "direction": direction,
+    }
+
+
 def empty_peer_payload(
     market: str,
     symbol: str,
@@ -78,6 +123,7 @@ def empty_peer_payload(
         "industry": None,
         "peers": [],
         "rankings": [],
+        "benchmarks": [],
         "fetchedAt": datetime.now(timezone.utc).isoformat(),
         "source": "AKShare peer comparison",
         "note": note,
@@ -107,6 +153,12 @@ def build_peer_payload(
         build_peer_ranking(all_peers, company_symbol, "pe", "动态市盈率", "asc", "", True),
         build_peer_ranking(all_peers, company_symbol, "pb", "市净率", "asc", "", True),
     ]
+    benchmarks = [
+        build_peer_benchmark(all_peers, "changePercent", "涨跌幅", "desc", "%"),
+        build_peer_benchmark(all_peers, "turnoverRate", "换手率", "desc", "%"),
+        build_peer_benchmark(all_peers, "pe", "动态市盈率", "asc", "", True),
+        build_peer_benchmark(all_peers, "pb", "市净率", "asc", "", True),
+    ]
 
     return {
         "company": {
@@ -122,6 +174,7 @@ def build_peer_payload(
         },
         "peers": display_peers,
         "rankings": rankings,
+        "benchmarks": benchmarks,
         "fetchedAt": datetime.now(timezone.utc).isoformat(),
         "source": source,
         "note": note if note else (None if all_peers else "AKShare 未返回同行成份。"),

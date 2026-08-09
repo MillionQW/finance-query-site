@@ -11,6 +11,12 @@ const comparison: PeerComparison = {
     { key: 'pe', label: '动态市盈率', rank: 2, total: 10, value: 12, direction: 'asc' },
     { key: 'pb', label: '市净率', rank: null, total: 10, value: null, direction: 'asc' }
   ],
+  benchmarks: [
+    {
+      key: 'pe', label: '动态市盈率', count: 10, min: 8, q1: 10,
+      median: 16, q3: 22, max: 30, direction: 'asc'
+    }
+  ],
   fetchedAt: '2026-01-01T00:00:00.000Z',
   source: 'fixture'
 };
@@ -19,8 +25,10 @@ test('industry positions translate rank into an explicit percentile band', () =>
   const positions = buildIndustryPositions(comparison);
   assert.equal(positions.length, 1);
   assert.equal(positions[0].rankLabel, '2 / 10');
-  assert.equal(positions[0].percentileLabel, '前 20%');
+  assert.equal(positions[0].percentileLabel, '估值低于约 89% 同行');
   assert.equal(positions[0].band, 'leading');
+  assert.equal(positions[0].benchmark?.median, 16);
+  assert.equal(positions[0].sampleLabel, '10 家有效样本');
   assert.match(positions[0].context, /不等同于投资吸引力/);
 });
 

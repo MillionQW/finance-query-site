@@ -1,4 +1,4 @@
-import type { PeerComparison, PeerRanking } from '../types/finance';
+import type { PeerBenchmark, PeerComparison, PeerRanking } from '../types/finance';
 
 export interface IndustryPosition {
   key: string;
@@ -9,6 +9,8 @@ export interface IndustryPosition {
   value: number | null;
   unit?: string;
   context: string;
+  benchmark: PeerBenchmark | null;
+  sampleLabel: string;
 }
 
 function positionBand(rank: number, total: number): IndustryPosition['band'] {
@@ -31,8 +33,22 @@ function metricContext(ranking: PeerRanking): string {
   return '按当前横截面数据排序，短期涨跌不代表基本面质量。';
 }
 
+function relativePosition(ranking: PeerRanking, rank: number): string {
+  const otherCompanies = Math.max(0, ranking.total - 1);
+  const companiesBehind = Math.max(0, ranking.total - rank);
+  const share = otherCompanies > 0 ? Math.round((companiesBehind / otherCompanies) * 100) : 0;
+
+  if (ranking.key === 'pe' || ranking.key === 'pb') {
+    if (rank / ranking.total <= 0.25) return `估值低于约 ${share}% 同行`;
+    if (rank / ranking.total >= 0.75) return `估值高于约 ${100 - share}% 同行`;
+    return '估值处于行业中段';
+  }
+  return `高于约 ${share}% 同行`;
+}
+
 export function buildIndustryPositions(comparison: PeerComparison | null): IndustryPosition[] {
   if (!comparison) return [];
+  const benchmarks = new Map((comparison.benchmarks ?? []).map((item) => [item.key, item]));
   return comparison.rankings
     .filter((ranking) => (
       ranking.rank !== null &&
@@ -42,16 +58,17 @@ export function buildIndustryPositions(comparison: PeerComparison | null): Indus
     ))
     .map((ranking) => {
       const rank = ranking.rank as number;
-      const topPercent = Math.max(1, Math.ceil((rank / ranking.total) * 100));
       return {
         key: ranking.key,
         label: ranking.label,
         rankLabel: `${rank} / ${ranking.total}`,
-        percentileLabel: `前 ${topPercent}%`,
+        percentileLabel: relativePosition(ranking, rank),
         band: positionBand(rank, ranking.total),
         value: ranking.value,
         unit: ranking.unit,
-        context: metricContext(ranking)
+        context: metricContext(ranking),
+        benchmark: benchmarks.get(ranking.key) ?? null,
+        sampleLabel: `${benchmarks.get(ranking.key)?.count ?? ranking.total} 家有效样本`
       };
     });
 }
