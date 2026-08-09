@@ -8,10 +8,21 @@ const DEFAULT_WEB_ORIGINS = [
 ];
 
 export function loadLocalEnvironment(cwd = process.cwd()): void {
-  const envPath = resolve(cwd, '.env');
-  if (existsSync(envPath)) {
+  const envPath = [resolve(cwd, '.env'), resolve(runtimeRoot(cwd), '.env')]
+    .find((candidate, index, candidates) => (
+      candidates.indexOf(candidate) === index && existsSync(candidate)
+    ));
+  if (envPath) {
     loadEnvFile(envPath);
   }
+}
+
+export function runtimeRoot(cwd = process.cwd()): string {
+  const candidates = [cwd, resolve(cwd, '..', '..')];
+  return candidates.find((candidate) => (
+    existsSync(resolve(candidate, 'package.json'))
+    && existsSync(resolve(candidate, 'apps', 'api'))
+  )) ?? cwd;
 }
 
 export function apiHost(env: NodeJS.ProcessEnv = process.env): string {

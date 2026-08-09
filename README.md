@@ -83,6 +83,7 @@ Windows 下也可以直接运行 `start-finance-site.cmd`。脚本会在源码�
 - `AKSHARE_EXPOSE_ERROR_DETAILS`：是否向浏览器暴露上游错误细节，默认关闭。
 - `FINANCE_DB_PATH`：SQLite 数据库路径。
 - `FINANCE_REFRESH_*`、`ANNOUNCEMENT_*`：后台刷新频率。
+- `REQUEST_ERROR_LOG_*`：异常请求日志的启用状态、目录、保留天数和清理周期。日志默认写入 `data/logs`，保留 14 天并每 24 小时清理一次。
 
 ## 质量检查
 

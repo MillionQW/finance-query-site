@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import { resolve } from 'node:path';
 import test from 'node:test';
-import { allowedWebOrigins, apiHost, apiPort } from './config';
+import { allowedWebOrigins, apiHost, apiPort, runtimeRoot } from './config';
 import { normalizeEtfSymbol } from './finance/etf.service';
 import { normalizeSymbol } from './finance/finance-store.service';
 import { calculateIndexMetrics } from './finance/index.service';
@@ -23,6 +24,12 @@ test('configured web origins are trimmed and deduplicated', () => {
     }),
     ['https://finance.example', 'http://localhost:5173']
   );
+});
+
+test('runtime paths resolve to the workspace root from the API package', () => {
+  const workspaceRoot = resolve(__dirname, '..', '..', '..');
+  assert.equal(runtimeRoot(workspaceRoot), workspaceRoot);
+  assert.equal(runtimeRoot(resolve(workspaceRoot, 'apps', 'api')), workspaceRoot);
 });
 
 test('security symbols are normalized consistently', () => {
