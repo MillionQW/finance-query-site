@@ -24,6 +24,7 @@ import {
   sanitizePeerBasketKeys,
   savePeerBasket
 } from '../finance/peer-preferences';
+import PeerDataPullPanel from './PeerDataPullPanel.vue';
 
 echarts.use([GridComponent, LegendComponent, TooltipComponent, LineChart, CanvasRenderer]);
 
@@ -112,7 +113,7 @@ watch(
 
 watch(requiredCompanyKey, () => restoreBasketSelection());
 
-async function loadMetricComparison(): Promise<void> {
+async function loadMetricComparison(preserveCurrent = false): Promise<void> {
   requestController?.abort();
   const companies = comparisonCompanies.value;
   if (!companies.length) {
@@ -127,7 +128,7 @@ async function loadMetricComparison(): Promise<void> {
   loading.value = true;
   chart.value?.dispose();
   chart.value = null;
-  metricComparison.value = null;
+  if (!preserveCurrent) metricComparison.value = null;
   error.value = null;
   try {
     const payload = await getMetricComparison(
@@ -197,6 +198,10 @@ function toggleBasketCompany(entry: CacheEntry): void {
 
 function isBasketSelected(entry: CacheEntry): boolean {
   return selectedCompanyKeys.value.includes(peerCompanyKey(entry));
+}
+
+async function refreshAfterStatementPull(): Promise<void> {
+  await Promise.all([loadMetricComparison(true), loadCachedCompanies()]);
 }
 
 const chartOption = computed<EChartsCoreOption>(() => {
@@ -320,7 +325,7 @@ function formatTooltip(params: unknown, kind: 'amount' | 'percent'): string {
       <div>
         <span>{{ comparisonMode === 'industry' ? '行业同行' : '自选篮子' }} · 财务横向对比</span>
         <h4 id="peer-financial-title">{{ activeOption.label }}</h4>
-        <small>{{ activeOption.description }} 数据仅来自本地已缓存财报。</small>
+        <small>{{ activeOption.description }} 优先使用本地缓存；缺失公司可在下方选择拉取，成功后自动缓存。</small>
       </div>
       <div v-if="snapshot.year" class="peer-financial-snapshot">
         <span>{{ snapshot.year }} 年</span>
@@ -415,13 +420,13 @@ function formatTooltip(params: unknown, kind: 'amount' | 'percent'): string {
     <div v-if="loading" class="peer-financial-state" role="status">正在读取已缓存的同行财报...</div>
     <div v-else-if="error" class="peer-financial-state error" role="alert">
       <span>{{ error }}</span>
-      <button type="button" @click="loadMetricComparison"><RefreshCw :size="14" />重试</button>
+      <button type="button" @click="loadMetricComparison()"><RefreshCw :size="14" />重试</button>
     </div>
     <div
       v-else-if="!metricComparison?.companies.length"
       class="peer-financial-state"
     >
-      暂无可比较数据。先查看或刷新几家同行财报后，这里会自动形成横向趋势。
+      暂无可比较数据。可在下方选择缺失公司拉取财报，成功后会自动形成横向趋势。
     </div>
     <template v-else>
       <div
@@ -433,9 +438,15 @@ function formatTooltip(params: unknown, kind: 'amount' | 'percent'): string {
       <div class="peer-financial-coverage">
         <span>已覆盖 {{ metricComparison.companies.length }} 家</span>
         <small v-if="metricComparison.missingCompanies.length">
-          {{ metricComparison.missingCompanies.length }} 家尚无本地财报，未触发批量拉取
+          {{ metricComparison.missingCompanies.length }} 家当前缺少该指标，可在下方选择拉取并缓存
         </small>
       </div>
     </template>
+
+    <PeerDataPullPanel
+      v-if="metricComparison?.missingCompanies.length"
+      :missing-companies="metricComparison.missingCompanies"
+      @refreshed="refreshAfterStatementPull"
+    />
   </section>
 </template>
