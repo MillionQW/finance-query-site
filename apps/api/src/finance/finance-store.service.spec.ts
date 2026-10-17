@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { FinanceStoreService } from './finance-store.service';
+import { DatabaseSync } from 'node:sqlite';
 
 test('store facade coordinates company, favorite, and insight repositories', () => {
   const directory = mkdtempSync(join(tmpdir(), 'finance-store-'));
@@ -43,6 +44,26 @@ test('store facade coordinates company, favorite, and insight repositories', () 
     assert.equal(insight.risks, '需求波动');
     assert.equal(insight.catalysts, '渠道改革');
     assert.equal(insight.questions, '批价能否稳定');
+    assert.ok(insight.buyPointUpdatedAt);
+    const db = new DatabaseSync(join(directory, 'test.sqlite'));
+    try {
+      db.prepare("UPDATE company_insights SET buy_point_updated_at = '2025-01-01 00:00:00' WHERE market = 'a' AND symbol = '600519'").run();
+      const unchanged = store.saveCompanyInsight('a', '600519', {
+        ...insight, note: '更新备注', buyPointRange: ' 1300-1400 '
+      });
+      assert.equal(unchanged.buyPointUpdatedAt, '2025-01-01T00:00:00Z');
+      const changed = store.saveCompanyInsight('a', '600519', {
+        ...unchanged, buyPointRange: '1200-1300'
+      });
+      assert.ok(changed.buyPointUpdatedAt);
+      assert.notEqual(changed.buyPointUpdatedAt, unchanged.buyPointUpdatedAt);
+      const cleared = store.saveCompanyInsight('a', '600519', {
+        ...changed, buyPointRange: ''
+      });
+      assert.equal(cleared.buyPointUpdatedAt, null);
+    } finally {
+      db.close();
+    }
   } finally {
     store?.onModuleDestroy();
     if (previousPath === undefined) {

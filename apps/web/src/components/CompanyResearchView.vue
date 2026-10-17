@@ -178,8 +178,11 @@ defineEmits<{
                     {{ activeCompanyInsight.buyPointRange ? '修改' : '设置' }}
                   </button>
                 </template>
-                <span v-if="showBuyPointReminder" class="buy-point-reminder">
-                  <AlertTriangle :size="14" />
+                <small v-if="activeCompanyInsight.buyPointRange && activeCompanyInsight.buyPointUpdatedAt" class="buy-point-time">
+                  设置时间：{{ formatDate(activeCompanyInsight.buyPointUpdatedAt) }}
+                </small>
+                <span v-if="showBuyPointReminder" class="buy-point-reminder" role="status">
+                  <i class="buy-point-reminder-dot" aria-hidden="true"></i>
                   请更新最新预估买点
                 </span>
               </div>

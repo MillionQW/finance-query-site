@@ -45,6 +45,7 @@ import {
 } from './app/app-navigation';
 import type { AppView, UrlMode } from './app/app-navigation';
 import { isAbortError } from './app/app-formatters';
+import { isBuyPointDue } from './services/company-insight';
 import {
   loadRecentCompanies as readRecentCompanies,
   rememberRecentCompany as persistRecentCompany
@@ -161,14 +162,14 @@ const activeCompanyInsight = computed<CompanyInsight>(() => {
   };
 });
 
-const showBuyPointReminder = computed(() => {
-  const updatedAt = activeCompanyInsight.value.buyPointUpdatedAt;
-  if (!updatedAt || !activeCompanyInsight.value.buyPointRange) return false;
-  const updatedDate = new Date(updatedAt);
-  if (Number.isNaN(updatedDate.getTime())) return false;
-  const reminderDate = new Date(updatedDate.getFullYear() + 1, 5, 1);
-  return new Date() >= reminderDate;
-});
+const buyPointNow = ref(Date.now());
+const buyPointTimer = setInterval(() => { buyPointNow.value = Date.now(); }, 60_000);
+onUnmounted(() => clearInterval(buyPointTimer));
+const showBuyPointReminder = computed(() => isBuyPointDue(
+  activeCompanyInsight.value.buyPointRange,
+  activeCompanyInsight.value.buyPointUpdatedAt,
+  buyPointNow.value
+));
 
 const showSearchDropdown = computed(() => {
   return (

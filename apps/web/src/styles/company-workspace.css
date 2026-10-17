@@ -303,11 +303,24 @@
   cursor: not-allowed;
 }
 
+.buy-point-time {
+  color: var(--muted, #64748b);
+  font-size: 12px;
+}
+
+.buy-point-reminder-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #dc2626;
+}
+
 .buy-point-reminder {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #b45309;
+  color: #dc2626;
   font-size: 12px;
   font-weight: 600;
 }
