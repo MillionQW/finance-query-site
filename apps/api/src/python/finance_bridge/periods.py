@@ -68,6 +68,14 @@ def normalize_period_report_dataframe(
 
     periods = sorted(df["_period"].astype(str).unique(), reverse=True)[:periods_limit]
     selected = df[df["_period"].isin(periods)].copy()
+    starts = {}
+    if "START_DATE" in selected.columns:
+        for period in periods:
+            values = {
+                extract_report_period(value)
+                for value in selected.loc[selected["_period"] == period, "START_DATE"]
+            } - {None}
+            starts[period] = next(iter(values)) if len(values) == 1 else None
 
     if item_name_column and amount_column:
         selected["_item"] = selected[item_name_column].astype(str).str.strip()
@@ -97,6 +105,7 @@ def normalize_period_report_dataframe(
             "type": statement_type,
             "title": title,
             "periods": periods,
+            "periodStarts": starts,
             "rows": sorted_rows(statement_type, rows),
         }
 
@@ -125,6 +134,7 @@ def normalize_period_report_dataframe(
         "type": statement_type,
         "title": title,
         "periods": periods,
+        "periodStarts": starts,
         "rows": sorted_rows(statement_type, rows),
     }
 

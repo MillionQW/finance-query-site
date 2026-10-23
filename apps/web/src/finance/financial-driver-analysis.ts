@@ -1,7 +1,7 @@
 import type { FinancialStatements, StatementTable } from '../types/finance';
+import { freeCashFlowDetails } from './financial-metric-calculation-helpers';
 import {
   ACCOUNTS_PAYABLE_ALIASES,
-  CAPITAL_EXPENDITURE_ALIASES,
   EQUITY_ALIASES,
   INVENTORY_ALIASES,
   NET_PROFIT_ALIASES,
@@ -11,12 +11,9 @@ import {
   TOTAL_ASSET_ALIASES
 } from './financial-metric-fields';
 import {
-  calculateFreeCashFlow,
-  findRows,
   growthRate,
   rowValue,
   safeDivide,
-  toNumber
 } from './financial-metric-engine';
 
 export interface DriverValue {
@@ -54,18 +51,12 @@ function tableOf(statements: FinancialStatements, type: StatementTable['type']):
   return statements.tables.find((table) => table.type === type);
 }
 
-function summedRowValue(table: StatementTable | undefined, year: string, aliases: string[]): number | null {
-  const values = findRows(table, aliases)
-    .map((row) => toNumber(row.values[year]))
-    .filter((value): value is number => value !== null);
-  return values.length ? values.reduce((total, value) => total + Math.abs(value), 0) : null;
-}
-
 function gapTone(label: string, gap: number | null): WorkingCapitalSignal['tone'] {
   if (gap === null) return 'neutral';
   const materialGap = 0.1 - Number.EPSILON * 10;
   if (label === '应付账款') {
-    return gap >= materialGap ? 'positive' : gap <= -materialGap ? 'warning' : 'neutral';
+    // Faster payable growth can reflect bargaining power OR payment stress.
+    return Math.abs(gap) >= materialGap ? 'warning' : 'neutral';
   }
   return gap <= 0 ? 'positive' : gap >= materialGap ? 'warning' : 'neutral';
 }
@@ -103,10 +94,13 @@ export function buildFinancialDriverAnalysis(
   const baseEquity = baseYear ? rowValue(balance, baseYear, EQUITY_ALIASES) : null;
   const operatingCash = rowValue(cashflow, currentYear, OPERATING_CASHFLOW_ALIASES);
   const previousOperatingCash = rowValue(cashflow, previousYear, OPERATING_CASHFLOW_ALIASES);
-  const capex = summedRowValue(cashflow, currentYear, CAPITAL_EXPENDITURE_ALIASES);
-  const previousCapex = summedRowValue(cashflow, previousYear, CAPITAL_EXPENDITURE_ALIASES);
-  const freeCash = calculateFreeCashFlow(operatingCash, capex, []).freeCashFlow;
-  const previousFreeCash = calculateFreeCashFlow(previousOperatingCash, previousCapex, []).freeCashFlow;
+  const context = { statements, balance, income, cashflow };
+  const currentCash = freeCashFlowDetails(context, currentYear);
+  const previousCash = freeCashFlowDetails(context, previousYear);
+  const capex = currentCash.capitalExpenditure;
+  const previousCapex = previousCash.capitalExpenditure;
+  const freeCash = currentCash.freeCashFlow;
+  const previousFreeCash = previousCash.freeCashFlow;
 
   const averageAssets = average(assets, previousAssets);
   const previousAverageAssets = average(previousAssets, baseAssets);

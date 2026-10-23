@@ -5,6 +5,15 @@ import type { FinancialStatements } from '../types';
 import { CompanyStoreRepository } from './company.repository';
 import { initializeFinanceStoreSchema } from './finance-store.schema';
 import { StatementStoreRepository } from './statements.repository';
+import { mergePartialStatements } from './finance-store.utils';
+
+test('partial refresh retains fiscal starts for preserved reporting-period rows', () => {
+  const original = payload(100, '2026-01-01');
+  original.periodTables = [{ type:'income', title:'利润表', periods:['2025-06-30'], periodStarts:{'2025-06-30':'2025-01-01'}, rows:[] }];
+  const partial = payload(100, '2026-02-01');
+  partial.periodTables = [{ type:'income', title:'利润表', periods:[], rows:[] }];
+  assert.equal(mergePartialStatements(original, partial).periodTables?.[0].periodStarts?.['2025-06-30'], '2025-01-01');
+});
 
 function payload(revenue: number, fetchedAt: string): FinancialStatements {
   return {

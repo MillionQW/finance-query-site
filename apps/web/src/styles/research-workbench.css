@@ -1,0 +1,26 @@
+.research-workbench { margin: 20px 0; padding: 24px; border: 1px solid #dce5ee; border-radius: 16px; background: #fff; color: #223449; }
+.research-workbench header { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.research-workbench h2 { margin: 6px 0 12px; font-size: 19px; }
+.research-workbench h3 { font-size: 15px; }
+.research-workbench p, .research-workbench small, .denomination-note { font-size: 12px; color: #62748a; line-height: 1.8; }
+.research-workbench .eyebrow { color: #326bb2; font-size: 12px; }
+.workbench-scroll { overflow: auto; }
+.research-workbench table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.research-workbench th, .research-workbench td { padding: 12px; text-align: right; border-bottom: 1px solid #e6edf4; white-space: nowrap; }
+.research-workbench th:first-child { text-align: left; }
+.research-workbench td small { display: block; }
+.research-workbench thead { background: #f3f7fc; }
+.operating-signals { margin: 16px 0; background: #f3f7fc; padding: 16px 20px; border-radius: 10px; font-size: 13px; line-height: 1.9; }
+.workbench-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 16px 0; }
+.research-workbench label { display: flex; flex-direction: column; gap: 7px; font-size: 12px; }
+.research-workbench input, .research-workbench select, .research-workbench textarea { width: 100%; min-width: 0; box-sizing: border-box; padding: 9px; border: 1px solid #ced9e6; border-radius: 6px; background: #fff; color: #223449; font: inherit; }
+.research-workbench button { cursor: pointer; padding: 8px 14px; border: 1px solid #c8d7e8; border-radius: 6px; background: #edf4fe; color: #285d9e; }
+.research-workbench button:disabled { opacity: .5; cursor: default; }
+.scenario-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
+.scenario-card { border: 1px solid #dde6f0; border-radius: 10px; padding: 18px; background: #f8fafd; }
+.scenario-card label { margin: 12px 0; }
+.scenario-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px; }
+.scenario-card dd { text-align: right; margin: 0; font-weight: 600; }
+.research-workbench .workbench-error { color: #b43c31; }
+.workbench-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 18px 0; }
+@media (max-width: 900px) { .workbench-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .scenario-grid { grid-template-columns: 1fr; } }

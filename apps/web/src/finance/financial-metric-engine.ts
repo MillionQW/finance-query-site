@@ -52,7 +52,7 @@ export function calculateFreeCashFlow(
   const separateTotal = separateValues.reduce((total, value) => total + Math.abs(value), 0);
   const capitalExpenditure = combinedCapitalExpenditure !== null
     ? Math.abs(combinedCapitalExpenditure)
-    : separateValues.length
+    : separateValues.length && separateValues.length === separateCapitalExpenditures.length
       ? separateTotal
       : null;
   return {

@@ -18,16 +18,24 @@ import type { EtfDetailResponse, EtfMarketResponse, EtfSortKey, EtfValuation, Fa
 import type { FavoriteIndex, IndexDetailResponse, IndexMarket, IndexMarketResponse, IndexValuation } from '../types/index';
 import { normalizeCompanyInsight } from './company-insight';
 import type { CompanyValuation } from '../types/company-valuation';
+import type { ValuationModel, ValuationSnapshot } from '../finance/scenario-valuation';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
 const REQUEST_TIMEOUT_MS = 125_000;
+
+export function getValuationModels(market: Market, symbol: string, signal?: AbortSignal) {
+  return request<ValuationSnapshot[]>(`/finance/valuation-models/${market}/${encodeURIComponent(symbol)}`, { signal });
+}
+export function saveValuationModel(market: Market, symbol: string, model: ValuationModel) {
+  return request<ValuationSnapshot>(`/finance/valuation-models/${market}/${encodeURIComponent(symbol)}`, { method: 'POST', body: JSON.stringify(model) });
+}
 
 export function getCompanyValuation(market: Market, symbol: string, refresh = false, signal?: AbortSignal) {
   const params = new URLSearchParams({ market, symbol, refresh: String(refresh) });
   return request<CompanyValuation>(`/finance/company-valuation?${params}`, { signal });
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (init?.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');

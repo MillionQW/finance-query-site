@@ -98,6 +98,7 @@ export function mergePartialStatements(
       periods: [...new Set([...cachedTable.periods, ...incomingTable.periods])]
         .sort((a, b) => b.localeCompare(a))
         .slice(0, 20),
+      periodStarts: { ...cachedTable.periodStarts, ...incomingTable.periodStarts },
       rows: [...rows.values()]
     };
   });

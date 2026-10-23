@@ -86,6 +86,16 @@ test('evaluator returns stable empty results before statements load', () => {
   assert.deepEqual(result.alerts, []);
 });
 
+test('a missing latest year is never backfilled from an older year', () => {
+  const input = statements();
+  const cash = input.tables.find(t => t.type === 'cashflow')!.rows[0];
+  cash.values['2025'] = null;
+  const definition = definitions.find(d => d.key === 'operatingCashConversion')!;
+  const [result] = evaluateFinancialMetrics(input, input.years, [definition]);
+  assert.equal(result.latest, null);
+  assert.notEqual(result.points[1].value, null);
+});
+
 test('evaluator classifies enterprise type from three cash-flow net amounts', () => {
   const definition = definitions.find((item) => item.key === 'cashFlowCompanyType');
   assert.ok(definition);

@@ -82,6 +82,10 @@ test('free cash flow sums separate Hong Kong fixed and intangible asset purchase
   assert.ok(INTANGIBLE_ASSET_CAPEX_ALIASES.includes('购建无形资产及其他资产'));
 });
 
+test('incomplete capex components do not treat missing purchases as zero', () => {
+  assert.deepEqual(calculateFreeCashFlow(500, null, [100, null]), { capitalExpenditure: null, freeCashFlow: null });
+});
+
 test('free cash flow stays unavailable when capex fields are absent', () => {
   assert.deepEqual(
     calculateFreeCashFlow(500, null, [null, null]),

@@ -1,0 +1,28 @@
+.tracking-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.tracking-editor { border: 1px solid #cbdcf1; background: #f5f8fd; border-radius: 12px; padding: 20px; margin: 18px 0; }
+.tracking-editor > label { margin: 14px 0; }
+.tracking-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; margin: 16px 0; font-size: 13px; }
+.tracking-summary > label { margin-left: auto; min-width: 170px; }
+.tracking-checkbox { flex-direction: row !important; align-items: center; }
+.tracking-checkbox input { width: auto; }
+.tracking-row-actions { display: flex; flex-wrap: wrap; gap: 7px; max-width: 260px; justify-content: flex-end; }
+.tracking-row-actions button { font-size: 12px; padding: 6px 9px; }
+.tracking-source { white-space: normal !important; min-width: 160px; max-width: 250px; overflow-wrap: anywhere; }
+.research-workbench th > small { display: block; font-weight: normal; }
+.tracking-hypothesis { border: 1px solid #dce5ee; border-radius: 12px; padding: 18px 20px; margin: 16px 0; }
+.tracking-hypothesis.attention { border-left: 4px solid #d49538; }
+.tracking-hypothesis h3 { margin: 0; line-height: 1.7; }
+.tracking-status { white-space: nowrap; color: #396283; font-size: 12px; }
+.tracking-hypothesis .tracking-row-actions { max-width: none; justify-content: flex-start; margin-top: 16px; }
+.tracking-archived { opacity: .7; }
+.tracking-last-review { border-radius: 8px; background: #f3f7fc; padding: 14px; margin-top: 14px; font-size: 12px; }
+.tracking-history-entry { padding: 16px 0; border-bottom: 1px solid #e1e8f0; font-size: 13px; }
+.tracking-history-entry p, .tracking-hypothesis p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.tracking-error { padding: 14px; background: #fff1ed; color: #ae3828; border-radius: 8px; }
+.research-tracking-workspace > .workbench-actions { font-size: 12px; color: #62748a; }
+.research-tracking-workspace > .workbench-actions button { padding: 8px 12px; border: 1px solid #ccd9e8; background: #f3f7fc; color: #2d5e96; border-radius: 6px; cursor: pointer; }
+.tracking-sync-status { padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 10px; margin-bottom: 16px; color: #475569; background: #f8fafc; font-size: 13px; }
+.tracking-sync-status p { margin: 5px 0; }
+.tracking-provenance { margin-top: 6px; font-size: 12px; }
+.tracking-provenance summary { cursor: pointer; }
+.tracking-provenance pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; max-width: 360px; text-align: left; }

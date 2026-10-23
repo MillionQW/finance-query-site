@@ -163,6 +163,7 @@ export interface PeriodStatementTable {
   title: string;
   periods: string[];
   rows: StatementRow[];
+  periodStarts?: Record<string, string | null>;
 }
 
 export interface PeriodMetricPoint {
@@ -285,6 +286,9 @@ export interface FinancialStatements {
   };
   years: string[];
   unit: string;
+  reportingCurrency?: string | null;
+  amountScale?: number | null;
+  currencyNote?: string;
   tables: StatementTable[];
   highlights: MetricSeries[];
   reportPeriods?: ReportPeriod[];

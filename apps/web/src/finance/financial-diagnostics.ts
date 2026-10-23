@@ -25,7 +25,7 @@ export interface FinancialDiagnostic {
   key: 'profitability' | 'growthQuality' | 'cashCreation' | 'financialRisk';
   title: string;
   eyebrow: string;
-  status: '稳健' | '关注' | '风险' | '数据不足';
+  status: '未触发风险' | '关注' | '风险' | '数据不足';
   tone: DiagnosticTone;
   summary: string;
   availableCount: number;
@@ -103,7 +103,7 @@ export function buildFinancialDiagnostics(results: MetricResult[]): FinancialDia
       ? 'danger'
       : warning.length || warningSignals.length
         ? 'warning'
-        : available.length >= 2
+        : available.length >= Math.ceil(config.metricKeys.length * 0.8)
           ? 'positive'
           : 'neutral';
     const status = tone === 'danger'
@@ -111,7 +111,7 @@ export function buildFinancialDiagnostics(results: MetricResult[]): FinancialDia
       : tone === 'warning'
         ? '关注'
         : tone === 'positive'
-          ? '稳健'
+          ? '未触发风险'
           : '数据不足';
     const signalPriority = new Map(
       signals.map((signal) => [signal.metricKey, signal.tone === 'danger' ? 4 : 2])
@@ -124,7 +124,7 @@ export function buildFinancialDiagnostics(results: MetricResult[]): FinancialDia
     const criticalAlert = primaryCritical?.alerts.find((alert) => alert.year)?.message;
     const warningAlert = primaryWarning?.alerts.find((alert) => alert.year)?.message;
     const summary = tone === 'neutral'
-      ? '可计算指标不足，请检查财报科目或历史年限。'
+      ? '可计算指标不足（需覆盖至少80%）；不作稳健判断，请检查当年科目或历史年限。'
       : primaryCritical
         ? criticalAlert ??
           dangerSignals[0]?.message ??
@@ -144,7 +144,7 @@ export function buildFinancialDiagnostics(results: MetricResult[]): FinancialDia
       tone,
       summary,
       availableCount: available.length,
-      totalCount: configuredResults.length,
+      totalCount: config.metricKeys.length,
       metrics: prioritized.slice(0, 3).map((result) => ({
         metricKey: result.definition.key,
         label: result.definition.label,

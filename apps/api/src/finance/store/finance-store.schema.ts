@@ -1,5 +1,26 @@
 export function initializeFinanceStoreSchema(db: any): void {
   db.exec(`
+      CREATE TABLE IF NOT EXISTS company_business_sync (
+        market TEXT NOT NULL, symbol TEXT NOT NULL, payload_json TEXT NOT NULL,
+        PRIMARY KEY (market, symbol)
+      );
+      CREATE TABLE IF NOT EXISTS company_research_entries (
+        id TEXT PRIMARY KEY, market TEXT NOT NULL, symbol TEXT NOT NULL, kind TEXT NOT NULL,
+        version INTEGER NOT NULL, updated_at TEXT NOT NULL, payload_json TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_company_research_entries ON company_research_entries(market,symbol,kind);
+      CREATE TABLE IF NOT EXISTS company_research_revisions (
+        entry_id TEXT NOT NULL, version INTEGER NOT NULL, updated_at TEXT NOT NULL, payload_json TEXT NOT NULL,
+        PRIMARY KEY(entry_id,version), FOREIGN KEY(entry_id) REFERENCES company_research_entries(id)
+      );
+      CREATE TABLE IF NOT EXISTS company_valuation_models (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        market TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        saved_at TEXT NOT NULL,
+        payload_json TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_valuation_models_company ON company_valuation_models(market, symbol, id);
       CREATE TABLE IF NOT EXISTS company_pe_history (
         market TEXT NOT NULL,
         symbol TEXT NOT NULL,

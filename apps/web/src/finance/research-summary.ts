@@ -12,7 +12,7 @@ import { evaluateFinancialMetrics } from './financial-metric-evaluator';
 
 export interface ResearchSummary {
   tone: DiagnosticTone;
-  status: '整体稳健' | '存在关注项' | '存在风险项' | '数据不足';
+  status: '已覆盖指标未触发风险' | '存在关注项' | '存在风险项' | '数据不足';
   headline: string;
   diagnostics: FinancialDiagnostic[];
   prioritySignals: Array<{
@@ -69,7 +69,8 @@ export function buildResearchSummary(
     .sort((left, right) => Number(right.tone === 'danger') - Number(left.tone === 'danger'))
     .slice(0, 4);
   const latestPeriod = statements.reportPeriods?.[0]?.label;
-  const context = latestPeriod ? `最新已覆盖 ${latestPeriod}。` : '当前主要基于年度财报。';
+  const context = `本结论仅基于 ${statements.years[0] ?? '未知'} 年度数据；缺失指标不沿用往年值。`
+    + (latestPeriod ? `另有 ${latestPeriod} 数据，请在经营变化面板查看。` : '');
   const headline = tone === 'danger'
     ? `${danger.map((item) => item.title).join('、')}出现风险信号；${context}`
     : tone === 'warning'
@@ -85,7 +86,7 @@ export function buildResearchSummary(
       : tone === 'warning'
         ? '存在关注项'
         : tone === 'positive'
-          ? '整体稳健'
+          ? '已覆盖指标未触发风险'
           : '数据不足',
     headline,
     diagnostics,

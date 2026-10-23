@@ -1,4 +1,7 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { ResearchTrackingRepository } from './store/research-tracking.repository';
+import { ValuationModelRepository } from './store/valuation-model.repository';
+import type { ValuationModelDto } from './valuation-model.dto';
 import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, normalize, resolve } from 'node:path';
@@ -48,6 +51,8 @@ export class FinanceStoreService implements OnModuleDestroy {
   private readonly peersRepository: PeerStoreRepository;
   private readonly refreshRepository: RefreshStoreRepository;
   private readonly valuationRepository: CompanyValuationRepository;
+  private readonly valuationModelRepository: ValuationModelRepository;
+  readonly researchTracking: ResearchTrackingRepository;
 
   constructor() {
     mkdirSync(dirname(this.dbPath), { recursive: true });
@@ -61,6 +66,8 @@ export class FinanceStoreService implements OnModuleDestroy {
     this.peersRepository = new PeerStoreRepository(this.db, this.companyRepository);
     this.refreshRepository = new RefreshStoreRepository(this.db);
     this.valuationRepository = new CompanyValuationRepository(this.db);
+    this.valuationModelRepository = new ValuationModelRepository(this.db);
+    this.researchTracking = new ResearchTrackingRepository(this.db);
     this.refreshRepository.markInterruptedRefreshRuns();
   }
 
@@ -71,6 +78,9 @@ export class FinanceStoreService implements OnModuleDestroy {
   getCompanyPeHistory(market: Market, symbol: string): CompanyPeHistory | null {
     return this.valuationRepository.get(market, symbol);
   }
+
+  listValuationModels(market: Market, symbol: string) { return this.valuationModelRepository.list(market, symbol); }
+  saveValuationModel(market: Market, symbol: string, model: ValuationModelDto) { return this.valuationModelRepository.save(market, symbol, model); }
 
   saveCompanyPeHistory(payload: CompanyPeHistory): void {
     this.valuationRepository.save(payload);

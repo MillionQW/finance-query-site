@@ -85,16 +85,25 @@ test('diagnostics remain transparent when no configured data is available', () =
   assert.equal(profitability?.metrics.length, 0);
 });
 
-test('stable diagnostics require at least two available inputs and show representative metrics', () => {
+test('limited coverage cannot be labeled as no risk', () => {
   const diagnostics = buildFinancialDiagnostics([
     result('interestCoverage', 6, 'times'),
     result('netDebtToOperatingCash', 1, 'times'),
     result('assetLiabilityRatio', 0.45)
   ]);
   const risk = diagnostics.find((item) => item.key === 'financialRisk');
-  assert.equal(risk?.status, '稳健');
+  assert.equal(risk?.status, '数据不足');
   assert.equal(risk?.availableCount, 3);
   assert.equal(risk?.metrics.length, 3);
+});
+
+test('no-risk label requires at least 80 percent coverage', () => {
+  const diagnostics = buildFinancialDiagnostics([
+    result('interestCoverage', 6, 'times'), result('netDebtToOperatingCash', 1, 'times'),
+    result('assetLiabilityRatio', 0.45), result('goodwillToEquity', 0.01),
+    result('impairmentToOperatingProfit', 0.01), result('developmentToEquity', 0.01)
+  ]);
+  assert.equal(diagnostics.find(d => d.key === 'financialRisk')?.status, '未触发风险');
 });
 
 test('two consecutive contraction years promote growth quality to danger', () => {

@@ -30,6 +30,9 @@ const CustomMetricChart = defineAsyncComponent(() => import('./CustomMetricChart
 const FinancialDriverPanel = defineAsyncComponent(() => import('./FinancialDriverPanel.vue'));
 const MiniTrend = defineAsyncComponent(() => import('./MiniTrend.vue'));
 const PeriodAnalysisPanel = defineAsyncComponent(() => import('./PeriodAnalysisPanel.vue'));
+const OperatingChangesPanel = defineAsyncComponent(() => import('./OperatingChangesPanel.vue'));
+const ScenarioValuationPanel = defineAsyncComponent(() => import('./ScenarioValuationPanel.vue'));
+const ResearchTrackingWorkspace = defineAsyncComponent(() => import('./ResearchTrackingWorkspace.vue'));
 const PeerComparisonPanel = defineAsyncComponent(() => import('./PeerComparisonPanel.vue'));
 const ResearchSummaryPanel = defineAsyncComponent(() => import('./ResearchSummaryPanel.vue'));
 const ResearchDossierPanel = defineAsyncComponent(() => import('./ResearchDossierPanel.vue'));
@@ -54,7 +57,7 @@ defineProps<{
   statementError: string | null;
   availableYears: string[];
   activeYears: string[];
-  summaryCards: Array<MetricSeries & { latest: number | null; delta: number | null }>;
+  summaryCards: Array<MetricSeries & { year: string; latest: number | null; delta: number | null }>;
   peerComparison: PeerComparison | null;
   peerLoading: boolean;
   peerError: string | null;
@@ -204,10 +207,11 @@ defineEmits<{
               <strong>{{ formatDate(statements?.fetchedAt) }}</strong>
             </div>
             <div>
-              <span>单位</span>
-              <strong>{{ statements?.unit ?? '-' }}</strong>
+              <span>报表币种 / 单位</span>
+              <strong>{{ statements?.reportingCurrency ?? '币种未确认' }} / {{ statements?.unit ?? '-' }}</strong>
             </div>
           </div>
+          <p v-if="statements" class="denomination-note">{{ statements.currencyNote ?? '旧缓存未记录币种与金额倍率，请刷新财报或核对原报告；不要按上市市场推定报告币种。' }}</p>
         </div>
 
         <CompanyValuationPanel :company="selectedCompany" />
@@ -255,6 +259,9 @@ defineEmits<{
         </div>
 
         <PeriodAnalysisPanel :statements="statements" />
+        <OperatingChangesPanel :statements="statements" />
+        <ScenarioValuationPanel v-if="selectedCompany" :key="companyKey(selectedCompany)" :company="selectedCompany" :statements="statements" />
+        <ResearchTrackingWorkspace v-if="selectedCompany" :key="companyKey(selectedCompany)" :company="selectedCompany" />
 
         <FinancialDriverPanel :statements="statements" />
 
@@ -262,7 +269,7 @@ defineEmits<{
           <MiniTrend :series="statements?.highlights ?? []" />
           <div class="metric-cards">
             <article v-for="card in summaryCards" :key="card.key" class="metric-card">
-              <span>{{ card.label }}</span>
+              <span>{{ card.label }} · {{ card.year }}年</span>
               <strong>{{ formatNumber(card.latest) }}</strong>
               <em :class="{ up: (card.delta ?? 0) >= 0, down: (card.delta ?? 0) < 0 }">
                 <TrendingUp :size="15" />

@@ -15,7 +15,7 @@ const summary = computed(() => buildResearchSummary(props.statements));
   <section class="research-summary-panel" :class="summary.tone">
     <header>
       <div>
-        <span><Compass :size="16" />结论优先</span>
+        <span><Compass :size="16" />年度财务质量</span>
         <h2>{{ summary.status }}</h2>
         <p>{{ summary.headline }}</p>
       </div>
@@ -58,7 +58,7 @@ const summary = computed(() => buildResearchSummary(props.statements));
       </div>
       <div v-else class="research-no-signal">
         <CheckCircle2 :size="16" />
-        当前可计算指标暂未发现需要优先处理的风险信号。
+        {{ summary.tone === 'neutral' ? '数据覆盖不足，暂不作整体判断。' : '已覆盖指标未触发优先风险，不代表所有风险均已排除。' }}
       </div>
     </div>
   </section>

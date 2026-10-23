@@ -293,6 +293,8 @@ export function statementDataForHash(statements: FinancialStatements): object {
       symbol: statements.company.symbol
     },
     years: statements.years,
+    ...(statements.reportingCurrency !== undefined ? { reportingCurrency: statements.reportingCurrency } : {}),
+    ...(statements.amountScale !== undefined ? { amountScale: statements.amountScale } : {}),
     tables: statements.tables,
     reportPeriods: statements.reportPeriods ?? [],
     periodTables: statements.periodTables ?? []

@@ -41,7 +41,8 @@ export function evaluateFinancialMetrics(
     return {
       definition,
       points,
-      latest: points.find((point) => point.value !== null)?.value ?? null,
+      // Missing current-year values must never silently become older observations.
+      latest: points[0]?.value ?? null,
       missing: missingRequirements(definition, context),
       alerts: metricAlerts(definition, points)
     };

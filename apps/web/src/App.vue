@@ -3,6 +3,7 @@ import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, 
 import AppTopbar from './components/AppTopbar.vue';
 import CompanyNoteDialog from './components/CompanyNoteDialog.vue';
 import CompanyResearchView from './components/CompanyResearchView.vue';
+import { annualSummaryCards } from './finance/annual-summary';
 import SettingsPage from './components/SettingsPage.vue';
 import {
   getCacheEntries,
@@ -183,15 +184,7 @@ const activeSearchDescendant = computed(() => {
   return company ? searchOptionId(company) : undefined;
 });
 
-const summaryCards = computed(() => {
-  return (statements.value?.highlights ?? []).slice(0, 4).map((series) => {
-    const values = series.points.map((point) => point.value).filter((value): value is number => value !== null);
-    const latest = values[values.length - 1] ?? null;
-    const previous = values[values.length - 2] ?? null;
-    const delta = latest !== null && previous ? ((latest - previous) / Math.abs(previous)) * 100 : null;
-    return { ...series, latest, delta };
-  });
-});
+const summaryCards = computed(() => annualSummaryCards(statements.value));
 
 const statementCacheLabel = computed(() => {
   if (!statements.value?.cache) {

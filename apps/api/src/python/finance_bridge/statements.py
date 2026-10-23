@@ -233,6 +233,7 @@ def report_period_keys(
 
 
 def handle_statements(args: argparse.Namespace) -> None:
+    from .statement_metadata import statement_metadata
     # years=0 is the public "since listing" mode. 200 is only a defensive ceiling,
     # not a business window; the listing year below determines the actual start.
     years_limit = 200 if int(args.years) <= 0 else max(1, min(int(args.years), 200))
@@ -312,7 +313,7 @@ def handle_statements(args: argparse.Namespace) -> None:
         "schemaVersion": 2,
         "company": company,
         "years": years,
-        "unit": "AKShare 原始单位",
+        **statement_metadata(args.market, [*annual_reports, *period_reports]),
         "tables": tables,
         "highlights": build_highlights(tables, years),
         "reportPeriods": report_periods,

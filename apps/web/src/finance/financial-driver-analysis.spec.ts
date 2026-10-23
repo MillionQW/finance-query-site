@@ -62,3 +62,14 @@ test('driver analysis explains insufficient history', () => {
   assert.equal(analysis.coverage, 0);
   assert.equal(analysis.dupont.length, 0);
 });
+
+test('cash bridge does not count capex components twice when the total is supplied', () => {
+  const input = structuredClone(statements);
+  input.tables.find(t => t.type === 'cashflow')!.rows.push(
+    { item: '购建固定资产', values: { '2025': 25, '2024': 20 } },
+    { item: '购建无形资产及其他资产', values: { '2025': 15, '2024': 10 } }
+  );
+  const bridge = buildFinancialDriverAnalysis(input).cashBridge;
+  assert.equal(bridge.find(r => r.label === '资本开支')?.current, 40);
+  assert.equal(bridge.find(r => r.label === '自由现金流')?.current, 110);
+});

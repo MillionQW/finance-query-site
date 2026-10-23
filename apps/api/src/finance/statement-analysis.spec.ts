@@ -7,6 +7,11 @@ import {
   statementDataForHash
 } from './statement-analysis';
 
+test('currency and amount scale changes are part of the immutable data version', () => {
+  assert.notDeepEqual(statementDataForHash({ ...fixture(), reportingCurrency: 'CNY' }), statementDataForHash({ ...fixture(), reportingCurrency: 'HKD' }));
+  assert.notDeepEqual(statementDataForHash({ ...fixture(), amountScale: 1 }), statementDataForHash({ ...fixture(), amountScale: 1000 }));
+});
+
 function fixture(revenue = 100): FinancialStatements {
   return {
     schemaVersion: 2,
