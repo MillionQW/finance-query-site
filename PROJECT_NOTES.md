@@ -42,6 +42,17 @@
   - `86024db Add interactive statement item trends`
   - `43feed2 Rebuild financial trend panel with ECharts`
 
+## Company PE (TTM) historical percentiles (2026-10-23)
+
+- Company pages independently load `GET /api/finance/company-valuation?market=a|hk&symbol=...`; `refresh=true` bypasses the daily cache.
+- The Python `company-valuation` bridge uses `stock_zh_valuation_baidu` / `stock_hk_valuation_baidu`, indicator `市盈率(TTM)`, period `全部`. Live A-share (600519) and HK (00700) calls were verified.
+- These interfaces return sampled history, **not daily observations**. The UI labels this and shows 3/5/10-year percentiles, each window's valid sample count and actual sample dates, latest PE, and valuation date.
+- The percentile cards also switch a PE (TTM) history chart between 3/5/10 years, defaulting to 3 years. The chart and selected percentile share the same calendar cutoff and normalized observations; switching ranges does not fetch again. The API exposes the last 10 years as `history`, preserving invalid PE as null gaps. The chart uses a time axis, hover date/PE values, and responsive resizing.
+- Windows end at the latest source date. Percentile is `count(PE <= latest PE) / valid sample count * 100`, including the latest observation. Dates are deduplicated; missing, non-finite, zero and negative PE are excluded. Invalid latest PE or fewer than two valid observations yields no percentile. Incomplete history is explicitly labeled.
+- Each window also returns `referenceLevels` for the 20th/50th/80th percentile PE, using linear interpolation at `(n - 1) * p` (PERCENTILE.INC). The chart renders matching dashed lines and colored PE labels, updated on range switches without fetching. Equal levels share a line label; fewer than two valid samples yield null levels and no reference lines. Latest invalid PE does not suppress reference levels derived from otherwise valid historical samples.
+- Raw snapshots are persisted in SQLite `company_pe_history`, cached for 24 hours, and concurrent requests share one subprocess. Refresh failures preserve the previous snapshot and explicitly mark it stale.
+- Verification: 33 API tests, full typecheck and production build passed. Browser checks covered A/HK live data, manual refresh, failure display, rapid company switching, and desktop/mobile layouts.
+
 ## Implemented Features
 
 - Search A-share and Hong Kong stock companies.

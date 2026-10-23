@@ -1,5 +1,13 @@
 export function initializeFinanceStoreSchema(db: any): void {
   db.exec(`
+      CREATE TABLE IF NOT EXISTS company_pe_history (
+        market TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        fetched_at TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        PRIMARY KEY (market, symbol)
+      );
+
       CREATE TABLE IF NOT EXISTS companies (
         market TEXT NOT NULL,
         symbol TEXT NOT NULL,

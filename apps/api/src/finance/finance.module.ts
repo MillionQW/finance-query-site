@@ -10,11 +10,14 @@ import { EtfService } from './etf.service';
 import { IndexController } from './index.controller';
 import { IndexService } from './index.service';
 import { IndexStoreService } from './index-store.service';
+import { CompanyValuationController } from './company-valuation.controller';
+import { CompanyValuationService } from './company-valuation.service';
 
 @Module({
-  controllers: [FinanceController, EtfController, IndexController],
+  controllers: [FinanceController, EtfController, IndexController, CompanyValuationController],
   providers: [
     FinanceService,
+    CompanyValuationService,
     EtfService,
     IndexService,
     IndexStoreService,

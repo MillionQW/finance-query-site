@@ -9,6 +9,8 @@ import { EtfStoreRepository } from './store/etf.repository';
 import { initializeFinanceStoreSchema } from './store/finance-store.schema';
 import { PeerStoreRepository } from './store/peers.repository';
 import { RefreshStoreRepository } from './store/refresh.repository';
+import { CompanyValuationRepository } from './store/company-valuation.repository';
+import type { CompanyPeHistory } from './company-valuation.types';
 import { StatementStoreRepository } from './store/statements.repository';
 import type {
   AnnouncementFeed,
@@ -45,6 +47,7 @@ export class FinanceStoreService implements OnModuleDestroy {
   private readonly cacheRepository: CacheStoreRepository;
   private readonly peersRepository: PeerStoreRepository;
   private readonly refreshRepository: RefreshStoreRepository;
+  private readonly valuationRepository: CompanyValuationRepository;
 
   constructor() {
     mkdirSync(dirname(this.dbPath), { recursive: true });
@@ -57,11 +60,20 @@ export class FinanceStoreService implements OnModuleDestroy {
     this.cacheRepository = new CacheStoreRepository(this.db, this.dbPath);
     this.peersRepository = new PeerStoreRepository(this.db, this.companyRepository);
     this.refreshRepository = new RefreshStoreRepository(this.db);
+    this.valuationRepository = new CompanyValuationRepository(this.db);
     this.refreshRepository.markInterruptedRefreshRuns();
   }
 
   onModuleDestroy() {
     this.db.close();
+  }
+
+  getCompanyPeHistory(market: Market, symbol: string): CompanyPeHistory | null {
+    return this.valuationRepository.get(market, symbol);
+  }
+
+  saveCompanyPeHistory(payload: CompanyPeHistory): void {
+    this.valuationRepository.save(payload);
   }
 
   findCompanies(query: string, market: 'all' | Market): CompanySearchResult[] {

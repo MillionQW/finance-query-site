@@ -11,6 +11,7 @@ import {
   TrendingUp
 } from 'lucide-vue-next';
 import AnnouncementPanel from './AnnouncementPanel.vue';
+import CompanyValuationPanel from './CompanyValuationPanel.vue';
 import { companyKey } from '../app/app-navigation';
 import { formatDate, formatNumber, marketLabel } from '../app/app-formatters';
 import type {
@@ -208,6 +209,8 @@ defineEmits<{
             </div>
           </div>
         </div>
+
+        <CompanyValuationPanel :company="selectedCompany" />
 
         <div class="statement-cache-strip">
           <span>财报数据</span>
