@@ -146,6 +146,7 @@ function formatPercent(value: number | null): string {
         :active-years="visiblePeriods"
         :column-labels="labels"
         :comparison-keys="comparisons"
+        :report-periods="reportPeriods"
       />
     </template>
   </section>

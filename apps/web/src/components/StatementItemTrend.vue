@@ -6,7 +6,8 @@ import { GridComponent, TooltipComponent } from 'echarts/components';
 import { LineChart } from 'echarts/charts';
 import { CanvasRenderer } from 'echarts/renderers';
 import type { ECharts, EChartsCoreOption } from 'echarts/core';
-import type { StatementRow } from '../types/finance';
+import type { ReportPeriod, StatementRow } from '../types/finance';
+import { statementTrendGroups } from '../finance/statement-trend';
 
 echarts.use([GridComponent, TooltipComponent, LineChart, CanvasRenderer]);
 
@@ -16,6 +17,7 @@ const props = defineProps<{
   row: StatementRow;
   years: string[];
   unit: ValueDisplayUnit;
+  reportPeriods?: ReportPeriod[];
 }>();
 
 const emit = defineEmits<{
@@ -24,6 +26,15 @@ const emit = defineEmits<{
 
 const chartElement = ref<HTMLDivElement | null>(null);
 const chart = shallowRef<ECharts | null>(null);
+const selectedGroupKey = ref('annual');
+const periodGroups = computed(() => statementTrendGroups(props.reportPeriods ?? [], props.years));
+const selectedGroup = computed(() =>
+  periodGroups.value.find((group) => group.key === selectedGroupKey.value) ?? periodGroups.value[0]
+);
+const trendPeriods = computed(() => props.reportPeriods
+  ? selectedGroup.value?.periods ?? []
+  : [...props.years].sort().map((key) => ({ key, label: key }))
+);
 
 const unitDivisors: Record<ValueDisplayUnit, number> = {
   raw: 1,
@@ -38,10 +49,10 @@ const unitLabels: Record<ValueDisplayUnit, string> = {
 };
 
 const points = computed(() =>
-  [...props.years].reverse().map((year) => {
-    const rawValue = parseNumericValue(props.row.values[year]);
+  trendPeriods.value.map((period) => {
+    const rawValue = parseNumericValue(props.row.values[period.key]);
     return {
-      year,
+      year: period.label,
       rawValue,
       value: rawValue === null ? null : rawValue / unitDivisors[props.unit]
     };
@@ -110,6 +121,7 @@ watch(chartOption, async (option) => {
   await nextTick();
   ensureChart();
   chart.value?.setOption(option, true);
+  chart.value?.resize();
 });
 
 onMounted(async () => {
@@ -125,7 +137,7 @@ onBeforeUnmount(() => {
 });
 
 function ensureChart(): void {
-  if (!chart.value && chartElement.value) {
+  if (hasData.value && !chart.value && chartElement.value) {
     chart.value = echarts.init(chartElement.value);
   }
 }
@@ -141,7 +153,9 @@ function parseNumericValue(value: number | string | null | undefined): number | 
   if (typeof value !== 'string') {
     return null;
   }
-  const numeric = Number(value.trim().replace(/,/g, ''));
+  const normalized = value.trim().replace(/,/g, '');
+  if (!normalized) return null;
+  const numeric = Number(normalized);
   return Number.isFinite(numeric) ? numeric : null;
 }
 
@@ -200,13 +214,51 @@ function escapeHtml(value: string): string {
       </button>
     </div>
 
+    <div v-if="reportPeriods" class="statement-trend-period-controls">
+      <label>
+        趋势口径
+        <select
+          aria-label="科目趋势报告期"
+          :value="selectedGroup?.key"
+          @change="selectedGroupKey = ($event.target as HTMLSelectElement).value"
+        >
+          <option v-for="group in periodGroups" :key="group.key" :value="group.key">{{ group.label }}</option>
+        </select>
+      </label>
+      <small>仅比较历年同类报告期；利润及现金流为报告期累计值</small>
+    </div>
+
     <div
-      v-if="hasData"
+      v-show="hasData"
       ref="chartElement"
       class="statement-item-trend-chart"
       role="img"
-      :aria-label="`${row.item} ${years.length} 年变化趋势，单位${unitLabels[unit]}`"
+      :aria-label="`${row.item} ${selectedGroup?.label ?? '年度'}变化趋势，共${points.length}期，单位${unitLabels[unit]}`"
     ></div>
-    <div v-else class="statement-item-trend-empty">当前选择年份没有可绘制的数值</div>
+    <div v-if="!hasData" class="statement-item-trend-empty">当前所选报告期没有可绘制的数值</div>
   </section>
 </template>
+
+<style scoped>
+.statement-trend-period-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.statement-trend-period-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.statement-trend-period-controls select {
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+}
+</style>

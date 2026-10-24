@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import StatementItemTrend from './StatementItemTrend.vue';
-import type { StatementTable } from '../types/finance';
+import type { ReportPeriod, StatementTable } from '../types/finance';
 
 type ValueDisplayUnit = 'raw' | 'wan' | 'yi';
 type StatementViewMode = 'value' | 'yoy' | 'ratio';
@@ -14,6 +14,7 @@ const props = defineProps<{
   activeYears: string[];
   columnLabels?: Record<string, string>;
   comparisonKeys?: Record<string, string>;
+  reportPeriods?: ReportPeriod[];
 }>();
 
 const unitDivisors: Record<ValueDisplayUnit, number> = {
@@ -208,7 +209,8 @@ function toggleSelectedRow(row: StatementRowLike): void {
   <StatementItemTrend
     v-if="selectedRow"
     :row="selectedRow"
-    :years="activeYears"
+    :years="reportPeriods ? table?.years ?? [] : activeYears"
+    :report-periods="reportPeriods"
     :unit="valueUnit"
     @close="selectedRow = null"
   />
