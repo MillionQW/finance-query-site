@@ -18,9 +18,9 @@ export class FinanceService {
     @Inject(FinanceStoreService) private readonly store: FinanceStoreService
   ) {}
 
-  async searchCompanies(query: string, market: Market): Promise<CompanySearchResult[]> {
+  async searchCompanies(query: string, market: Market, source?: string, signal?: AbortSignal): Promise<CompanySearchResult[]> {
     const localResults = this.store.findCompanies(query, market);
-    if (localResults.length > 0) {
+    if (source === 'local' || (!source && localResults.length > 0)) {
       return localResults;
     }
 
@@ -29,8 +29,9 @@ export class FinanceService {
       '--q',
       query,
       '--market',
-      market
-    ]);
+      market,
+      ...(source ? ['--source', source] : [])
+    ], undefined, signal);
     this.store.upsertCompanies(remoteResults);
     return remoteResults;
   }

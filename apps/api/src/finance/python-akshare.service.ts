@@ -25,7 +25,7 @@ export class PythonAkshareService {
   );
   private readonly exposeErrorDetails = process.env.AKSHARE_EXPOSE_ERROR_DETAILS === 'true';
 
-  async run<T>(args: string[], timeoutMs = this.defaultTimeoutMs): Promise<T> {
+  async run<T>(args: string[], timeoutMs = this.defaultTimeoutMs, signal?: AbortSignal): Promise<T> {
     if (!existsSync(this.bridgePath)) {
       throw new HttpException(
         `AKShare bridge not found: ${this.bridgePath}`,
@@ -33,7 +33,7 @@ export class PythonAkshareService {
       );
     }
 
-    const output = await this.spawnBridge(args, timeoutMs);
+    const output = await this.spawnBridge(args, timeoutMs, signal);
     let parsed: BridgeResult<T>;
     try {
       parsed = JSON.parse(output) as BridgeResult<T>;
@@ -86,7 +86,7 @@ export class PythonAkshareService {
     return candidates.find((candidate) => candidate === 'python' || existsSync(candidate)) ?? 'python';
   }
 
-  private spawnBridge(args: string[], timeoutMs?: number): Promise<string> {
+  private spawnBridge(args: string[], timeoutMs?: number, signal?: AbortSignal): Promise<string> {
     return new Promise((resolvePromise, reject) => {
       const child = spawn(this.pythonBin, [this.bridgePath, ...args], {
         cwd: resolve(__dirname, '..', '..'),
@@ -107,6 +107,7 @@ export class PythonAkshareService {
         ? setTimeout(() => {
             if (settled) return;
             settled = true;
+            signal?.removeEventListener('abort', cancel);
             child.kill('SIGKILL');
             reject(
               new HttpException(
@@ -126,9 +127,17 @@ export class PythonAkshareService {
       const finish = <T>(callback: () => T): T | undefined => {
         if (settled) return undefined;
         settled = true;
+        signal?.removeEventListener('abort', cancel);
         if (timeout) clearTimeout(timeout);
         return callback();
       };
+
+      const cancel = () => finish(() => {
+        child.kill('SIGKILL');
+        reject(new HttpException('Search cancelled.', HttpStatus.REQUEST_TIMEOUT));
+      });
+      signal?.addEventListener('abort', cancel, { once: true });
+      if (signal?.aborted) cancel();
 
       child.stdout.setEncoding('utf8');
       child.stderr.setEncoding('utf8');

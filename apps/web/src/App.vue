@@ -17,7 +17,7 @@ import {
   removeFavorite,
   saveFavorite,
   saveCompanyInsight,
-  searchCompanies,
+  searchCompaniesProgressively,
   triggerRefresh
 } from './services/api';
 import type {
@@ -507,7 +507,7 @@ function handleSearchEnter(): void {
 
 function moveSearchSelection(direction: 1 | -1): void {
   searchDropdownOpen.value = true;
-  if (searchLoading.value || searchError.value || !companies.value.length) return;
+  if (!companies.value.length) return;
   const count = companies.value.length;
   activeSearchIndex.value = activeSearchIndex.value < 0
     ? (direction > 0 ? 0 : count - 1)
@@ -523,6 +523,7 @@ function selectSearchMarket(value: MarketFilter): void {
 function selectSearchCompany(company: CompanySearchResult): void {
   searchRequestController?.abort();
   searchRequestController = null;
+  searchLoading.value = false;
   closeSearchDropdown();
   void selectCompany(company);
 }
@@ -565,20 +566,16 @@ async function runSearch(): Promise<void> {
   searchRequestController = requestController;
   searchLoading.value = true;
   searchError.value = null;
+  companies.value = [];
   try {
-    const results = await searchCompanies(text, market.value, requestController.signal);
-    if (requestController.signal.aborted) return;
-    companies.value = results;
-    if (results.length && !selectedCompany.value) {
-      await selectCompany(results[0]);
-    }
+    await searchCompaniesProgressively(text, market.value, requestController.signal, (results) => {
+      if (requestController.signal.aborted || searchRequestController !== requestController) return;
+      companies.value = results;
+      if (results.length) searchLoading.value = false;
+    });
   } catch (error) {
-    if (isAbortError(error)) return;
+    if (requestController.signal.aborted || searchRequestController !== requestController || isAbortError(error)) return;
     searchError.value = error instanceof Error ? error.message : '搜索失败';
-    companies.value = seedCompanies.filter(
-      (company) =>
-        market.value === 'all' || company.market === market.value
-    );
   } finally {
     if (searchRequestController === requestController) {
       searchRequestController = null;

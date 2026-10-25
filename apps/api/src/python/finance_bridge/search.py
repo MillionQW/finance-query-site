@@ -2,8 +2,30 @@ from .runtime import *  # noqa: F401,F403
 from .common import clean_value, emit, first_existing_column, normalize_a_symbol, normalize_hk_symbol, text_contains
 
 
-def search_a_shares(query: str, limit: int = 20) -> List[Dict[str, Any]]:
-    df = ak.stock_info_a_code_name()
+def search_a_shares(query: str, limit: int = 20, source: Optional[str] = None) -> List[Dict[str, Any]]:
+    # Fetch each board independently: one unavailable exchange must not discard
+    # the stock lists successfully returned by the others.
+    sources = [
+        ("深交所", ak.stock_info_sz_name_code, {"symbol": "A股列表"}, "A股代码", "A股简称"),
+        ("沪市主板", ak.stock_info_sh_name_code, {"symbol": "主板A股"}, "证券代码", "证券简称"),
+        ("科创板", ak.stock_info_sh_name_code, {"symbol": "科创板"}, "证券代码", "证券简称"),
+        ("北交所", ak.stock_info_bj_name_code, {}, "证券代码", "证券简称"),
+    ]
+    frames = []
+    errors = []
+    for source_id, (label, fetch, kwargs, source_code, source_name) in zip(["sz", "sh", "star", "bj"], sources):
+        if source and source != source_id:
+            continue
+        try:
+            frame = fetch(**kwargs)[[source_code, source_name]].copy()
+            frame.columns = ["code", "name"]
+            frame["code"] = frame["code"].astype(str).str.zfill(6)
+            frames.append(frame)
+        except Exception as exc:
+            errors.append(f"{label}: {exc}")
+    if not frames:
+        raise RuntimeError("全部 A 股数据源获取失败: " + "; ".join(errors))
+    df = pd.concat(frames, ignore_index=True).drop_duplicates(subset=["code"])
     code_col = first_existing_column(df, ["code", "代码", "证券代码"]) or df.columns[0]
     name_col = first_existing_column(df, ["name", "名称", "证券简称"]) or df.columns[1]
     matches = df[
@@ -20,7 +42,7 @@ def search_a_shares(query: str, limit: int = 20) -> List[Dict[str, Any]]:
                 "symbol": re.sub(r"\D", "", code),
                 "displaySymbol": display_symbol,
                 "name": str(row[name_col]).strip(),
-                "source": "AKShare stock_info_a_code_name",
+                "source": "AKShare exchange stock lists",
                 "latestPrice": None,
                 "changePercent": None,
             }
@@ -132,6 +154,10 @@ def handle_search(args: argparse.Namespace) -> None:
     query = args.q.strip()
     if not query:
         emit([])
+        return
+    source = getattr(args, "source", None)
+    if source:
+        emit(search_hk_shares(query) if source == "hk" else search_a_shares(query, source=source))
         return
     results: List[Dict[str, Any]] = []
     errors: List[str] = []

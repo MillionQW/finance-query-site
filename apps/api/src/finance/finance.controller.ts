@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Inject, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Inject, Param, Post, Put, Query, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { FinanceService } from './finance.service';
 import { FinanceRefreshService } from './finance-refresh.service';
 import { AnnouncementRefreshService } from './announcement-refresh.service';
@@ -32,8 +33,16 @@ export class FinanceController {
   }
 
   @Get('companies/search')
-  searchCompanies(@Query() query: SearchCompaniesDto) {
-    return this.finance.searchCompanies(query.q.trim(), query.market ?? 'all');
+  async searchCompanies(@Query() query: SearchCompaniesDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const controller = new AbortController();
+    const cancel = () => controller.abort();
+    res.on('close', cancel);
+    try {
+      if (req.aborted) controller.abort();
+      return await this.finance.searchCompanies(query.q.trim(), query.market ?? 'all', query.source, controller.signal);
+    } finally {
+      res.off('close', cancel);
+    }
   }
 
   @Get('finance/statements')

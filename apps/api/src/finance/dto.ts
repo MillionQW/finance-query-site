@@ -5,6 +5,10 @@ export type Market = 'all' | 'a' | 'hk';
 export type StatementType = 'balance' | 'income' | 'cashflow';
 
 export class SearchCompaniesDto {
+  @IsOptional()
+  @IsIn(['local', 'sz', 'sh', 'star', 'bj', 'hk'])
+  source?: 'local' | 'sz' | 'sh' | 'star' | 'bj' | 'hk';
+
   @IsString()
   @IsNotEmpty()
   q!: string;

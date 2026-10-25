@@ -17,6 +17,7 @@ import type {
 import type { EtfDetailResponse, EtfMarketResponse, EtfSortKey, EtfValuation, FavoriteEtf } from '../types/etf';
 import type { FavoriteIndex, IndexDetailResponse, IndexMarket, IndexMarketResponse, IndexValuation } from '../types/index';
 import { normalizeCompanyInsight } from './company-insight';
+import { progressiveSearch } from './progressive-search';
 import type { CompanyValuation } from '../types/company-valuation';
 import type { ValuationModel, ValuationSnapshot } from '../finance/scenario-valuation';
 
@@ -90,6 +91,18 @@ export function searchCompanies(
 ): Promise<CompanySearchResult[]> {
   const params = new URLSearchParams({ q, market });
   return request<CompanySearchResult[]>(`/companies/search?${params.toString()}`, { signal });
+}
+
+export function searchCompaniesProgressively(
+  q: string,
+  market: MarketFilter,
+  signal: AbortSignal,
+  onResults: (results: CompanySearchResult[]) => void
+): Promise<CompanySearchResult[]> {
+  return progressiveSearch(market, (source) => {
+    const params = new URLSearchParams({ q, market, source });
+    return request<CompanySearchResult[]>(`/companies/search?${params}`, { signal });
+  }, onResults, signal);
 }
 
 export function getStatements(

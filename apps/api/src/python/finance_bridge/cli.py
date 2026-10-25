@@ -31,6 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     search_parser = subparsers.add_parser("search")
     search_parser.add_argument("--q", required=True)
     search_parser.add_argument("--market", choices=["all", "a", "hk"], default="all")
+    search_parser.add_argument("--source", choices=["sz", "sh", "star", "bj", "hk"])
 
     statements_parser = subparsers.add_parser("statements")
     statements_parser.add_argument("--market", choices=["a", "hk"], required=True)
