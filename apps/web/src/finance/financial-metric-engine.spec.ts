@@ -55,6 +55,22 @@ test('field matching supports A-share aliases and traditional account characters
   assert.equal(findRow(statement, ['应付账款'])?.item, '应付帐款');
 });
 
+test('field lookup preserves exact-match priority and observes row edits after repeated lookups', () => {
+  const statement = table([
+    { item: '经营活动现金流量净额（调整前）', values: { '2025': 10 } },
+    { item: '经营活动现金流量净额', values: { '2025': 20 } }
+  ]);
+  const aliases = ['经营活动现金流量净额'];
+  assert.equal(rowValue(statement, '2025', aliases), 20);
+  assert.equal(rowValue(statement, '2025', aliases), 20);
+  statement.rows[1].values['2025'] = 30;
+  assert.equal(rowValue(statement, '2025', aliases), 30);
+  statement.rows[1].item = '其他';
+  assert.equal(rowValue(statement, '2025', aliases), 10);
+  assert.equal(findRow(statement, ['经营活动']), undefined);
+  assert.equal(findRow(statement, ['不存在']), undefined);
+});
+
 test('field matching covers A-share and Hong Kong research and impairment names', () => {
   const statement = table([
     { item: '研发费用', values: { '2025': 240 } },

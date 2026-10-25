@@ -170,23 +170,33 @@ export function calculateCashConversionCycle(
   return { receivableDays, inventoryDays, payableDays, cycle };
 }
 
+// Labels repeat across years, metrics and panels. Cache only this pure string
+// transformation, so edited rows and newly fetched statements stay current.
+const normalizedLabels = new Map<string, string>();
+const MAX_NORMALIZED_LABELS = 4096;
+
 export function normalizeLabel(value: string): string {
-  return value
+  const cached = normalizedLabels.get(value);
+  if (cached !== undefined) return cached;
+  const normalized = value
     .toLowerCase()
     .replace(/[()（）\s_、，,]/g, '')
     .replace(/帐/g, '账')
     .replace(/凈/g, '净');
+  if (normalizedLabels.size >= MAX_NORMALIZED_LABELS) normalizedLabels.clear();
+  normalizedLabels.set(value, normalized);
+  return normalized;
 }
 
 export function findRow(table: StatementTable | undefined, aliases: string[]) {
   if (!table) return undefined;
   const normalizedAliases = aliases.map(normalizeLabel);
-  const rows = table.rows.map((row) => ({ row, item: normalizeLabel(row.item) }));
-  const exact = rows.find(({ item }) => normalizedAliases.some((alias) => item === alias));
-  if (exact) return exact.row;
-  return rows.find(({ item }) =>
-    normalizedAliases.some((alias) => alias.length >= 6 && item.startsWith(alias))
-  )?.row;
+  const exact = table.rows.find((row) => normalizedAliases.includes(normalizeLabel(row.item)));
+  if (exact) return exact;
+  return table.rows.find((row) => {
+    const item = normalizeLabel(row.item);
+    return normalizedAliases.some((alias) => alias.length >= 6 && item.startsWith(alias));
+  });
 }
 
 export function findRows(table: StatementTable | undefined, aliases: string[]) {

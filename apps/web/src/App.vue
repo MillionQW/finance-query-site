@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import AppTopbar from './components/AppTopbar.vue';
 import CompanyNoteDialog from './components/CompanyNoteDialog.vue';
 import CompanyResearchView from './components/CompanyResearchView.vue';
@@ -64,7 +64,9 @@ const query = ref(initialCompany.name);
 const market = ref<MarketFilter>(initialCompany.market);
 const companies = ref<CompanySearchResult[]>(mergeCompanyList([initialCompany], seedCompanies));
 const selectedCompany = ref<CompanySearchResult | null>(initialCompany);
-const statements = ref<FinancialStatements | null>(null);
+// API snapshots are replaced as a whole; proxying every financial cell makes
+// repeated metric calculations unnecessarily expensive.
+const statements = shallowRef<FinancialStatements | null>(null);
 const peerComparison = ref<PeerComparison | null>(null);
 const announcementFeed = ref<AnnouncementFeed | null>(null);
 const activeStatement = ref<StatementType>('balance');
