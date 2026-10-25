@@ -12,7 +12,7 @@ import {
   getFavorites,
   getPeerComparison,
   getRefreshStatus,
-  getStatements,
+  getStatementsProgressively,
   markAnnouncementsViewed,
   removeFavorite,
   saveFavorite,
@@ -609,7 +609,17 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
   void loadAnnouncements(company, signal);
   void loadCompanyInsight(company, signal);
   try {
-    const payload = await getStatements(company.market, company.symbol, 0, refresh, signal);
+    const payload = await getStatementsProgressively(company.market, company.symbol, refresh, signal, (batch) => {
+      if (signal.aborted || requestId !== statementRequestId || !sameCompany(company, selectedCompany.value)) return;
+      const previousYears = new Set(statements.value?.years ?? []);
+      const firstBatch = !statements.value;
+      statements.value = batch;
+      selectedYears.value = [...selectedYears.value.filter((year) => batch.years.includes(year)),
+        ...batch.years.filter((year) => !previousYears.has(year))];
+      if (firstBatch) {
+        activeStatement.value = batch.tables.find((table) => table.rows.length)?.type ?? 'balance';
+      }
+    });
     if (requestId !== statementRequestId || !sameCompany(company, selectedCompany.value)) {
       return;
     }
@@ -624,11 +634,9 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
       companies.value = mergeCompanyList([enrichedCompany], companies.value);
       rememberRecentCompany(enrichedCompany);
     }
-    selectedYears.value = [...payload.years];
   } catch (error) {
     if (requestId === statementRequestId && !isAbortError(error)) {
-      statements.value = null;
-      selectedYears.value = [];
+      if (statements.value) statements.value = { ...statements.value, loading: false, partial: true };
       statementError.value = error instanceof Error ? error.message : '财报查询失败';
     }
   } finally {

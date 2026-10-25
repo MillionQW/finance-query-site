@@ -18,6 +18,7 @@ import type { EtfDetailResponse, EtfMarketResponse, EtfSortKey, EtfValuation, Fa
 import type { FavoriteIndex, IndexDetailResponse, IndexMarket, IndexMarketResponse, IndexValuation } from '../types/index';
 import { normalizeCompanyInsight } from './company-insight';
 import { progressiveSearch } from './progressive-search';
+import { consumeStatementStream } from './statement-stream';
 import type { CompanyValuation } from '../types/company-valuation';
 import type { ValuationModel, ValuationSnapshot } from '../finance/scenario-valuation';
 
@@ -117,6 +118,28 @@ export function getStatements(
     params.set('refresh', 'true');
   }
   return request<FinancialStatements>(`/finance/statements?${params.toString()}`, { signal });
+}
+
+export async function getStatementsProgressively(
+  market: Market, symbol: string, refresh: boolean, signal: AbortSignal,
+  onProgress: (data: FinancialStatements) => void
+): Promise<FinancialStatements> {
+  const params = new URLSearchParams({ market, symbol, years: '0', refresh: String(refresh) });
+  const controller = new AbortController();
+  const cancel = () => controller.abort(signal.reason);
+  signal.addEventListener('abort', cancel, { once: true });
+  if (signal.aborted) cancel();
+  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${API_BASE}/finance/statements/stream?${params}`, { signal: controller.signal });
+    return await consumeStatementStream(response, onProgress, controller.signal);
+  } catch (error) {
+    if (controller.signal.aborted && !signal.aborted) throw new Error('财报拉取超时，已收到的数据仍可查看，请重试补齐');
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+    signal.removeEventListener('abort', cancel);
+  }
 }
 
 export function getAnnouncements(market: Market, symbol: string, signal?: AbortSignal): Promise<AnnouncementFeed> {

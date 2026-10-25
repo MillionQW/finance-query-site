@@ -352,6 +352,7 @@ export interface FinancialStatements {
   source: string;
   listingYear?: number | null;
   partial?: boolean;
+  loading?: boolean;
   fetchWarnings?: string[];
   cache?: {
     hit: boolean;

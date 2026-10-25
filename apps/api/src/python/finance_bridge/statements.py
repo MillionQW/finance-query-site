@@ -1,4 +1,8 @@
 from .runtime import *  # noqa: F401,F403
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from queue import Queue, Empty
+from .request_trace import trace_requests, record
+from .common import REAL_STDOUT, json_default
 from .common import (
     STATEMENT_TITLES,
     build_highlights,
@@ -37,6 +41,8 @@ def eastmoney_get_json(url: str, params: Dict[str, Any], attempts: int = 3) -> D
             response.raise_for_status()
             return response.json()
         except (requests.RequestException, ValueError) as exc:
+            record('request_attempt_failed', endpoint=url, attempt=attempt + 1,
+                   errorType=type(exc).__name__, dates=params.get('dates'))
             last_error = exc
             if attempt + 1 < attempts:
                 time.sleep(0.6 * (2**attempt))
@@ -72,6 +78,7 @@ def call_a_report(
     symbol: str,
     company_type: str,
     listing_year: Optional[int],
+    on_batch=None,
 ) -> "pd.DataFrame":
     date_endpoint, data_endpoint = A_REPORT_ENDPOINTS[statement_type]
     base_url = "https://emweb.securities.eastmoney.com/PC_HSF10/NewFinanceAnalysis"
@@ -89,22 +96,28 @@ def call_a_report(
         if date and year and (listing_year is None or int(year) >= listing_year):
             dates.append(date)
 
+    dates = sorted(set(dates), reverse=True)
     batches = [dates[index : index + 5] for index in range(0, len(dates), 5)]
     frames: List[pd.DataFrame] = []
     failed_batches: List[str] = []
-    for batch in batches:
-        params = {
-            **common_params,
-            "reportType": "1",
-            "dates": ",".join(batch),
-        }
-        try:
-            payload = eastmoney_get_json(f"{base_url}/{data_endpoint}", params)
-            rows = payload.get("data") or []
-            if rows:
-                frames.append(pd.DataFrame(rows))
-        except Exception as exc:
-            failed_batches.append(f"{batch[-1]}..{batch[0]}: {exc}")
+    def fetch_batch(batch):
+        params = {**common_params, "reportType": "1", "dates": ",".join(batch)}
+        payload = eastmoney_get_json(f"{base_url}/{data_endpoint}", params)
+        return pd.DataFrame(payload.get("data") or [])
+
+    # Two batches per table, at most six report requests across three tables.
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        pending = {executor.submit(fetch_batch, batch): batch for batch in batches}
+        for future in as_completed(pending):
+            batch = pending[future]
+            try:
+                frame = future.result()
+                if not frame.empty:
+                    frames.append(frame)
+                    if on_batch:
+                        on_batch(pd.concat(frames, ignore_index=True))
+            except Exception as exc:
+                failed_batches.append(f"{batch[-1]}..{batch[0]}: {exc}")
 
     if not frames and failed_batches:
         raise RuntimeError(f"Eastmoney {statement_type} report batches all failed: {failed_batches[0]}")
@@ -232,66 +245,19 @@ def report_period_keys(
     return sorted(periods, reverse=True)
 
 
-def handle_statements(args: argparse.Namespace) -> None:
+def build_statement_payload(args, annual_reports, period_reports, listing_year, fetch_warnings, loading=False):
     from .statement_metadata import statement_metadata
-    # years=0 is the public "since listing" mode. 200 is only a defensive ceiling,
-    # not a business window; the listing year below determines the actual start.
     years_limit = 200 if int(args.years) <= 0 else max(1, min(int(args.years), 200))
-    tables: List[Dict[str, Any]] = []
-    annual_reports: List[pd.DataFrame] = []
-    period_reports: List[pd.DataFrame] = []
-    fetch_warnings: List[str] = []
+    tables = [normalize_report_dataframe(report, key, title, years_limit)
+              for report, (key, title) in zip(annual_reports, STATEMENT_TITLES.items())]
     if args.market == "a":
         api_symbol, display_symbol = normalize_a_symbol(args.symbol)
         company_symbol = re.sub(r"\D", "", api_symbol)
-        listing_year = extract_listing_year("a", company_symbol)
-        company_type = get_a_company_type(api_symbol)
-        for statement_type, title in STATEMENT_TITLES.items():
-            try:
-                df = call_a_report(statement_type, api_symbol, company_type, listing_year)
-            except Exception as exc:
-                fetch_warnings.append(f"{statement_type}: {exc}")
-                df = pd.DataFrame()
-            fetch_warnings.extend(
-                f"{statement_type}: {warning}" for warning in df.attrs.get("fetch_warnings", [])
-            )
-            annual_reports.append(df)
-            period_reports.append(df)
-            tables.append(normalize_report_dataframe(df, statement_type, title, years_limit))
-        if not any(not report.empty for report in annual_reports):
-            raise RuntimeError("All A-share financial statement requests failed")
-        company = {
-            "market": "a",
-            "symbol": company_symbol,
-            "displaySymbol": display_symbol,
-            "name": extract_company_name(*annual_reports),
-        }
-        source = "AKShare Eastmoney A-share annual and reporting-period APIs"
     else:
-        api_symbol, display_symbol = normalize_hk_symbol(args.symbol)
-        listing_year = extract_listing_year("hk", api_symbol)
-        for statement_type, title in STATEMENT_TITLES.items():
-            annual_df = call_hk_report(statement_type, api_symbol, "年度")
-            annual_reports.append(annual_df)
-            tables.append(
-                normalize_report_dataframe(
-                    annual_df, statement_type, title, years_limit
-                )
-            )
-            try:
-                period_df = call_hk_report(statement_type, api_symbol, "报告期")
-            except Exception as exc:
-                fetch_warnings.append(f"{statement_type} reporting periods: {exc}")
-                period_df = pd.DataFrame()
-            period_reports.append(period_df)
-        company = {
-            "market": "hk",
-            "symbol": api_symbol,
-            "displaySymbol": display_symbol,
-            "name": extract_company_name(*annual_reports, *period_reports),
-        }
-        source = "AKShare Eastmoney HK annual and reporting-period API"
-
+        company_symbol, display_symbol = normalize_hk_symbol(args.symbol)
+    company = {"market": args.market, "symbol": company_symbol, "displaySymbol": display_symbol,
+               "name": extract_company_name(*annual_reports, *period_reports)}
+    source = "AKShare Eastmoney financial reports"
     filter_tables_from_year(tables, listing_year)
     years = merge_years(tables, years_limit)
     period_tables = [
@@ -325,7 +291,86 @@ def handle_statements(args: argparse.Namespace) -> None:
         "fetchedAt": datetime.now(timezone.utc).isoformat(),
         "source": source,
         "listingYear": listing_year,
-        "partial": bool(fetch_warnings),
+        "partial": loading or bool(fetch_warnings),
+        "loading": loading,
         "fetchWarnings": fetch_warnings,
     }
-    emit(payload)
+    return payload
+
+
+def handle_statements(args):
+    with trace_requests(args.market, args.symbol) as log:
+        _fetch_statements(args, log)
+
+
+def _fetch_statements(args, log):
+    events = Queue()
+    annual = [pd.DataFrame() for _ in STATEMENT_TITLES]
+    periods = [pd.DataFrame() for _ in STATEMENT_TITLES]
+    warnings = []
+    listing_year = None
+    api_symbol = normalize_a_symbol(args.symbol)[0] if args.market == "a" else normalize_hk_symbol(args.symbol)[0]
+
+    def worker(index, key, company_type):
+        try:
+            if args.market == "a":
+                frame = call_a_report(key, api_symbol, company_type, None,
+                                      lambda frame: events.put(("batch", index, frame, frame)))
+                events.put(("batch", index, frame, frame))
+                if frame.empty:
+                    events.put(("warning", f"{key}: 接口未返回报表数据"))
+                for warning in frame.attrs.get("fetch_warnings", []):
+                    events.put(("warning", f"{key}: {warning}"))
+            else:
+                # Annual and reporting-period variants complete independently.
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    jobs = {pool.submit(call_hk_report, key, api_symbol, kind): kind
+                            for kind in ["年度", "报告期"]}
+                    for future in as_completed(jobs):
+                        kind = jobs[future]
+                        try:
+                            frame = future.result()
+                            if frame.empty:
+                                events.put(("warning", f"{key} {kind}: 接口未返回报表数据"))
+                            events.put(("hk_batch", index, kind, frame))
+                        except Exception as exc:
+                            events.put(("warning", f"{key} {kind}: {exc}"))
+        except Exception as exc:
+            events.put(("warning", f"{key}: {exc}"))
+        finally:
+            events.put(("done", index))
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        listing = pool.submit(extract_listing_year, args.market, args.symbol)
+        company_type = get_a_company_type(api_symbol) if args.market == "a" else None
+        for index, key in enumerate(STATEMENT_TITLES):
+            pool.submit(worker, index, key, company_type)
+        done = 0
+        last_emit = 0.0
+        while done < 3 or not listing.done():
+            try:
+                event = events.get(timeout=0.1)
+            except Empty:
+                continue
+            if event[0] == "batch":
+                _, index, annual[index], periods[index] = event
+            elif event[0] == "hk_batch":
+                _, index, kind, frame = event
+                (annual if kind == "年度" else periods)[index] = frame
+            elif event[0] == "warning":
+                warnings.append(event[1])
+                log("batch_failed", detail=event[1][:2000])
+            elif event[0] == "done":
+                done += 1
+            if listing.done():
+                listing_year = listing.result()
+            if getattr(args, "stream", False) and any(not frame.empty for frame in annual + periods):
+                now = time.monotonic()
+                if now-last_emit >= 0.3 or event[0] == "done":
+                    payload = build_statement_payload(args, annual, periods, listing_year, warnings, loading=True)
+                    print(json.dumps({"progress": True, "data": payload}, ensure_ascii=False, default=json_default), file=REAL_STDOUT, flush=True)
+                    last_emit = now
+        listing_year = listing.result()
+    if not any(not frame.empty for frame in annual + periods):
+        raise RuntimeError("全部财报请求失败")
+    emit(build_statement_payload(args, annual, periods, listing_year, warnings))

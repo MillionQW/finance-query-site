@@ -55,6 +55,27 @@ export class FinanceController {
     );
   }
 
+  @Get('finance/statements/stream')
+  async streamStatements(@Query() query: StatementQueryDto, @Res() response: Response) {
+    response.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    response.setHeader('Cache-Control', 'no-cache, no-transform');
+    response.setHeader('X-Accel-Buffering', 'no');
+    response.flushHeaders();
+    const send = (event: unknown) => {
+      if (!response.destroyed && !response.writableEnded) response.write(JSON.stringify(event) + '\n');
+    };
+    // The shared job continues warming the cache if the user changes companies.
+    try {
+      const data = await this.finance.getStatements(query.market, query.symbol.trim(), query.years ?? 0,
+        query.refresh ?? false, (data) => send({ type: 'progress', data }));
+      send({ type: 'complete', data });
+    } catch (error) {
+      send({ type: 'error', message: error instanceof Error ? error.message : '财报拉取失败' });
+    } finally {
+      response.end();
+    }
+  }
+
   @Get('finance/peers')
   getPeerComparison(@Query() query: PeerQueryDto) {
     return this.finance.getPeerComparison(

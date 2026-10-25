@@ -37,6 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     statements_parser.add_argument("--market", choices=["a", "hk"], required=True)
     statements_parser.add_argument("--symbol", required=True)
     statements_parser.add_argument("--years", type=int, default=0)
+    statements_parser.add_argument("--stream", action="store_true")
 
     peers_parser = subparsers.add_parser("peers")
     peers_parser.add_argument("--market", choices=["a", "hk"], required=True)

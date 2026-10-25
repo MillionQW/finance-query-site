@@ -146,6 +146,7 @@ npm run build
 - `GET /api/companies/search?q=腾讯&market=all`
 - `GET /api/finance/statements?market=hk&symbol=00700`
 - `GET /api/finance/statements?market=a&symbol=600519`
+- `GET /api/finance/statements/stream?market=a&symbol=600809&years=0` 返回 NDJSON：`progress` 为累计报表快照，`complete` 为最终结果，`error` 表示拉取失败；已有数据继续可用。
 - `GET /api/finance/statements?market=hk&symbol=00700&refresh=true` 强制重新拉取并更新 SQLite
 - `GET /api/cache/stats` 查看本地库统计
 - `GET /api/finance/research/:market/:symbol` 读取业务与假设记录
@@ -168,7 +169,11 @@ data\finance.sqlite
 - 后端先按 `market + symbol + years` 查询 SQLite。
 - 命中缓存时直接返回本地 JSON，避免重复请求 AKShare。
 - 未命中时调用 AKShare，成功后同时写入完整响应和拆分后的明细表。
-- 点击前端“刷新”会带上 `refresh=true`，强制重新拉取并覆盖本地快照。
+- 点击前端“刷新”会带上 `refresh=true`，完整拉取成功后更新本地快照；部分结果不会覆盖完整缓存。
+
+首次加载时，三张财报并行拉取，A 股每张表最多并发两个历史批次（每批五个报告期，较新报告期优先提交）。页面先显示已返回报表，其他批次继续补齐；数据未齐时暂不展示分析指标。切换公司后，已有后台任务继续完成缓存，同一公司同一年限的请求复用一个任务。
+
+财报外部请求日志位于 `data/logs/upstream-requests-YYYY-MM-DD-任务ID.jsonl`，按拉取任务分文件，保留 14 天（下次财报任务启动时清理）。每条记录含任务 ID、请求 ID、股票代码、接口地址、报告期、HTTP 状态、耗时毫秒数或异常类型；记录请求开始、完成、失败、重试及整个桥接任务超时。只记录允许的查询参数，不记录鉴权头或完整响应正文。同一任务的 Node 与 Python 日志通过任务 ID 关联；`request_started` 没有对应结束记录时，可结合 `bridge_timeout` 定位尚未完成的请求。
 
 为后续搜索和图表预留的表：
 

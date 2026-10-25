@@ -222,7 +222,7 @@ defineEmits<{
           <small>缓存刷新：{{ formatDate(statements?.cache?.refreshedAt) }}</small>
         </div>
 
-        <ResearchSummaryPanel :statements="statements" />
+        <ResearchSummaryPanel :statements="statements?.partial ? null : statements" />
 
         <ResearchDossierPanel :insight="activeCompanyInsight" @edit="$emit('openNote')" />
 
@@ -234,13 +234,21 @@ defineEmits<{
           :error="announcementError"
         />
 
-        <div v-if="statementLoading" class="loading-panel company-loading-panel" role="status" aria-live="polite">
+        <div v-if="statementLoading && !statements" class="loading-panel company-loading-panel" role="status" aria-live="polite">
           <Loader2 class="spin-icon" :size="22" />
           <strong>正在读取 {{ selectedCompany?.name ?? '个股' }} 财报数据</strong>
           <span>本地没有缓存时会通过 AKShare 拉取，请稍候...</span>
         </div>
 
         <template v-else>
+        <div v-if="statementLoading" class="status-banner" role="status" aria-live="polite">
+          <Loader2 class="spin-icon" :size="18" />
+          <span>已收到部分财报，可先查看报表；其余历史数据正在补齐，分析指标将在加载完成后显示。</span>
+        </div>
+        <div v-else-if="statements?.partial && !statementError" class="status-banner" role="status">
+          <AlertTriangle :size="18" />
+          <span>部分财报未能拉取，已保留成功返回的报表。分析指标暂不显示，请刷新补齐。</span>
+        </div>
         <div v-if="statementError" class="status-banner">
           <AlertTriangle :size="18" />
           <span>{{ statementError }}</span>
@@ -258,14 +266,14 @@ defineEmits<{
           </button>
         </div>
 
-        <PeriodAnalysisPanel :statements="statements" />
-        <OperatingChangesPanel :statements="statements" />
-        <ScenarioValuationPanel v-if="selectedCompany" :key="companyKey(selectedCompany)" :company="selectedCompany" :statements="statements" />
+        <PeriodAnalysisPanel :statements="statements?.partial ? null : statements" />
+        <OperatingChangesPanel :statements="statements?.partial ? null : statements" />
+        <ScenarioValuationPanel v-if="selectedCompany" :key="companyKey(selectedCompany)" :company="selectedCompany" :statements="statements?.partial ? null : statements" />
         <ResearchTrackingWorkspace v-if="selectedCompany" :key="companyKey(selectedCompany)" :company="selectedCompany" />
 
-        <FinancialDriverPanel :statements="statements" />
+        <FinancialDriverPanel :statements="statements?.partial ? null : statements" />
 
-        <div class="insight-grid">
+        <div v-if="!statements?.partial" class="insight-grid">
           <MiniTrend :series="statements?.highlights ?? []" />
           <div class="metric-cards">
             <article v-for="card in summaryCards" :key="card.key" class="metric-card">
@@ -286,7 +294,7 @@ defineEmits<{
           :error="peerError"
         />
 
-        <CustomMetricChart :statements="statements" :active-years="activeYears" />
+        <CustomMetricChart :statements="statements?.partial ? null : statements" :active-years="activeYears" />
 
         <div class="toolbar">
           <div class="tabs">

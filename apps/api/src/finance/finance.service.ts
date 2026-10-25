@@ -10,6 +10,7 @@ export class FinanceService {
   private readonly peerCacheDays = this.readPositiveNumber(process.env.FINANCE_PEER_CACHE_DAYS, 7);
   private readonly screenerCacheDays = this.readPositiveNumber(process.env.FINANCE_SCREENER_CACHE_DAYS, 7);
   private readonly statementRequests = new Map<string, Promise<FinancialStatements>>();
+  private readonly statementProgress = new Map<string, { latest?: FinancialStatements; listeners: Set<(data: FinancialStatements) => void> }>();
   private readonly peerRequests = new Map<string, Promise<PeerComparison>>();
   private readonly screenerRequests = new Map<string, Promise<ScreenerResult>>();
 
@@ -40,7 +41,8 @@ export class FinanceService {
     market: 'a' | 'hk',
     symbol: string,
     years: number,
-    refresh = false
+    refresh = false,
+    onProgress?: (data: FinancialStatements) => void
   ): Promise<FinancialStatements> {
     const normalizedSymbol = normalizeSymbol(market, symbol);
     if (!refresh) {
@@ -53,8 +55,18 @@ export class FinanceService {
     const requestKey = `${market}:${normalizedSymbol}:${years}`;
     const running = this.statementRequests.get(requestKey);
     if (running) {
-      return running;
+      const progress = this.statementProgress.get(requestKey);
+      if (onProgress) {
+        progress?.listeners.add(onProgress);
+        if (progress?.latest) onProgress(progress.latest);
+      }
+      try { return await running; }
+      finally { if (onProgress) progress?.listeners.delete(onProgress); }
     }
+
+    const progress = { latest: undefined as FinancialStatements | undefined, listeners: new Set<(data: FinancialStatements) => void>() };
+    if (onProgress) progress.listeners.add(onProgress);
+    this.statementProgress.set(requestKey, progress);
 
     const request = this.akshare
       .run<FinancialStatements>([
@@ -64,9 +76,15 @@ export class FinanceService {
         '--symbol',
         normalizedSymbol,
         '--years',
-        String(years)
-      ])
+        String(years),
+        '--stream'
+      ], undefined, undefined, (payload) => {
+        progress.latest = payload;
+        for (const listener of progress.listeners) listener(payload);
+      })
       .then((payload) => {
+        // Never replace a complete cache with an incomplete fetch.
+        if (payload.partial) return payload;
         this.store.saveStatements(payload, years);
         const stored = this.store.getStatements(market, normalizedSymbol, years);
         return {
@@ -79,6 +97,7 @@ export class FinanceService {
       })
       .finally(() => {
         this.statementRequests.delete(requestKey);
+        this.statementProgress.delete(requestKey);
       });
 
     this.statementRequests.set(requestKey, request);

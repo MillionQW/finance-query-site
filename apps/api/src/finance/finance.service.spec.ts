@@ -14,6 +14,17 @@ function createService(
   return new FinanceService(akshare, store);
 }
 
+test('incomplete statement fetch never replaces a complete cached version', async () => {
+  let saves = 0;
+  const payload = { partial: true, tables: [], years: [] } as unknown as FinancialStatements;
+  const service = createService(async <T>() => payload as T, {
+    getStatements: () => null,
+    saveStatements: () => { saves += 1; }
+  });
+  assert.equal(await service.getStatements('a', '600809', 0, true), payload);
+  assert.equal(saves, 0);
+});
+
 test('concurrent statement requests for the same company share one bridge process', async () => {
   let bridgeCalls = 0;
   let saves = 0;
