@@ -32,7 +32,11 @@ export function cleanHolding(value: unknown): HoldingInput {
   if (holdingCurrency !== 'CNY' && holdingCurrency !== 'HKD') throw new BadRequestException('持仓金额币种仅支持人民币或港币');
   if (!Number.isInteger(v.expectedVersion) || Number(v.expectedVersion) < 0) throw new BadRequestException('版本无效');
   if (typeof v.confirmValuation !== 'boolean') throw new BadRequestException('估值确认状态无效');
+  const buyPoint = pricePoint('buyPoint', '理想买点下限');
+  const buyPointUpper = v.buyPointUpper === undefined ? buyPoint : pricePoint('buyPointUpper', '理想买点上限');
+  if (Boolean(buyPoint) !== Boolean(buyPointUpper)) throw new BadRequestException('理想买点的下限和上限须同时填写，或同时留空');
+  if (buyPoint && Number(buyPoint) > Number(buyPointUpper)) throw new BadRequestException('理想买点下限不能大于上限');
   return { market: v.market, symbol: v.symbol as string, name, holdingValue: v.holdingValue as number | null, holdingCurrency,
-    valuation: text('valuation', 150), buyPoint: pricePoint('buyPoint', '理想买点'), sellPoint: pricePoint('sellPoint', '1年内卖点'),
+    valuation: text('valuation', 150), buyPoint, buyPointUpper, sellPoint: pricePoint('sellPoint', '1年内卖点'),
     note: text('note', 2000), confirmValuation: v.confirmValuation, expectedVersion: Number(v.expectedVersion) };
 }

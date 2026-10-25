@@ -6,6 +6,7 @@ export interface HoldingInput {
   holdingCurrency: 'CNY' | 'HKD';
   valuation: string;
   buyPoint: string;
+  buyPointUpper?: string;
   sellPoint: string;
   note: string;
   confirmValuation: boolean;

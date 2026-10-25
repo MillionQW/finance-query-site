@@ -1,5 +1,6 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PortfolioRepository } from './store/portfolio.repository';
+import { PerformanceRepository } from './store/performance.repository';
 import { ResearchTrackingRepository } from './store/research-tracking.repository';
 import { ValuationModelRepository } from './store/valuation-model.repository';
 import type { ValuationModelDto } from './valuation-model.dto';
@@ -55,6 +56,7 @@ export class FinanceStoreService implements OnModuleDestroy {
   private readonly valuationModelRepository: ValuationModelRepository;
   readonly researchTracking: ResearchTrackingRepository;
   readonly portfolio: PortfolioRepository;
+  readonly performance: PerformanceRepository;
 
   constructor() {
     mkdirSync(dirname(this.dbPath), { recursive: true });
@@ -71,6 +73,7 @@ export class FinanceStoreService implements OnModuleDestroy {
     this.valuationModelRepository = new ValuationModelRepository(this.db);
     this.researchTracking = new ResearchTrackingRepository(this.db);
     this.portfolio = new PortfolioRepository(this.db);
+    this.performance = new PerformanceRepository(this.db);
     this.refreshRepository.markInterruptedRefreshRuns();
   }
 

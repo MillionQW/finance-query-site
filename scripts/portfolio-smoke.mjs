@@ -60,11 +60,16 @@ try {
   assert.equal(await page.getByLabel('持仓金额币种', { exact: true }).inputValue(), 'HKD');
   await page.getByLabel('当前持仓总市值（元）', { exact: true }).fill('100000');
   await page.getByLabel('三年后估值（亿元人民币）', { exact: true }).fill('60000 ±10%');
-  await page.getByLabel('理想买点（亿元人民币）', { exact: true }).fill('30000');
+  await page.getByLabel('理想买点下限（亿元人民币）', { exact: true }).fill('30000');
+  await page.getByLabel('理想买点上限（亿元人民币）', { exact: true }).fill('20000');
+  await page.getByRole('button', { name: '保存修改', exact: true }).click();
+  await page.getByText('理想买点下限不能大于上限', { exact: true }).waitFor();
+  await page.getByLabel('理想买点上限（亿元人民币）', { exact: true }).fill('40000');
   await page.getByRole('button', { name: '保存修改', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'detached' });
   const first = (await api('/portfolio', undefined, 'GET'))[0];
   assert.equal(first.holdingValue, 100000); assert.equal(first.holdingCurrency, 'HKD'); assert.ok(first.valuationUpdatedAt);
+  assert.equal(first.buyPoint, '30000'); assert.equal(first.buyPointUpper, '40000');
   for (const [index, company] of companies.slice(1).entries()) {
     await api('/portfolio', { ...company, holdingValue: [100000, 0, 0, 0][index], holdingCurrency: 'CNY', valuation: '35000 ±10%', buyPoint: '17500',
       sellPoint: '44000', note: '', confirmValuation: false, expectedVersion: 0 });
@@ -78,8 +83,9 @@ try {
   const maotai = page.locator('tbody tr').filter({ hasText: '贵州茅台' });
   await row.getByText('47.37%', { exact: true }).waitFor();
   await maotai.getByText('52.63%', { exact: true }).waitFor();
-  await row.getByText(`约 ${(30000 / (35097 * .9) * 386).toLocaleString('zh-CN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} 港币/股`, { exact: true }).waitFor();
-  await maotai.getByText(`约 ${(17500 / 16688 * 1335).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 人民币/股`, { exact: true }).waitFor();
+  await row.getByText(`下限：约 ${(30000 / (35097 * .9) * 386).toLocaleString('zh-CN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} 港币/股`, { exact: true }).waitFor();
+  await row.getByText(`上限：约 ${(40000 / (35097 * .9) * 386).toLocaleString('zh-CN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} 港币/股`, { exact: true }).waitFor();
+  await maotai.getByText(`下限：约 ${(17500 / 16688 * 1335).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 人民币/股`, { exact: true }).waitFor();
   await page.locator('.portfolio-summary').getByText('190,000.00', { exact: false }).waitFor();
   fxRate = 1;
   await page.getByRole('button', { name: '刷新行情', exact: true }).click();
@@ -105,6 +111,8 @@ try {
   await row.getByText('过期数据，需要更新', { exact: true }).waitFor();
   await row.getByRole('button', { name: '编辑', exact: true }).click();
   assert.equal(await page.getByLabel('当前持仓总市值（元）', { exact: true }).inputValue(), '100000');
+  assert.equal(await page.getByLabel('理想买点下限（亿元人民币）', { exact: true }).inputValue(), '30000');
+  assert.equal(await page.getByLabel('理想买点上限（亿元人民币）', { exact: true }).inputValue(), '40000');
   assert.equal(await page.getByLabel('持仓金额币种', { exact: true }).inputValue(), 'HKD');
   await page.getByLabel('备注', { exact: true }).fill('只修改备注，不更新估值年份');
   await page.getByRole('button', { name: '保存修改', exact: true }).click();

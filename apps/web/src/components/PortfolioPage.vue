@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Plus, RefreshCw, Search, Wallet, AlertCircle } from 'lucide-vue-next';
 import HoldingEditor from './HoldingEditor.vue';
+import PortfolioPerformance from './PortfolioPerformance.vue';
 import { searchCompanies } from '../services/api';
 import { getHoldings, getPortfolioQuote, removeHolding, saveHolding } from '../services/portfolio';
 import { holdingSupported, portfolioDate, shanghaiYear, valuationExpired, holdingAllocation, impliedSharePrice } from '../finance/portfolio';
@@ -93,7 +94,7 @@ async function add(company: CompanySearchResult) {
   adding.value = true; searchError.value = '';
   try {
     const saved = await saveHolding(null, { market: company.market, symbol: company.symbol, name: company.name,
-      holdingValue: null, holdingCurrency: company.market === 'hk' ? 'HKD' : 'CNY', valuation: '', buyPoint: '', sellPoint: '', note: '', expectedVersion: 0, confirmValuation: false });
+      holdingValue: null, holdingCurrency: company.market === 'hk' ? 'HKD' : 'CNY', valuation: '', buyPoint: '', buyPointUpper: '', sellPoint: '', note: '', expectedVersion: 0, confirmValuation: false });
     holdings.value.push(saved); results.value = []; query.value = ''; editing.value = saved;
     void loadQuote(saved.market, saved.symbol);
   } catch (e) { searchError.value = e instanceof Error ? e.message : '添加失败'; }
@@ -133,6 +134,7 @@ onUnmounted(() => { abort.abort(); searchAbort?.abort(); window.clearInterval(ti
     <div v-if="error" role="alert" class="portfolio-error">{{ error }}</div>
     <p v-if="notice" role="status" class="portfolio-notice">{{ notice }}</p>
 
+    <PortfolioPerformance />
     <div class="portfolio-card">
       <form class="portfolio-search" @submit.prevent="search"><Plus :size="18" /><strong>添加企业</strong>
         <select v-model="market" aria-label="添加企业市场"><option value="all">A股和港股</option><option value="a">A股</option><option value="hk">港股</option></select>
@@ -157,7 +159,7 @@ onUnmounted(() => { abort.abort(); searchAbort?.abort(); window.clearInterval(ti
             <td :class="{ 'portfolio-expired': expired(h) }"><strong>{{ h.valuation || '未填写' }}</strong>
               <small v-if="h.valuationUpdatedAt">目标 {{ shanghaiYear(new Date(h.valuationUpdatedAt)) + 3 }} 年</small>
               <small>填写：{{ portfolioDate(h.valuationUpdatedAt) }}</small><span v-if="expired(h)" class="portfolio-expired-badge">过期数据，需要更新</span></td>
-            <td>{{ h.buyPoint || '—' }}<small>{{ targetPrice(h, h.buyPoint) }}</small></td><td>{{ h.sellPoint || '—' }}<small>{{ targetPrice(h, h.sellPoint) }}</small></td>
+            <td><template v-if="h.buyPoint">{{ h.buyPoint }} – {{ h.buyPointUpper ?? h.buyPoint }}<small>下限：{{ targetPrice(h, h.buyPoint) }}</small><small>上限：{{ targetPrice(h, h.buyPointUpper ?? h.buyPoint) }}</small></template><template v-else>—</template></td><td>{{ h.sellPoint || '—' }}<small>{{ targetPrice(h, h.sellPoint) }}</small></td>
             <td>{{ number(capCny(h)) }}<small v-if="quote(h)?.currency === 'HKD'">{{ number(quote(h)?.marketCap) }} 亿港币</small><small v-if="quote(h)?.currency === 'HKD' && !fx?.price">汇率缺失，暂不换算</small></td>
             <td>{{ number(quote(h)?.price, h.market === 'hk' ? 3 : 2) }} <small>{{ quote(h)?.currency || (h.market === 'hk' ? 'HKD' : 'CNY') }}</small>
               <small v-if="quote(h)">{{ portfolioDate(quote(h)!.quoteAt) }}</small><small v-if="loadingQuotes[key(h)]">正在更新…</small><small v-if="quotes[key(h)]?.error" class="portfolio-expired-text">{{ quotes[key(h)].error }}</small></td>

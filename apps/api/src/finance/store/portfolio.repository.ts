@@ -19,7 +19,7 @@ export class PortfolioRepository extends SqliteRepository {
         // Old percentages cannot establish a monetary holding value. Keep the
         // stored legacy payload untouched until the user explicitly edits it.
         const { weight: _legacyWeight, ...record } = JSON.parse(r.payload_json);
-        return { ...record, holdingValue: record.holdingValue ?? null, holdingCurrency: record.holdingCurrency ?? 'CNY' };
+        return { ...record, buyPointUpper: record.buyPointUpper ?? record.buyPoint, holdingValue: record.holdingValue ?? null, holdingCurrency: record.holdingCurrency ?? 'CNY' };
       });
   }
 
@@ -35,7 +35,7 @@ export class PortfolioRepository extends SqliteRepository {
       }
       const { confirmValuation, expectedVersion, ...fields } = input;
       const changed = Boolean(fields.valuation) && (fields.valuation !== old?.valuation || confirmValuation);
-      const record: Holding = { ...fields, id: id ?? 0, version: expectedVersion + 1, updatedAt: now,
+      const record: Holding = { ...fields, buyPointUpper: fields.buyPointUpper ?? fields.buyPoint, id: id ?? 0, version: expectedVersion + 1, updatedAt: now,
         valuationUpdatedAt: !fields.valuation ? null : changed ? now : old?.valuationUpdatedAt ?? null };
       if (id === null) {
         record.id = Number(this.db.prepare('INSERT INTO portfolio_holdings(market,symbol,version,payload_json) VALUES (?,?,?,?)')

@@ -9,6 +9,7 @@ export interface Holding {
   holdingCurrency: 'CNY' | 'HKD';
   valuation: string;
   buyPoint: string;
+  buyPointUpper?: string;
   sellPoint: string;
   note: string;
   version: number;
