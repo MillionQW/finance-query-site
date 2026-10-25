@@ -160,10 +160,14 @@ defineEmits<{
       <strong v-if="currentView === 'settings'">系统设置</strong>
       <strong v-else-if="currentView === 'etf'">ETF 研究</strong>
       <strong v-else-if="currentView === 'index'">指数研究</strong>
+      <strong v-else-if="currentView === 'portfolio'">持仓估值表</strong>
       <strong v-else>ROA/PE 筛选</strong>
     </div>
 
     <nav class="top-actions" aria-label="工具">
+      <button v-if="currentView !== 'portfolio'" class="ghost-button" type="button" @click="$emit('navigate', 'portfolio')">
+        <TrendingUp :size="17" />持仓
+      </button>
       <template v-if="currentView === 'company'">
         <button class="ghost-button" type="button" @click="$emit('navigate', 'screener')">
           <SlidersHorizontal :size="17" />筛选

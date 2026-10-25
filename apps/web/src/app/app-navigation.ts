@@ -1,7 +1,7 @@
 import type { CompanySearchResult, Market } from '../types/finance';
 
 export type UrlMode = 'push' | 'replace' | 'none';
-export type AppView = 'company' | 'settings' | 'etf' | 'index' | 'screener';
+export type AppView = 'company' | 'settings' | 'etf' | 'index' | 'screener' | 'portfolio';
 
 export const seedCompanies: CompanySearchResult[] = [
   { market: 'hk', symbol: '00700', displaySymbol: '00700.HK', name: '腾讯控股', source: 'seed' },
@@ -58,7 +58,7 @@ export function companyFromUrl(search = window.location.search): CompanySearchRe
 
 export function viewFromUrl(search = window.location.search): AppView {
   const view = new URLSearchParams(search).get('view');
-  return view === 'settings' || view === 'etf' || view === 'index' || view === 'screener'
+  return view === 'settings' || view === 'etf' || view === 'index' || view === 'screener' || view === 'portfolio'
     ? view
     : 'company';
 }
@@ -107,8 +107,8 @@ export function writeViewUrl(view: AppView, mode: 'push' | 'replace' = 'push'): 
     params.set('view', 'index');
     params.delete('etf');
     if (!params.get('index')) params.set('index', 'cn:000300');
-  } else if (view === 'screener') {
-    params.set('view', 'screener');
+  } else if (view === 'screener' || view === 'portfolio') {
+    params.set('view', view);
     params.delete('etf');
     params.delete('index');
   } else {

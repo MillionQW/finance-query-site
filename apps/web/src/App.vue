@@ -55,6 +55,7 @@ import { exportStatementCsv } from './app/export-statements';
 
 const EtfPage = defineAsyncComponent(() => import('./components/EtfPage.vue'));
 const IndexPage = defineAsyncComponent(() => import('./components/IndexPage.vue'));
+const PortfolioPage = defineAsyncComponent(() => import('./components/PortfolioPage.vue'));
 const ScreenerPage = defineAsyncComponent(() => import('./components/ScreenerPage.vue'));
 
 const initialCompany = companyFromUrl() ?? seedCompanies[0];
@@ -340,6 +341,10 @@ function navigateToView(view: AppView): void {
     openEtfPage();
   } else if (view === 'index') {
     openIndexPage();
+  } else if (view === 'portfolio') {
+    searchDropdownOpen.value = false;
+    syncViewUrl('portfolio');
+    window.scrollTo({ top: 0, behavior: 'auto' });
   } else {
     openScreenerPage();
   }
@@ -360,7 +365,7 @@ function handleUrlNavigation(): void {
     void Promise.all([loadRefreshStatus(), loadCacheEntries()]);
     return;
   }
-  if (currentView.value === 'etf' || currentView.value === 'index' || currentView.value === 'screener') return;
+  if (currentView.value === 'etf' || currentView.value === 'index' || currentView.value === 'screener' || currentView.value === 'portfolio') return;
 
   const company = companyFromUrl();
   if (!company) {
@@ -703,6 +708,7 @@ function updatePageTitle(): void {
     settings: '系统设置 - 财报查询台',
     etf: 'ETF 研究 - 财报查询台',
     index: '指数研究 - 财报查询台',
+    portfolio: '持仓估值表 - 财报查询台',
     screener: '低 PE 筛选 - 财报查询台'
   };
   document.title = currentView.value === 'company'
@@ -786,6 +792,7 @@ onUnmounted(() => {
 
       <EtfPage v-else-if="currentView === 'etf'" />
       <IndexPage v-else-if="currentView === 'index'" />
+      <PortfolioPage v-else-if="currentView === 'portfolio'" />
       <ScreenerPage v-else-if="currentView === 'screener'" />
 
       <CompanyResearchView

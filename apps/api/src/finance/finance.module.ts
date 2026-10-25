@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { PortfolioController } from './portfolio.controller';
+import { PortfolioService } from './portfolio.service';
 import { ResearchTrackingController } from './research-tracking.controller';
 import { BusinessSyncService } from './business-sync.service';
 import { ValuationModelController } from './valuation-model.controller';
@@ -17,8 +19,9 @@ import { CompanyValuationController } from './company-valuation.controller';
 import { CompanyValuationService } from './company-valuation.service';
 
 @Module({
-  controllers: [FinanceController, EtfController, IndexController, CompanyValuationController, ValuationModelController, ResearchTrackingController],
+  controllers: [FinanceController, EtfController, IndexController, CompanyValuationController, ValuationModelController, ResearchTrackingController, PortfolioController],
   providers: [
+    PortfolioService,
     BusinessSyncService,
     FinanceService,
     CompanyValuationService,

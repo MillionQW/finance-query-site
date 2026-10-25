@@ -9,11 +9,16 @@ from .etf import handle_etf_history, handle_etf_market, handle_etf_valuation
 from .index import handle_index_history, handle_index_market, handle_index_valuation
 from .valuation import handle_company_valuation
 from .business import handle_business
+from .portfolio import handle_portfolio_market
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="AKShare bridge for finance-query-site")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    portfolio_parser = subparsers.add_parser("portfolio-market")
+    portfolio_parser.add_argument("--market", choices=["a", "hk", "index", "fx"], required=True)
+    portfolio_parser.add_argument("--symbol", required=True)
 
     business_parser = subparsers.add_parser("business-segments")
     business_parser.add_argument("--market", choices=["a", "hk"], required=True)
@@ -81,7 +86,9 @@ def main() -> None:
     args = parser.parse_args()
     try:
         with contextlib.redirect_stdout(sys.stderr):
-            if args.command == "business-segments":
+            if args.command == "portfolio-market":
+                handle_portfolio_market(args)
+            elif args.command == "business-segments":
                 handle_business(args)
             elif args.command == "company-valuation":
                 handle_company_valuation(args)
