@@ -78,7 +78,12 @@ defineEmits<{
           @keydown.up.prevent="$emit('moveSearch', -1)"
           @keydown.esc.prevent="$emit('closeSearch')"
         />
-        <button type="button" :disabled="searchLoading" @click="$emit('submitSearch')">
+        <button
+          type="button"
+          :aria-disabled="searchLoading"
+          :aria-busy="searchLoading"
+          @click="!searchLoading && $emit('submitSearch')"
+        >
           <Loader2 v-if="searchLoading" class="spin-icon" :size="15" />
           <span>{{ searchLoading ? '搜索中' : '搜索' }}</span>
         </button>
