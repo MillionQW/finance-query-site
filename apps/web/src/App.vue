@@ -491,6 +491,7 @@ function handleSearchFocusOut(event: FocusEvent): void {
 }
 
 function submitSearch(): void {
+  market.value = 'all';
   searchDropdownOpen.value = true;
   resetSearchSelection();
   void runSearch();
@@ -517,7 +518,9 @@ function moveSearchSelection(direction: 1 | -1): void {
 function selectSearchMarket(value: MarketFilter): void {
   if (market.value === value) return;
   market.value = value;
-  submitSearch();
+  searchDropdownOpen.value = true;
+  resetSearchSelection();
+  void runSearch();
 }
 
 function selectSearchCompany(company: CompanySearchResult): void {
