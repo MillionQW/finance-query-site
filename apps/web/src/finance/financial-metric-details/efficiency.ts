@@ -27,10 +27,23 @@ export function efficiencyMetricDetails(
     };
   }
 
-  if (definition.key === 'inventoryTurnover') {
+  if (definition.key === 'receivablesToRevenue') {
+    const receivable = rowValue(context.balance, year, RECEIVABLE_ALIASES);
+    const revenue = rowValue(context.income, year, REVENUE_ALIASES);
+    const value = safeDivide(receivable, revenue);
+    return {
+      rows: [
+        { label: `${year} 应收账款`, value: receivable, note: '期末' },
+        { label: context.statements.company.market === 'hk' ? '年度营业额' : '年度营业收入', value: revenue, note: year }
+      ],
+      expression: `${formatRawValue(receivable)} / ${formatRawValue(revenue)} = ${formatMetricValue(value, definition.kind)}`
+    };
+  }
+
+  if (definition.key === 'inventoryTurnoverDays') {
     const cost = operatingCostDetails(context, year);
     const inventory = averageBalanceDetails(context, context.balance, year, yearIndex, INVENTORY_ALIASES);
-    const value = safeDivide(cost.costAbs, inventory.average);
+    const value = safeDivide(inventory.average === null ? null : inventory.average * 365, cost.costAbs);
     return {
       rows: [
         ...cost.rows,
@@ -38,7 +51,7 @@ export function efficiencyMetricDetails(
         { label: `${inventory.previousYear ?? '上年'} 存货`, value: inventory.previous, note: '期初' },
         { label: '存货平均余额', value: inventory.average, note: '(期初 + 期末) / 2' }
       ],
-      expression: `${formatRawValue(cost.costAbs)} / ${formatRawValue(inventory.average)} = ${formatMetricValue(value, definition.kind)}`
+      expression: `${formatRawValue(inventory.average)} × 365 / ${formatRawValue(cost.costAbs)} = ${formatMetricValue(value, definition.kind)}`
     };
   }
 

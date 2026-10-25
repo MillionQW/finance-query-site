@@ -22,22 +22,41 @@ export const efficiencyDefinitions: MetricDefinition[] = [
       )
   },
   {
-    key: 'inventoryTurnover',
-    label: '存货周转率',
+    key: 'receivablesToRevenue',
+    label: '应收账款占营业收入比',
     group: 'efficiency',
-    formula: '营业成本 / 存货平均余额',
-    kind: 'times',
-    description: '观察存货转化为销售成本的速度。',
+    formula: '期末应收账款 / 同年度营业收入',
+    kind: 'percent',
+    description: '观察期末应收账款相对于年度营收的规模。比例上升可能来自赊销增加、回款放缓或收入下降，需结合账龄、坏账准备、经营现金流和应收账款周转率判断。',
+    requirements: [
+      { label: '应收账款', table: 'balance', aliases: RECEIVABLE_ALIASES },
+      { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES }
+    ],
+    calculate: (context, year) =>
+      safeDivide(
+        rowValue(context.balance, year, RECEIVABLE_ALIASES),
+        rowValue(context.income, year, REVENUE_ALIASES)
+      )
+  },
+  {
+    key: 'inventoryTurnoverDays',
+    label: '存货周转天数',
+    group: 'efficiency',
+    formula: '存货平均余额 × 365 / 营业成本',
+    kind: 'days',
+    description: '按一年365天计算，观察存货平均周转一次所需的天数。存货平均余额为期初与期末余额的平均值；天数越短通常表示周转越快，需结合行业特点、季节性和备货策略判断。',
     requirements: [
       { label: '营业成本或毛利润', table: 'income', aliases: [...OPERATING_COST_ALIASES, ...GROSS_PROFIT_ALIASES] },
       { label: '营业收入', table: 'income', aliases: REVENUE_ALIASES },
       { label: '存货', table: 'balance', aliases: INVENTORY_ALIASES }
     ],
-    calculate: (context, year, yearIndex) =>
-      safeDivide(
-        operatingCostDetails(context, year).costAbs,
-        averageBalance(context, context.balance, year, yearIndex, INVENTORY_ALIASES)
-      )
+    calculate: (context, year, yearIndex) => {
+      const inventory = averageBalance(context, context.balance, year, yearIndex, INVENTORY_ALIASES);
+      return safeDivide(
+        inventory === null ? null : inventory * 365,
+        operatingCostDetails(context, year).costAbs
+      );
+    }
   },
   {
     key: 'fixedAssetTurnover',
