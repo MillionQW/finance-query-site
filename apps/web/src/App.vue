@@ -10,7 +10,6 @@ import {
   getAnnouncements,
   getCompanyInsight,
   getFavorites,
-  getPeerComparison,
   getRefreshStatus,
   getStatementsProgressively,
   markAnnouncementsViewed,
@@ -29,7 +28,6 @@ import type {
   FavoriteCompany,
   FinancialStatements,
   MarketFilter,
-  PeerComparison,
   StatementRefreshRuntimeStatus,
   StatementType
 } from './types/finance';
@@ -67,18 +65,15 @@ const selectedCompany = ref<CompanySearchResult | null>(initialCompany);
 // API snapshots are replaced as a whole; proxying every financial cell makes
 // repeated metric calculations unnecessarily expensive.
 const statements = shallowRef<FinancialStatements | null>(null);
-const peerComparison = ref<PeerComparison | null>(null);
 const announcementFeed = ref<AnnouncementFeed | null>(null);
 const activeStatement = ref<StatementType>('balance');
 const selectedYears = ref<string[]>([]);
 const searchLoading = ref(false);
 const statementLoading = ref(false);
-const peerLoading = ref(false);
 const cacheEntriesLoading = ref(false);
 const announcementLoading = ref(false);
 const searchError = ref<string | null>(null);
 const statementError = ref<string | null>(null);
-const peerError = ref<string | null>(null);
 const cacheEntriesError = ref<string | null>(null);
 const announcementError = ref<string | null>(null);
 const searchDropdownOpen = ref(false);
@@ -104,7 +99,6 @@ const buyPointDraft = ref('');
 const buyPointEditing = ref(false);
 let favoriteNoticeTimer: number | undefined;
 let statementRequestId = 0;
-let peerRequestId = 0;
 let announcementRequestId = 0;
 let insightRequestId = 0;
 let companyRequestController: AbortController | null = null;
@@ -603,9 +597,7 @@ async function selectCompany(company: CompanySearchResult, refresh = false, urlM
   statementError.value = null;
   statements.value = null;
   selectedYears.value = [];
-  peerComparison.value = null;
   activeStatement.value = 'balance';
-  void loadPeerComparison(company, signal);
   void loadAnnouncements(company, signal);
   void loadCompanyInsight(company, signal);
   try {
@@ -666,28 +658,6 @@ async function loadAnnouncements(company: CompanySearchResult, signal?: AbortSig
   } finally {
     if (requestId === announcementRequestId) {
       announcementLoading.value = false;
-    }
-  }
-}
-
-async function loadPeerComparison(company: CompanySearchResult, signal?: AbortSignal): Promise<void> {
-  const requestId = ++peerRequestId;
-  peerLoading.value = true;
-  peerError.value = null;
-  peerComparison.value = null;
-
-  try {
-    const payload = await getPeerComparison(company.market, company.symbol, 20, signal);
-    if (requestId === peerRequestId && !signal?.aborted) {
-      peerComparison.value = payload;
-    }
-  } catch (error) {
-    if (requestId === peerRequestId && !isAbortError(error)) {
-      peerError.value = error instanceof Error ? error.message : '同行对比获取失败';
-    }
-  } finally {
-    if (requestId === peerRequestId) {
-      peerLoading.value = false;
     }
   }
 }
@@ -826,9 +796,6 @@ onUnmounted(() => {
         :available-years="availableYears"
         :active-years="activeYears"
         :summary-cards="summaryCards"
-        :peer-comparison="peerComparison"
-        :peer-loading="peerLoading"
-        :peer-error="peerError"
         :active-table="activeTable"
         @select-company="selectCompany"
         @open-note="openNoteDialog"

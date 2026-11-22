@@ -21,7 +21,6 @@ import type {
   FavoriteCompany,
   FinancialStatements,
   MetricSeries,
-  PeerComparison,
   StatementTable,
   StatementType
 } from '../types/finance';
@@ -33,7 +32,6 @@ const PeriodAnalysisPanel = defineAsyncComponent(() => import('./PeriodAnalysisP
 const OperatingChangesPanel = defineAsyncComponent(() => import('./OperatingChangesPanel.vue'));
 const ScenarioValuationPanel = defineAsyncComponent(() => import('./ScenarioValuationPanel.vue'));
 const ResearchTrackingWorkspace = defineAsyncComponent(() => import('./ResearchTrackingWorkspace.vue'));
-const PeerComparisonPanel = defineAsyncComponent(() => import('./PeerComparisonPanel.vue'));
 const ResearchDossierPanel = defineAsyncComponent(() => import('./ResearchDossierPanel.vue'));
 const StatementTrustPanel = defineAsyncComponent(() => import('./StatementTrustPanel.vue'));
 const StatementTable = defineAsyncComponent(() => import('./StatementTable.vue'));
@@ -57,9 +55,6 @@ defineProps<{
   availableYears: string[];
   activeYears: string[];
   summaryCards: Array<MetricSeries & { year: string; latest: number | null; delta: number | null }>;
-  peerComparison: PeerComparison | null;
-  peerLoading: boolean;
-  peerError: string | null;
   activeTable: StatementTable | undefined;
 }>();
 
@@ -283,13 +278,6 @@ defineEmits<{
             </article>
           </div>
         </div>
-
-        <PeerComparisonPanel
-          :company="selectedCompany"
-          :comparison="peerComparison"
-          :loading="peerLoading"
-          :error="peerError"
-        />
 
         <CustomMetricChart :statements="statements?.partial ? null : statements" :active-years="activeYears" />
 
