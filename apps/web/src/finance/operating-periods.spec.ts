@@ -22,6 +22,15 @@ test('a missing previous quarter does not turn YTD into a quarter', () => {
   assert.equal(rows[0].revenue, null);
   assert.equal(rows[0].cash, null);
 });
+test('half-year view uses June YTD and subtracts it from the annual value for the second half', () => {
+  const input = fixture('a', ['2025-12-31','2025-09-30','2025-06-30','2024-12-31','2024-06-30'], [500,300,210,400,160]);
+  const rows = buildOperatingPeriods(input, 6);
+  assert.deepEqual(rows.map(row => [row.start, row.revenue]), [
+    ['2025-07-01', 290], ['2025-01-01', 210], ['2024-07-01', 240], ['2024-01-01', 160]
+  ]);
+  assert.equal(rows[0].revenueYoY, 290 / 240 - 1);
+  assert.equal(buildOperatingPeriods(fixture('a', ['2025-12-31'], [500]), 6)[0].revenue, null);
+});
 test('Hong Kong half years respect a March year end and never fabricate quarters', () => {
   const input = fixture('hk', ['2025-03-31', '2024-09-30', '2024-03-31', '2023-09-30'], [250,100,200,80], {
     '2025-03-31':'2024-04-01','2024-09-30':'2024-04-01','2024-03-31':'2023-04-01','2023-09-30':'2023-04-01'
@@ -32,6 +41,8 @@ test('Hong Kong half years respect a March year end and never fabricate quarters
   assert.equal(rows[0].revenue, 150);
   assert.equal(rows[0].revenueYoY, 0.25);
   assert.equal(rows[1].revenue, 100);
+  assert.deepEqual(buildOperatingPeriods(input, 3), []);
+  assert.deepEqual(buildOperatingPeriods(input, 6), rows);
 });
 test('unknown HK fiscal starts produce no guessed analysis', () => {
   assert.equal(buildOperatingPeriods(fixture('hk', ['2025-06-30'], [100])).length, 0);

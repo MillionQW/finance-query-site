@@ -53,6 +53,10 @@ try {
       return route.fulfill({contentType:'application/json',body:JSON.stringify({state,sync:{status:'empty',attemptedAt:new Date().toISOString(),lastSuccessAt:null,message:'测试源暂无分部数据',added:0,updated:0,protected:0,missing:0,sourceRows:0,skipped:0}})});
     }
     const company = companies.find(c => c.market === url.searchParams.get('market')) ?? companies[0];
+    if (path === '/api/finance/statements/stream') return route.fulfill({
+      contentType: 'application/x-ndjson',
+      body: JSON.stringify({ type: 'complete', data: statements(company) }) + '\n'
+    });
     let body;
     if (path === '/api/favorites') body = companies.map(c => ({ ...c, favoritedAt: '', updatedAt:'', hasUnreadAnnouncements: false, unreadAnnouncementCount:0 }));
     else if (path === '/api/finance/statements') body = statements(company);
@@ -87,10 +91,24 @@ try {
   assert.equal(await panel.getByRole('button', {name:'保存估值快照'}).isDisabled(), true);
   const operating = page.getByRole('region', {name:'最新经营变化',exact:true});
   assert.ok((await operating.innerText()).includes('2025-10-01—2025-12-31（单季）'));
+  assert.equal(await operating.getByRole('button', {name:'增长', pressed:true}).count(), 1);
+  assert.equal(await operating.getByRole('table').isVisible(), false);
+  await operating.getByRole('img', {name:/营收、归母净利润/}).locator('canvas').waitFor();
+  await operating.getByRole('button', {name:'利润率', exact:true}).click();
+  await operating.getByRole('img', {name:/毛利率、归母净利率/}).locator('canvas').waitFor();
+  await operating.getByRole('button', {name:'现金流', exact:true}).click();
+  await operating.getByRole('img', {name:'经营现金流与归母净利润'}).locator('canvas').waitFor();
+  await operating.getByRole('button', {name:'半年度', exact:true}).click();
+  await operating.getByText('经营数据明细', {exact:true}).click();
+  await operating.getByRole('table').getByText('2025-07-01—2025-12-31（半年）').waitFor();
+  await operating.getByText('经营数据明细', {exact:true}).click();
+  await operating.getByRole('button', {name:'单季', exact:true}).click();
+  await operating.getByRole('button', {name:'增长', exact:true}).click();
   await operating.screenshot({path:resolve(root,'data/research-operating.png')});
   await page.getByRole('button', {name:/港股验证公司/}).first().click();
   await panel.getByRole('button', {name:'导入最新年报利润'}).waitFor();
   await page.waitForFunction(() => document.querySelector('[aria-label="最新经营变化"]')?.textContent.includes('2024-10-01—2025-03-31（半年）'));
+  assert.equal(await operating.getByRole('button', {name:'单季', exact:true}).isDisabled(), true);
   assert.equal(await panel.getByLabel('基准利润（亿元）', {exact:true}).inputValue(), '');
   assert.equal(await panel.getByRole('button', {name:'导入最新年报利润'}).isDisabled(), true);
   await verifyResearchTracking(page,origin,root);

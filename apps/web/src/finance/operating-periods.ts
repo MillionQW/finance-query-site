@@ -48,7 +48,7 @@ export function comparableGrowth(current: number | null, previous: number | null
   return current === null || previous === null || previous <= 0 ? null : current / previous - 1;
 }
 
-export function buildOperatingPeriods(statements: FinancialStatements | null): OperatingPeriod[] {
+export function buildOperatingPeriods(statements: FinancialStatements | null, requestedMonths?: OperatingPeriod['months']): OperatingPeriod[] {
   if (!statements) return [];
   const income = statements.periodTables?.find(t => t.type === 'income');
   const cashflow = statements.periodTables?.find(t => t.type === 'cashflow');
@@ -71,7 +71,9 @@ export function buildOperatingPeriods(statements: FinancialStatements | null): O
       const n = (o.getUTCFullYear() - s.getUTCFullYear()) * 12 + o.getUTCMonth() - s.getUTCMonth() + 1;
       return n === 3 || n === 9;
     });
-    const months: 3 | 6 = hasQuarter ? 3 : 6;
+    if (requestedMonths === 3 && !hasQuarter) continue;
+    if (requestedMonths === 6 && duration !== 6 && duration !== 12) continue;
+    const months = requestedMonths ?? (hasQuarter ? 3 : 6);
     const start = monthStart(end, months);
     const read = (aliases: string[], table = income) => standalone(table, end, start, aliases, market);
     const revenue = read(REVENUE_ALIASES) ?? read(TOTAL_OPERATING_REVENUE_ALIASES);
