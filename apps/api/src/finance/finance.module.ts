@@ -18,11 +18,14 @@ import { IndexService } from './index.service';
 import { IndexStoreService } from './index-store.service';
 import { CompanyValuationController } from './company-valuation.controller';
 import { CompanyValuationService } from './company-valuation.service';
+import { MacroController } from './macro.controller';
+import { MacroService } from './macro.service';
 
 @Module({
-  controllers: [FinanceController, EtfController, IndexController, CompanyValuationController, ValuationModelController, ResearchTrackingController, PortfolioController, PerformanceController],
+  controllers: [FinanceController, EtfController, IndexController, CompanyValuationController, ValuationModelController, ResearchTrackingController, PortfolioController, PerformanceController, MacroController],
   providers: [
     PortfolioService,
+    MacroService,
     BusinessSyncService,
     FinanceService,
     CompanyValuationService,

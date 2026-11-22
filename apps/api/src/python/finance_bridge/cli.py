@@ -10,11 +10,17 @@ from .index import handle_index_history, handle_index_market, handle_index_valua
 from .valuation import handle_company_valuation
 from .business import handle_business
 from .portfolio import handle_portfolio_market
+from .macro import MACRO_IDS, handle_macro
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="AKShare bridge for finance-query-site")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    macro_parser = subparsers.add_parser("macro")
+    macro_parser.add_argument("--indicator", choices=[*MACRO_IDS, "releases"], required=True)
+    macro_parser.add_argument("--start-date")
+    macro_parser.add_argument("--release-pages", type=int, default=3)
 
     portfolio_parser = subparsers.add_parser("portfolio-market")
     portfolio_parser.add_argument("--market", choices=["a", "hk", "index", "fx"], required=True)
@@ -90,6 +96,8 @@ def main() -> None:
         with contextlib.redirect_stdout(sys.stderr):
             if args.command == "portfolio-market":
                 handle_portfolio_market(args)
+            elif args.command == "macro":
+                handle_macro(args)
             elif args.command == "business-segments":
                 handle_business(args)
             elif args.command == "company-valuation":

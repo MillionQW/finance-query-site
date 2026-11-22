@@ -1,5 +1,17 @@
 export function initializeFinanceStoreSchema(db: any): void {
   db.exec(`
+      CREATE TABLE IF NOT EXISTS macro_observations (
+        indicator TEXT NOT NULL, period TEXT NOT NULL, period_label TEXT, value REAL NOT NULL,
+        released_on TEXT, source TEXT NOT NULL, source_url TEXT NOT NULL,
+        PRIMARY KEY (indicator, period)
+      );
+      CREATE TABLE IF NOT EXISTS macro_releases (
+        indicator TEXT NOT NULL, period TEXT NOT NULL, released_on TEXT NOT NULL, release_url TEXT NOT NULL,
+        PRIMARY KEY (indicator, period)
+      );
+      CREATE TABLE IF NOT EXISTS macro_sync_state (
+        indicator TEXT PRIMARY KEY, attempted_at TEXT NOT NULL, synced_at TEXT, failed INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS company_business_sync (
         market TEXT NOT NULL, symbol TEXT NOT NULL, payload_json TEXT NOT NULL,
         PRIMARY KEY (market, symbol)
