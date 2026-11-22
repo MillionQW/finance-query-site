@@ -34,7 +34,6 @@ const OperatingChangesPanel = defineAsyncComponent(() => import('./OperatingChan
 const ScenarioValuationPanel = defineAsyncComponent(() => import('./ScenarioValuationPanel.vue'));
 const ResearchTrackingWorkspace = defineAsyncComponent(() => import('./ResearchTrackingWorkspace.vue'));
 const PeerComparisonPanel = defineAsyncComponent(() => import('./PeerComparisonPanel.vue'));
-const ResearchSummaryPanel = defineAsyncComponent(() => import('./ResearchSummaryPanel.vue'));
 const ResearchDossierPanel = defineAsyncComponent(() => import('./ResearchDossierPanel.vue'));
 const StatementTrustPanel = defineAsyncComponent(() => import('./StatementTrustPanel.vue'));
 const StatementTable = defineAsyncComponent(() => import('./StatementTable.vue'));
@@ -221,8 +220,6 @@ defineEmits<{
           <strong>{{ statementCacheLabel }}</strong>
           <small>缓存刷新：{{ formatDate(statements?.cache?.refreshedAt) }}</small>
         </div>
-
-        <ResearchSummaryPanel :statements="statements?.partial ? null : statements" />
 
         <ResearchDossierPanel :insight="activeCompanyInsight" @edit="$emit('openNote')" />
 
