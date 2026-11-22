@@ -13,7 +13,7 @@ const props = defineProps<{
   error: string | null;
 }>();
 
-type CategoryFilter = '重要' | AnnouncementCategory;
+type CategoryFilter = '全部' | '重要' | AnnouncementCategory;
 
 const categoryOrder: AnnouncementCategory[] = [
   '定期报告',
@@ -33,15 +33,23 @@ const categoryOrder: AnnouncementCategory[] = [
   '董事会',
   '风险提示'
 ];
-const activeCategory = ref<CategoryFilter>('重要');
+const activeCategory = ref<CategoryFilter>('全部');
+const allPreviewLimit = 10;
+const allExpanded = ref(false);
+const canExpandAll = computed(() =>
+  activeCategory.value === '全部' && (props.feed?.items.length ?? 0) > allPreviewLimit
+);
 
 const categories = computed<CategoryFilter[]>(() => {
   const present = new Set((props.feed?.items ?? []).map((item) => item.category));
-  return ['重要', ...categoryOrder.filter((category) => present.has(category))];
+  return ['全部', '重要', ...categoryOrder.filter((category) => present.has(category))];
 });
 
 const visibleItems = computed(() => {
   const items = props.feed?.items ?? [];
+  if (activeCategory.value === '全部') {
+    return allExpanded.value ? items : items.slice(0, allPreviewLimit);
+  }
   const filtered = activeCategory.value === '重要'
     ? items.filter((item) => !isRoutineAnnouncement(item))
     : items.filter((item) => item.category === activeCategory.value);
@@ -57,12 +65,14 @@ const visibleItems = computed(() => {
 watch(
   () => props.feed ? `${props.feed.company.market}:${props.feed.company.symbol}` : '',
   () => {
-    activeCategory.value = '重要';
+    activeCategory.value = '全部';
+    allExpanded.value = false;
   }
 );
 
 function categoryCount(category: CategoryFilter): number {
   const items = props.feed?.items ?? [];
+  if (category === '全部') return items.length;
   return category === '重要'
     ? items.filter((item) => !isRoutineAnnouncement(item)).length
     : items.filter((item) => item.category === category).length;
@@ -135,6 +145,22 @@ function formatDate(value: string | null | undefined): string {
         <time :datetime="item.publishedAt">{{ formatDate(item.publishedAt) }}</time>
         <ExternalLink :size="15" />
       </a>
+      <button
+        v-if="canExpandAll"
+        class="ghost-button announcement-expand"
+        type="button"
+        :aria-expanded="allExpanded"
+        @click="allExpanded = !allExpanded"
+      >
+        {{ allExpanded ? '收起' : '显示全部' }}
+      </button>
     </div>
   </section>
 </template>
+
+<style scoped>
+.announcement-expand {
+  justify-self: center;
+  margin-top: 5px;
+}
+</style>
