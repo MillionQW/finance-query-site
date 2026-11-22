@@ -15,7 +15,8 @@ export async function verifyResearchTracking(page, origin, root) {
   await business.getByLabel('原报告链接（选填）',{exact:true}).fill('https://example.com/report');
   await business.getByLabel('页码／附注位置',{exact:true}).fill('第50页');
   await business.getByRole('button',{name:'保存业务数据'}).click();
-  await business.getByRole('button',{name:'建立假设'}).waitFor();
+  const chart = business.getByRole('region',{name:'分业务指标对比图'});
+  await chart.getByText('本期 120 亿元',{exact:true}).waitFor();
   const endpoint=`${origin}/api/finance/research/a/600519`;
   let state=await (await fetch(endpoint)).json();
   assert.equal(state.business.length,1);
@@ -28,6 +29,11 @@ export async function verifyResearchTracking(page, origin, root) {
   await post('/business',{...actual.data,expectedVersion:0,dimension:'整体',segment:'公司整体',value:300});
   await post('/business',{...actual.data,expectedVersion:0,metric:'毛利',value:48});
   await page.getByRole('button',{name:'重新载入研究记录与估值快照'}).click();
+  await chart.getByText('上年同期 100 亿元',{exact:true}).waitFor();
+  const grossProfit = await chart.locator('option').filter({ hasText: /^毛利 · 业务/ }).getAttribute('value');
+  await chart.getByLabel('图表指标与口径').selectOption(grossProfit);
+  await chart.getByText('本期 48 亿元',{exact:true}).waitFor();
+  await business.getByText(/^业务明细与来源/).click();
   const row=business.locator('tbody tr').filter({has:page.getByText('业务 · 收入',{exact:true})}).filter({hasText:'广告'});
   await row.getByRole('button',{name:'建立假设'}).waitFor();
   assert.ok((await row.innerText()).includes('20.00%'));

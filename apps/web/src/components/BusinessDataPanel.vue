@@ -4,6 +4,7 @@ import type { BusinessData, ResearchEntry } from '../types/research-tracking';
 import { businessComparison,businessErrors,emptyBusiness,researchNumber as num,researchPercent as pct,dimensions } from '../finance/research-tracking';
 import ResearchMetricFields from './ResearchMetricFields.vue';
 import BusinessProvenance from './BusinessProvenance.vue';
+import BusinessComparisonChart from './BusinessComparisonChart.vue';
 const props = defineProps<{ entries: ResearchEntry<BusinessData>[]; save: (data:BusinessData,id:string|null,version:number)=>Promise<boolean> }>();
 const emit = defineEmits<{ hypothesis:[data:BusinessData]; history:[id:string] }>();
 const editing = ref(false), draft = ref(emptyBusiness()), editingId = ref<string|null>(null), version = ref(0), validation = ref<string[]>([]);
@@ -48,7 +49,11 @@ async function archive(entry:ResearchEntry<BusinessData>) { await props.save({..
       <label class="tracking-checkbox"><input v-model="showArchived" type="checkbox" />显示归档记录</label>
     </div>
     <p v-if="!visible.length">当前期间没有可用业务数据。自动抓取状态见上方，也可根据报告补录。同比需要两个相同口径的年度／半年度报告。</p>
-    <div v-else class="workbench-scroll"><table>
+    <template v-else>
+    <BusinessComparisonChart :entries="visible" />
+    <details class="business-data-details">
+    <summary>业务明细与来源（{{ visible.length }} 条）</summary>
+    <div class="workbench-scroll"><table>
       <thead><tr><th>分部 / 指标</th><th>披露值</th><th>上年同期 / 变化</th><th>占整体比例</th><th>分部毛利率</th><th>来源与口径</th><th>操作</th></tr></thead>
       <tbody><tr v-for="entry in visible" :key="entry.id" :class="{ 'tracking-archived':entry.data.archived }">
         <th>{{ entry.data.segment }}<small>{{ entry.data.dimension }} · {{ entry.data.metric }}{{ entry.data.archived ? ' · 已归档' : '' }}{{entry.data.origin?.missing?' · 源中缺失':''}}</small></th>
@@ -59,6 +64,14 @@ async function archive(entry:ResearchEntry<BusinessData>) { await props.save({..
         <td><div class="tracking-row-actions"><button type="button" @click="edit(entry)">编辑</button><button type="button" @click="edit(entry,true)">复制到新期间</button><button type="button" :disabled="entry.data.archived" @click="emit('hypothesis',entry.data)">建立假设</button><button type="button" @click="emit('history',entry.id)">历史</button><button type="button" @click="archive(entry)">{{ entry.data.archived ? '恢复' : '归档' }}</button></div></td>
       </tr></tbody>
     </table></div>
+    </details>
+    </template>
     <p>同比只比较同起止期间、同币种、同单位、同口径；比例指标显示百分点变化。占比以单独录入的“公司整体”同指标为分母，不把部分分部之和当作公司总额；毛利率仅在同口径收入与毛利齐全时计算。</p>
   </section>
 </template>
+
+<style scoped>
+.business-data-details { margin-top: 16px; }
+.business-data-details > summary { cursor: pointer; color: #285d9e; font-size: 14px; }
+.business-data-details > .workbench-scroll { margin-top: 10px; }
+</style>

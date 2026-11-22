@@ -14,6 +14,8 @@ export async function verifyAutomaticBusiness(page,origin,root) {
   });
   await page.goto(`${origin}/?market=a&symbol=600519`);
   const panel=page.getByRole('region',{name:'分业务经营数据',exact:true});
+  await panel.getByRole('region',{name:'分业务指标对比图'}).getByText('本期 123.4 亿元',{exact:true}).waitFor();
+  await panel.getByText(/^业务明细与来源/).click();
   await panel.getByRole('cell',{name:/123.4 亿元/}).waitFor();
   await panel.getByText('自动抓取 · 原始证据',{exact:true}).click();
   assert.ok((await panel.innerText()).includes('12340000000 元'));
