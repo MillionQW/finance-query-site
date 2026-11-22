@@ -73,6 +73,10 @@ export class ResearchTrackingRepository extends SqliteRepository {
     return this.withTransaction(() => {
       const entries = this.list(market, symbol).business;
       const seen = new Set(observations.map(d => d.origin!.key));
+      // The HK page only returns the latest period per dimension.
+      const scope = (data: BusinessData) => JSON.stringify([data.dimension, data.periodStart, data.periodEnd]);
+      const coveredScopes = new Set(observations.map(scope));
+      const provider = observations[0]?.origin?.provider;
       for (const data of observations) {
         const previous = entries.find(e => e.data.origin?.provider === data.origin!.provider && e.data.origin?.key === data.origin!.key);
         const collision = entries.find(e => e.id !== previous?.id && !e.data.archived && sameObservation(e.data, data));
@@ -91,7 +95,8 @@ export class ResearchTrackingRepository extends SqliteRepository {
       // An empty response is not sufficient evidence that all previous disclosures vanished.
       if (observations.length) for (const entry of entries) {
         const origin = entry.data.origin;
-        if (origin?.provider !== 'eastmoney-zygc' || !origin.managed || entry.data.archived || seen.has(origin.key)) continue;
+        if (!origin || origin.provider !== provider || !origin.managed || entry.data.archived || seen.has(origin.key)) continue;
+        if (market === 'hk' && (status.skipped > 0 || !coveredScopes.has(scope(entry.data)))) continue;
         status.missing++;
         if (!origin.missing) this.write(market, symbol, 'business', entry.id, entry.version + 1, { ...entry.data, origin: { ...origin, missing: true } });
       }

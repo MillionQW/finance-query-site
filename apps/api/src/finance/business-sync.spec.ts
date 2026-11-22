@@ -59,8 +59,27 @@ test('failures and empty sources preserve data; missing source entries are flagg
     f.setFail();const failed=await f.service.sync('a','600519',true);
     assert.equal(failed.sync.status,'error');assert.equal(failed.state.business.length,2);assert.ok(failed.sync.lastSuccessAt);
     const calls=f.calls();await f.service.sync('a','600519');assert.equal(f.calls(),calls);
-    const hk=await f.service.sync('hk','00700');assert.equal(hk.sync.status,'unsupported');assert.equal(f.calls(),calls);
   }finally{f.db.close();}
+});
+test('HK sync replaces stale unsupported status and retains older periods', async () => {
+  const f = fixture();
+  try {
+    f.repo.setSyncStatus('hk', '00700', {
+      status: 'unsupported', attemptedAt: new Date().toISOString(), lastSuccessAt: null, message: '',
+      added: 0, updated: 0, protected: 0, missing: 0, sourceRows: 0, skipped: 0,
+    });
+    const hk = { ...observation, currency: 'HKD', origin: { ...observation.origin!, provider: 'futu-hk-revenue' } };
+    f.setRows([hk]);
+    const first = await f.service.sync('hk', '00700');
+    assert.equal(first.sync.status, 'ready');
+    assert.match(first.sync.message, /富途收入构成/);
+    assert.equal(first.state.business[0].data.currency, 'HKD');
+    f.setRows([{ ...hk, periodEnd: '2025-12-31', origin: { ...hk.origin, key: 'b' } }]);
+    const next = await f.service.sync('hk', '00700', true);
+    assert.equal(next.sync.added, 1);
+    assert.equal(next.sync.missing, 0);
+    assert.equal(next.state.business.length, 2);
+  } finally { f.db.close(); }
 });
 test('invalid import is rejected atomically without altering prior records',async()=>{
   const f=fixture();try{

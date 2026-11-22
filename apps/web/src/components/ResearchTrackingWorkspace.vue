@@ -55,14 +55,14 @@ void load().then(()=>{if(alive)void syncBusiness();});
 </script>
 <template>
   <div class="research-tracking-workspace">
-    <div class="workbench-actions"><button type="button" :disabled="loading||busy||syncing" @click="load">重新载入研究记录与估值快照</button><button type="button" :disabled="loading||busy||syncing||company.market==='hk'" @click="syncBusiness(true)">刷新自动业务数据</button><span v-if="loading" role="status">正在读取研究记录…</span><span v-if="syncing" role="status">正在自动抓取分业务披露…</span><span v-if="busy" role="status">保存中…</span><span v-if="message" role="status">{{message}}</span></div>
+    <div class="workbench-actions"><button type="button" :disabled="loading||busy||syncing" @click="load">重新载入研究记录与估值快照</button><button type="button" :disabled="loading||busy||syncing" @click="syncBusiness(true)">刷新自动业务数据</button><span v-if="loading" role="status">正在读取研究记录…</span><span v-if="syncing" role="status">正在自动抓取分业务披露…</span><span v-if="busy" role="status">保存中…</span><span v-if="message" role="status">{{message}}</span></div>
     <div v-if="syncStatus" class="tracking-sync-status" role="status">
       <p>{{syncStatus.message}}</p>
-      <p v-if="syncStatus.status!=='unsupported'">最近尝试：{{new Date(syncStatus.attemptedAt).toLocaleString('zh-CN')}} · 最近成功：{{syncStatus.lastSuccessAt?new Date(syncStatus.lastSuccessAt).toLocaleString('zh-CN'):'尚无'}}<br />最近一次同步新增 {{syncStatus.added}} 项、修订 {{syncStatus.updated}} 项；保护手工修改／归档 {{syncStatus.protected}} 项，源中缺失 {{syncStatus.missing}} 项，跳过异常 {{syncStatus.skipped}} 项。</p>
+      <p>最近尝试：{{new Date(syncStatus.attemptedAt).toLocaleString('zh-CN')}} · 最近成功：{{syncStatus.lastSuccessAt?new Date(syncStatus.lastSuccessAt).toLocaleString('zh-CN'):'尚无'}}<br />最近一次同步新增 {{syncStatus.added}} 项、修订 {{syncStatus.updated}} 项；保护手工修改／归档 {{syncStatus.protected}} 项，源中缺失 {{syncStatus.missing}} 项，跳过异常 {{syncStatus.skipped}} 项。</p>
     </div>
     <p v-if="error" class="tracking-error" role="alert">{{error}}</p>
     <fieldset v-if="!loading" :disabled="busy||syncing" class="tracking-fieldset">
-      <BusinessDataPanel :entries="state.business" :save="saveBusiness" @hypothesis="startHypothesis" @history="showHistory('business',$event)" />
+      <BusinessDataPanel :market="company.market" :entries="state.business" :save="saveBusiness" @hypothesis="startHypothesis" @history="showHistory('business',$event)" />
       <HypothesisTrackingPanel :entries="state.hypotheses" :business="state.business" :valuations="valuations" :seed="seed" :save="saveHypothesis" :review="review" @history="showHistory('hypotheses',$event)" />
       <ResearchTrackingHistory v-if="history.length" :entries="history" :title="historyTitle" @close="history=[]" />
     </fieldset>

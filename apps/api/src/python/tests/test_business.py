@@ -1,14 +1,39 @@
 import sys
 import unittest
+import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from finance_bridge.business import normalize_business
+from finance_bridge.business_hk import normalize_hk_business
 
 ROW = dict(SECURITY_CODE='600519', REPORT_DATE='2025-06-30 00:00:00', MAINOP_TYPE='2', ITEM_NAME='产品A',
            MAIN_BUSINESS_INCOME=1200000000, MAIN_BUSINESS_COST=0, MAIN_BUSINESS_RPOFIT=None,
            GROSS_RPOFIT_RATIO=0.45, MBI_RATIO=0.6)
 
 class BusinessTest(unittest.TestCase):
+    def test_hk_fiscal_half_year_currency_and_display_units(self):
+        end = datetime(2026, 9, 30, tzinfo=timezone(timedelta(hours=8)))
+        payload = {
+            'stock_info': {'stockCode': '09988', 'marketLabel': 'HK'},
+            'financial': {'composition': {'8': {
+                'currency': '美元',
+                'date': '2027/H1',
+                'screenDates': [{'showName': '2027/H1', 'date': int(end.timestamp()), 'statementType': 5}],
+                'priceItem': [{'name': '业务A', 'mainOperIncome': '1,250万', 'ratio': '0.5%'}],
+            }}},
+        }
+        html = '<script>window.__INITIAL_STATE__=' + json.dumps(payload) + '</script>'
+        result = normalize_hk_business(html, '09988', 'https://example.com', 'now')
+        revenue, ratio = result['observations']
+        self.assertEqual(result['skipped'], 0)
+        self.assertEqual((revenue['periodStart'], revenue['periodEnd']), ('2026-04-01', '2026-09-30'))
+        self.assertEqual((revenue['currency'], revenue['value'], revenue['unit']), ('USD', 0.125, '亿元'))
+        self.assertEqual(ratio['value'], 0.5)
+        self.assertEqual(revenue['origin']['rawRecord']['mainOperIncome'], '1,250万')
+        with self.assertRaises(ValueError):
+            normalize_hk_business(html, '00700', 'https://example.com', 'now')
+
     def test_units_zero_missing_and_source_evidence(self):
         rows, skipped = normalize_business([ROW], '600519', '2026-01-01T00:00:00Z')
         metrics = {r['metric']: r for r in rows}

@@ -5,7 +5,8 @@ import { businessComparison,businessErrors,emptyBusiness,researchNumber as num,r
 import ResearchMetricFields from './ResearchMetricFields.vue';
 import BusinessProvenance from './BusinessProvenance.vue';
 import BusinessComparisonChart from './BusinessComparisonChart.vue';
-const props = defineProps<{ entries: ResearchEntry<BusinessData>[]; save: (data:BusinessData,id:string|null,version:number)=>Promise<boolean> }>();
+import type { CompanySearchResult } from '../types/finance';
+const props = defineProps<{ market: CompanySearchResult['market']; entries: ResearchEntry<BusinessData>[]; save: (data:BusinessData,id:string|null,version:number)=>Promise<boolean> }>();
 const emit = defineEmits<{ hypothesis:[data:BusinessData]; history:[id:string] }>();
 const editing = ref(false), draft = ref(emptyBusiness()), editingId = ref<string|null>(null), version = ref(0), validation = ref<string[]>([]);
 const period = ref(''), dimension = ref('全部'), showArchived = ref(false);
@@ -28,7 +29,8 @@ async function archive(entry:ResearchEntry<BusinessData>) { await props.save({..
 <template>
   <section class="research-workbench" aria-label="分业务经营数据">
     <header><div><span class="eyebrow">业务拆解 · 原始证据</span><h2>分业务经营数据</h2></div><button type="button" @click="edit()">录入业务数据</button></header>
-    <p>A股进入页面后自动同步产品、行业与地区的主营构成，24小时内复用缓存，可点击“刷新自动业务数据”重抓。收入、成本、主营利润和比例保留来源原字段；渠道、销量等未覆盖指标仍可补录。百分比按显示值录入（例如毛利率45%填45），未披露项目不记为零。</p>
+    <p v-if="market === 'hk'">自动同步富途各拆分维度最新一期的收入与披露占比，按报告原币和财年期间展示。往期数据随同步积累，也可根据财报补录。24小时内复用缓存，可点击“刷新自动业务数据”重抓。</p>
+    <p v-else>A股进入页面后自动同步产品、行业与地区的主营构成，24小时内复用缓存，可点击“刷新自动业务数据”重抓。收入、成本、主营利润和比例保留来源原字段；渠道、销量等未覆盖指标仍可补录。百分比按显示值录入（例如毛利率45%填45），未披露项目不记为零。</p>
     <form v-if="editing" class="tracking-editor" @submit.prevent="submit">
       <h3>{{ editingId ? '修订业务数据' : '新增业务数据' }}</h3>
       <p v-if="draft.origin">保存人工修订后，此记录受保护，后续自动刷新不会覆盖；原始抓取证据仍保留。</p>

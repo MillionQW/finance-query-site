@@ -10,6 +10,7 @@ import math
 from datetime import date, datetime, timezone
 import requests
 from .common import emit
+from .business_hk import fetch_hk_business
 
 PROVIDER = 'eastmoney-zygc'
 ENDPOINT = 'https://emweb.securities.eastmoney.com/PC_HSF10/BusinessAnalysis/PageAjax'
@@ -68,6 +69,9 @@ def normalize_business(rows, symbol, fetched_at):
 
 
 def handle_business(args):
+    if args.market == 'hk':
+        emit(fetch_hk_business(args.symbol))
+        return
     symbol = args.symbol.zfill(6)
     if args.market != 'a' or not symbol.isdigit() or len(symbol) != 6:
         raise ValueError('当前自动分业务数据仅支持A股')

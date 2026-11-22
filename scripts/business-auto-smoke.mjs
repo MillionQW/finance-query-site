@@ -9,8 +9,9 @@ export async function verifyAutomaticBusiness(page,origin,root) {
     const url=new URL(route.request().url());
     const state=await(await fetch(`${origin}${url.pathname.replace('/business-sync','')}`)).json();
     const hk=url.pathname.includes('/hk/');
-    if(!hk)state.business.push({id:'auto-fixture',version:1,updatedAt:data.origin.fetchedAt,data});
-    return route.fulfill({contentType:'application/json',body:JSON.stringify({state,sync:{status:hk?'unsupported':fail?'error':'ready',attemptedAt:data.origin.fetchedAt,lastSuccessAt:hk?null:data.origin.fetchedAt,message:hk?'港股暂未接入可靠的结构化分部数据源':fail?'自动抓取失败，原有数据保留。测试超时':'已同步东方财富主营构成；原始字段、单位换算和来源已保存。',added:hk||fail?0:1,updated:0,protected:0,missing:0,sourceRows:1,skipped:0}})});
+    const entry=hk?{...data,segment:'港股自动抓取业务',dimension:'业务',currency:'HKD',value:56.7,basis:'富途收入构成·业务·财年累计',sourceText:'富途收入构成',sourceUrl:'https://www.futunn.com/stock/00700-HK/financials-revenue',origin:{...data.origin,provider:'futu-hk-revenue',rawField:'mainOperIncome',rawValue:'56.7',rawUnit:'亿',rawRecord:{mainOperIncome:'56.7亿',currency:'港元'}}}:data;
+    state.business.push({id:'auto-fixture',version:1,updatedAt:data.origin.fetchedAt,data:entry});
+    return route.fulfill({contentType:'application/json',body:JSON.stringify({state,sync:{status:!hk&&fail?'error':'ready',attemptedAt:data.origin.fetchedAt,lastSuccessAt:data.origin.fetchedAt,message:hk?'已同步富途收入构成':fail?'自动抓取失败，原有数据保留。测试超时':'已同步东方财富主营构成；原始字段、单位换算和来源已保存。',added:!hk&&fail?0:1,updated:0,protected:0,missing:0,sourceRows:1,skipped:0}})});
   });
   await page.goto(`${origin}/?market=a&symbol=600519`);
   const panel=page.getByRole('region',{name:'分业务经营数据',exact:true});
@@ -27,9 +28,14 @@ export async function verifyAutomaticBusiness(page,origin,root) {
   await page.getByText('自动抓取失败，原有数据保留。测试超时',{exact:true}).waitFor();
   assert.ok((await panel.innerText()).includes('123.4'));
   await page.getByRole('button',{name:/港股验证公司/}).first().click();
-  await page.getByText('港股暂未接入可靠的结构化分部数据源',{exact:true}).waitFor();
-  assert.equal(await page.getByRole('button',{name:'刷新自动业务数据',exact:true}).isDisabled(),true);
+  await page.getByText('已同步富途收入构成',{exact:true}).waitFor();
+  await panel.getByRole('region',{name:'分业务指标对比图'}).getByText('本期 56.7 亿元',{exact:true}).waitFor();
+  const refresh=page.getByRole('button',{name:'刷新自动业务数据',exact:true});
+  assert.equal(await refresh.isEnabled(),true);
+  const refreshed=page.waitForResponse(response=>response.url().includes('/hk/00700/business-sync?refresh=true'));
+  await refresh.click();
+  await refreshed;
   assert.equal(await panel.getByText('自动抓取产品',{exact:true}).count(),0);
   await page.unroute(pattern);
-  console.log('PASS: automatic business loading, raw evidence and units, source links, retained data on errors, HK unsupported state and company isolation.');
+  console.log('PASS: A-share and HK automatic business data, raw evidence, refresh, retained data on errors and company isolation.');
 }
